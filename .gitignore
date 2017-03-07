@@ -1,0 +1,40 @@
+####### Listing files
+*.COD
+*.HTM
+*.I
+*.LST
+*.MAP
+*.M51
+*.M66
+*.SCR
+
+######## Object and HEX Files
+*.AXF
+*.D
+*.O
+*.SBR
+*.SCT
+*.CRF
+*.ELF
+*.H86
+*.bin
+
+######## Other Files
+*.BAK
+*.LNP
+*.iex
+*.dep
+*.uvguix.*
+*.uvoptx
+Backup/
+RTE/
+_build/
+*.dbgconf
+sdk_root
+
+######### Working Files
+*.c~
+*.h~
+*.TMP
+
+
