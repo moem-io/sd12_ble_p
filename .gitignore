@@ -25,12 +25,12 @@
 *.iex
 *.dep
 *.uvguix.*
-*.uvoptx
 Backup/
 RTE/
 _build/
 *.dbgconf
 sdk_root
+JLink*.*
 
 ######### Working Files
 *.c~
