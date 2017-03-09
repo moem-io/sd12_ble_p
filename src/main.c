@@ -53,9 +53,7 @@
 #include "ble_advertising.h"
 #include "ble_conn_state.h"
 
-#define NRF_LOG_MODULE_NAME "APP"
-#include "nrf_log.h"
-#include "nrf_log_ctrl.h"
+#include "main.h"
 
 #define IS_SRVC_CHANGED_CHARACT_PRESENT 1                                           /**< Include or not the service_changed characteristic. if not enabled, the server's database cannot be changed for the lifetime of the device*/
 
@@ -68,8 +66,8 @@
 #define CENTRAL_LINK_COUNT              0                                           /**< Number of central links used by the application. When changing this number remember to adjust the RAM settings*/
 #define PERIPHERAL_LINK_COUNT           1                                           /**< Number of peripheral links used by the application. When changing this number remember to adjust the RAM settings*/
 
-#define DEVICE_NAME                     "Nordic_Template"                           /**< Name of device. Will be included in the advertising data. */
-#define MANUFACTURER_NAME               "NordicSemiconductor"                       /**< Manufacturer. Will be passed to Device Information Service. */
+#define DEVICE_NAME                     "Mx04"                           /**< Name of device. Will be included in the advertising data. */
+#define MANUFACTURER_NAME               "DIYT"                       /**< Manufacturer. Will be passed to Device Information Service. */
 #define APP_ADV_INTERVAL                300                                         /**< The advertising interval (in units of 0.625 ms. This value corresponds to 187.5 ms). */
 #define APP_ADV_TIMEOUT_IN_SECONDS      180                                         /**< The advertising timeout in units of seconds. */
 
@@ -98,13 +96,8 @@
 
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                            /**< Handle of the current connection. */
 
-/* YOUR_JOB: Declare all services structure your application is using
-   static ble_xx_service_t                     m_xxs;
-   static ble_yy_service_t                     m_yys;
- */
-
-// YOUR_JOB: Use UUIDs for service(s) used in your application.
-static ble_uuid_t m_adv_uuids[] = {{BLE_UUID_DEVICE_INFORMATION_SERVICE, BLE_UUID_TYPE_BLE}}; /**< Universally unique service identifiers. */
+/* YOUR_JOB: Declare all services structure your application is using */
+ble_cmd_svc_t  m_cmd_s;
 
 static void advertising_start(void);
 
@@ -265,11 +258,7 @@ static void gap_params_init(void)
                                           (const uint8_t *)DEVICE_NAME,
                                           strlen(DEVICE_NAME));
     APP_ERROR_CHECK(err_code);
-
-    /* YOUR_JOB: Use an appearance value matching the application's use case.
-       err_code = sd_ble_gap_appearance_set(BLE_APPEARANCE_);
-       APP_ERROR_CHECK(err_code); */
-
+                                          
     memset(&gap_conn_params, 0, sizeof(gap_conn_params));
 
     gap_conn_params.min_conn_interval = MIN_CONN_INTERVAL;
@@ -311,6 +300,7 @@ static void gap_params_init(void)
  */
 static void services_init(void)
 {
+    cmd_service_init(&m_cmd_s);
     /* YOUR_JOB: Add code to initialize the services used by the application.
        uint32_t                           err_code;
        ble_xxs_init_t                     xxs_init;
@@ -712,13 +702,16 @@ static void advertising_init(void)
 {
     uint32_t               err_code;
     ble_advdata_t          advdata;
+    ble_advdata_t          srdata;
     ble_adv_modes_config_t options;
+    
+    // YOUR_JOB: Use UUIDs for service(s) used in your application.
+    static ble_uuid_t m_adv_uuids[] = {{BLE_UUID_CMD_SERVICE, BLE_UUID_TYPE_BLE}}; /**< Universally unique service identifiers. */
 
     // Build advertising data struct to pass into @ref ble_advertising_init.
     memset(&advdata, 0, sizeof(advdata));
 
-    advdata.name_type               = BLE_ADVDATA_FULL_NAME;
-    advdata.include_appearance      = true;
+    advdata.include_appearance      = false;
     advdata.flags                   = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
     advdata.uuids_complete.uuid_cnt = sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0]);
     advdata.uuids_complete.p_uuids  = m_adv_uuids;
@@ -727,8 +720,11 @@ static void advertising_init(void)
     options.ble_adv_fast_enabled  = true;
     options.ble_adv_fast_interval = APP_ADV_INTERVAL;
     options.ble_adv_fast_timeout  = APP_ADV_TIMEOUT_IN_SECONDS;
+    
+    memset(&srdata, 0, sizeof(srdata));
+    srdata.name_type = BLE_ADVDATA_FULL_NAME;
 
-    err_code = ble_advertising_init(&advdata, NULL, &options, on_adv_evt, NULL);
+    err_code = ble_advertising_init(&advdata, &srdata, &options, on_adv_evt, NULL);
     APP_ERROR_CHECK(err_code);
 }
 

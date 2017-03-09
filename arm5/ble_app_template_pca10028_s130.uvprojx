@@ -382,12 +382,17 @@
             <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\main.c</FilePath>
+              <FilePath>..\src\main.c</FilePath>
             </File>
             <File>
               <FileName>sdk_config.h</FileName>
               <FileType>5</FileType>
               <FilePath>config\sdk_config.h</FilePath>
+            </File>
+            <File>
+              <FileName>cmd_svc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\cmd_svc.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -3244,12 +3249,17 @@
             <File>
               <FileName>main.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\main.c</FilePath>
+              <FilePath>..\src\main.c</FilePath>
             </File>
             <File>
               <FileName>sdk_config.h</FileName>
               <FileType>5</FileType>
               <FilePath>config\sdk_config.h</FilePath>
+            </File>
+            <File>
+              <FileName>cmd_svc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\cmd_svc.c</FilePath>
             </File>
           </Files>
         </Group>
