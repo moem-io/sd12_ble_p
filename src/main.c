@@ -706,7 +706,7 @@ static void advertising_init(void)
     ble_adv_modes_config_t options;
     
     // YOUR_JOB: Use UUIDs for service(s) used in your application.
-    static ble_uuid_t m_adv_uuids[] = {{BLE_UUID_CMD_SERVICE, BLE_UUID_TYPE_BLE}}; /**< Universally unique service identifiers. */
+    static ble_uuid_t m_adv_uuids[] = {{BLE_UUID_CMD_SVC, BLE_UUID_TYPE_BLE}}; /**< Universally unique service identifiers. */
 
     // Build advertising data struct to pass into @ref ble_advertising_init.
     memset(&advdata, 0, sizeof(advdata));
