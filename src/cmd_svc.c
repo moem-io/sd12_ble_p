@@ -14,8 +14,9 @@ static uint32_t cmd_char_add(ble_cmd_svc_t * p_cmd_service)
     ble_uuid_t          char_uuid;
     ble_uuid128_t       base_uuid = BLE_UUID_CMD_SVC_BASE_UUID;
     char_uuid.uuid      = BLE_UUID_CMD_CHARACTERISTC_UUID;
-    err_code = sd_ble_uuid_vs_add(&base_uuid, &char_uuid.type);
+    
     //TODO : PUT FULL UUID VALUE IN BASE_UUID?
+    err_code = sd_ble_uuid_vs_add(&base_uuid, &char_uuid.type);
     APP_ERROR_CHECK(err_code);
     
     // CMD_JOB: Step 2.F Add read/write properties to our characteristic
@@ -23,15 +24,6 @@ static uint32_t cmd_char_add(ble_cmd_svc_t * p_cmd_service)
     memset(&char_md, 0, sizeof(char_md));
     char_md.char_props.read = 1;
     char_md.char_props.write = 1;
-    
-    // CMD_JOB: Step 3.A, Configuring Client Characteristic Configuration Descriptor metadata and add to char_md structure
-   ble_gatts_attr_md_t cccd_md;
-    memset(&cccd_md, 0, sizeof(cccd_md));
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.read_perm);
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.write_perm);
-    cccd_md.vloc                = BLE_GATTS_VLOC_STACK;
-    char_md.p_cccd_md           = &cccd_md;
-    char_md.char_props.notify   = 1;
     
     // CMD_JOB: Step 2.B, Configure the attribute metadata
     ble_gatts_attr_md_t attr_md;
