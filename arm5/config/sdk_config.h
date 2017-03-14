@@ -23,6 +23,13 @@
 #define BLE_DTM_ENABLED 0
 #endif
 
+// <q> BLE_DB_DISCOVERY_ENABLED  - ble_db_discovery - Database discovery module
+ 
+
+#ifndef BLE_DB_DISCOVERY_ENABLED
+#define BLE_DB_DISCOVERY_ENABLED 1
+#endif
+
 // <q> BLE_RACP_ENABLED  - ble_racp - Record Access Control Point library
  
 
