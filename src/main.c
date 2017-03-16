@@ -37,6 +37,7 @@
 #include "ble_advdata.h"
 #include "ble_advertising.h"
 #include "ble_conn_params.h"
+#include "ble_db_discovery.h"
 #include "boards.h"
 #include "softdevice_handler.h"
 #include "app_timer.h"
@@ -92,12 +93,33 @@
 #define SEC_PARAM_MIN_KEY_SIZE          7                                           /**< Minimum encryption key size. */
 #define SEC_PARAM_MAX_KEY_SIZE          16                                          /**< Maximum encryption key size. */
 
+#define SCAN_INTERVAL               0x00A0                                        /**< Determines scan interval in units of 0.625 millisecond. */
+#define SCAN_WINDOW                 0x0050                                        /**< Determines scan window in units of 0.625 millisecond. */
+#define SCAN_TIMEOUT                0
+
 #define DEAD_BEEF                       0xDEADBEEF                                  /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                            /**< Handle of the current connection. */
 
+bool app_net_established = false;
+
 /* YOUR_JOB: Declare all services structure your application is using */
 ble_cmd_svc_t  m_cmd_s;
+
+static const ble_gap_scan_params_t m_scan_params =
+{
+    .active   = 1,
+    .interval = SCAN_INTERVAL,
+    .window   = SCAN_WINDOW,
+    .timeout  = SCAN_TIMEOUT,
+    #if (NRF_SD_BLE_API_VERSION == 2)
+        .selective   = 0,
+        .p_whitelist = NULL,
+    #endif
+    #if (NRF_SD_BLE_API_VERSION == 3)
+        .use_whitelist = 0,
+    #endif
+};
 
 static void advertising_start(void);
 
@@ -382,6 +404,30 @@ static void conn_params_init(void)
 }
 
 
+/**@brief Function for handling database discovery events.
+ *
+ * @details This function is callback function to handle events from the database discovery module.
+ *          Depending on the UUIDs that are discovered, this function should forward the events
+ *          to their respective services.
+ *
+ * @param[in] p_event  Pointer to the database discovery event.
+ */
+static void db_disc_handler(ble_db_discovery_evt_t * p_evt)
+{
+//    ble_rscs_on_db_disc_evt(&m_ble_rsc_c, p_evt);
+//    ble_hrs_on_db_disc_evt(&m_ble_hrs_c, p_evt);
+}
+
+
+/**
+ * @brief Database discovery initialization.
+ */
+static void db_discovery_init(void)
+{
+    ret_code_t err_code = ble_db_discovery_init(db_disc_handler);
+    APP_ERROR_CHECK(err_code);
+}
+
 /**@brief Function for starting timers.
  */
 static void application_timers_start(void)
@@ -413,6 +459,297 @@ static void sleep_mode_enter(void)
     APP_ERROR_CHECK(err_code);
 }
 
+
+/**@brief Function for handling BLE Stack events concerning central applications.
+ *
+ * @details This function keeps the connection handles of central applications up-to-date. It
+ * parses scanning reports, initiating a connection attempt to peripherals when a target UUID
+ * is found, and manages connection parameter update requests. Additionally, it updates the status
+ * of LEDs used to report central applications activity.
+ *
+ * @note        Since this function updates connection handles, @ref BLE_GAP_EVT_DISCONNECTED events
+ *              should be dispatched to the target application before invoking this function.
+ *
+ * @param[in]   p_ble_evt   Bluetooth stack event.
+ */
+static void on_ble_central_evt(const ble_evt_t * const p_ble_evt)
+{
+    const ble_gap_evt_t   * const p_gap_evt = &p_ble_evt->evt.gap_evt;
+    ret_code_t                    err_code;
+
+    switch (p_ble_evt->header.evt_id)
+    {
+        /** Upon connection, check which peripheral has connected (HR or RSC), initiate DB
+         *  discovery, update LEDs status and resume scanning if necessary. */
+        case BLE_GAP_EVT_CONNECTED:
+        {
+            NRF_LOG_INFO("Central Connected \r\n");
+            /** If no Heart Rate sensor or RSC sensor is currently connected, try to find them on this peripheral*/
+//            if ((m_conn_handle_hrs_c == BLE_CONN_HANDLE_INVALID)
+//                ||(m_conn_handle_rscs_c == BLE_CONN_HANDLE_INVALID))
+//            {
+//                NRF_LOG_INFO("try to find HRS or RSC on conn_handle 0x%x\r\n", p_gap_evt->conn_handle);
+
+//                APP_ERROR_CHECK_BOOL(p_gap_evt->conn_handle < CENTRAL_LINK_COUNT + PERIPHERAL_LINK_COUNT);
+//                err_code = ble_db_discovery_start(&m_ble_db_discovery[p_gap_evt->conn_handle], p_gap_evt->conn_handle);
+//                APP_ERROR_CHECK(err_code);
+//            }
+
+//            /** Update LEDs status, and check if we should be looking for more
+//             *  peripherals to connect to. */
+//            bsp_board_led_on(CENTRAL_CONNECTED_LED);
+//            if (ble_conn_state_n_centrals() == CENTRAL_LINK_COUNT)
+//            {
+//                bsp_board_led_off(CENTRAL_SCANNING_LED);
+//            }
+//            else
+//            {
+//                // Resume scanning.
+//                bsp_board_led_on(CENTRAL_SCANNING_LED);
+//                scan_start();
+//            }
+        } break; // BLE_GAP_EVT_CONNECTED
+
+        /** Upon disconnection, reset the connection handle of the peer which disconnected, update
+         * the LEDs status and start scanning again. */
+        case BLE_GAP_EVT_DISCONNECTED:
+        {
+//            uint8_t n_centrals;
+
+//            if (p_gap_evt->conn_handle == m_conn_handle_hrs_c)
+//            {
+//                NRF_LOG_INFO("HRS central disconnected (reason: %d)\r\n",
+//                       p_gap_evt->params.disconnected.reason);
+
+//                m_conn_handle_hrs_c = BLE_CONN_HANDLE_INVALID;
+//            }
+//            if (p_gap_evt->conn_handle == m_conn_handle_rscs_c)
+//            {
+//                NRF_LOG_INFO("RSC central disconnected (reason: %d)\r\n",
+//                       p_gap_evt->params.disconnected.reason);
+
+//                m_conn_handle_rscs_c = BLE_CONN_HANDLE_INVALID;
+//            }
+
+//            if ((m_conn_handle_rscs_c == BLE_CONN_HANDLE_INVALID)||
+//                (m_conn_handle_hrs_c == BLE_CONN_HANDLE_INVALID))
+//            {
+//                // Start scanning
+//                scan_start();
+
+//                // Update LEDs status.
+//                bsp_board_led_on(CENTRAL_SCANNING_LED);
+//            }
+//            n_centrals = ble_conn_state_n_centrals();
+
+//            if (n_centrals == 0)
+//            {
+//                bsp_board_led_off(CENTRAL_CONNECTED_LED);
+//            }
+        } break; // BLE_GAP_EVT_DISCONNECTED
+
+        case BLE_GAP_EVT_ADV_REPORT:
+        {
+//            if (strlen(m_target_periph_name) != 0)
+//            {
+//                if (find_adv_name(&p_gap_evt->params.adv_report, m_target_periph_name))
+//                {
+//                    // Initiate connection.
+//                    err_code = sd_ble_gap_connect(&p_gap_evt->params.adv_report.peer_addr,
+//                                                  &m_scan_params,
+//                                                  &m_connection_param);
+//                    if (err_code != NRF_SUCCESS)
+//                    {
+//                        NRF_LOG_INFO("Connection Request Failed, reason %d\r\n", err_code);
+//                    }
+//                }
+//            }
+//            else
+//            {
+//               /** We do not want to connect to two peripherals offering the same service, so when
+//                *  a UUID is matched, we check that we are not already connected to a peer which
+//                *  offers the same service. */
+//                if ((find_adv_uuid(&p_gap_evt->params.adv_report, BLE_UUID_HEART_RATE_SERVICE)&&
+//                     (m_conn_handle_hrs_c == BLE_CONN_HANDLE_INVALID))||
+//                     (find_adv_uuid(&p_gap_evt->params.adv_report, BLE_UUID_RUNNING_SPEED_AND_CADENCE)&&
+//                     (m_conn_handle_rscs_c == BLE_CONN_HANDLE_INVALID)))
+//                {
+//                    // Initiate connection.
+//                    err_code = sd_ble_gap_connect(&p_gap_evt->params.adv_report.peer_addr,
+//                                                  &m_scan_params,
+//                                                  &m_connection_param);
+//                    if (err_code != NRF_SUCCESS)
+//                    {
+//                        NRF_LOG_INFO("Connection Request Failed, reason %d\r\n", err_code);
+//                    }
+//                }
+//            }
+        } break; // BLE_GAP_ADV_REPORT
+
+        case BLE_GAP_EVT_TIMEOUT:
+        {
+            // We have not specified a timeout for scanning, so only connection attemps can timeout.
+            if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_CONN)
+            {
+                NRF_LOG_INFO("Connection Request timed out.\r\n");
+            }
+        } break; // BLE_GAP_EVT_TIMEOUT
+
+        case BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST:
+        {
+            // Accept parameters requested by peer.
+            err_code = sd_ble_gap_conn_param_update(p_gap_evt->conn_handle,
+                                        &p_gap_evt->params.conn_param_update_request.conn_params);
+            APP_ERROR_CHECK(err_code);
+        } break; // BLE_GAP_EVT_CONN_PARAM_UPDATE_REQUEST
+
+        case BLE_GATTC_EVT_TIMEOUT:
+            // Disconnect on GATT Client timeout event.
+            NRF_LOG_DEBUG("GATT Client Timeout.\r\n");
+            err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
+                                             BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+            APP_ERROR_CHECK(err_code);
+            break; // BLE_GATTC_EVT_TIMEOUT
+
+        case BLE_GATTS_EVT_TIMEOUT:
+            // Disconnect on GATT Server timeout event.
+            NRF_LOG_DEBUG("GATT Server Timeout.\r\n");
+            err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle,
+                                             BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+            APP_ERROR_CHECK(err_code);
+            break; // BLE_GATTS_EVT_TIMEOUT
+
+#if (NRF_SD_BLE_API_VERSION == 3)
+        case BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST:
+            err_code = sd_ble_gatts_exchange_mtu_reply(p_ble_evt->evt.gatts_evt.conn_handle,
+                                                       NRF_BLE_MAX_MTU_SIZE);
+            APP_ERROR_CHECK(err_code);
+            break; // BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST
+#endif
+
+        default:
+            // No implementation needed.
+            break;
+    }
+}
+
+
+/**@brief Function for handling BLE Stack events involving peripheral applications. Manages the
+ * LEDs used to report the status of the peripheral applications.
+ *
+ * @param[in] p_ble_evt  Bluetooth stack event.
+ */
+static void on_ble_peripheral_evt(ble_evt_t * p_ble_evt)
+{
+    ret_code_t err_code;
+    switch (p_ble_evt->header.evt_id)
+    {
+        case BLE_GAP_EVT_CONNECTED:
+            NRF_LOG_INFO("Peripheral connected\r\n");
+            break; //BLE_GAP_EVT_CONNECTED
+
+        case BLE_GAP_EVT_DISCONNECTED:
+            NRF_LOG_INFO("Peripheral disconnected\r\n");
+            break;//BLE_GAP_EVT_DISCONNECTED
+
+        case BLE_GATTC_EVT_TIMEOUT:
+            // Disconnect on GATT Client timeout event.
+            NRF_LOG_DEBUG("GATT Client Timeout.\r\n");
+            err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
+                                             BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+            APP_ERROR_CHECK(err_code);
+            break; // BLE_GATTC_EVT_TIMEOUT
+
+        case BLE_GATTS_EVT_TIMEOUT:
+            // Disconnect on GATT Server timeout event.
+            NRF_LOG_DEBUG("GATT Server Timeout.\r\n");
+            err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle,
+                                             BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+            APP_ERROR_CHECK(err_code);
+            break; // BLE_GATTS_EVT_TIMEOUT
+
+        case BLE_EVT_USER_MEM_REQUEST:
+            err_code = sd_ble_user_mem_reply(p_ble_evt->evt.gap_evt.conn_handle, NULL);
+            APP_ERROR_CHECK(err_code);
+            break;//BLE_EVT_USER_MEM_REQUEST
+
+        case BLE_GATTS_EVT_RW_AUTHORIZE_REQUEST:
+        {
+            ble_gatts_evt_rw_authorize_request_t  req;
+            ble_gatts_rw_authorize_reply_params_t auth_reply;
+
+            req = p_ble_evt->evt.gatts_evt.params.authorize_request;
+
+            if (req.type != BLE_GATTS_AUTHORIZE_TYPE_INVALID)
+            {
+                if ((req.request.write.op == BLE_GATTS_OP_PREP_WRITE_REQ)     ||
+                    (req.request.write.op == BLE_GATTS_OP_EXEC_WRITE_REQ_NOW) ||
+                    (req.request.write.op == BLE_GATTS_OP_EXEC_WRITE_REQ_CANCEL))
+                {
+                    if (req.type == BLE_GATTS_AUTHORIZE_TYPE_WRITE)
+                    {
+                        auth_reply.type = BLE_GATTS_AUTHORIZE_TYPE_WRITE;
+                    }
+                    else
+                    {
+                        auth_reply.type = BLE_GATTS_AUTHORIZE_TYPE_READ;
+                    }
+                    auth_reply.params.write.gatt_status = APP_FEATURE_NOT_SUPPORTED;
+                    err_code = sd_ble_gatts_rw_authorize_reply(p_ble_evt->evt.gatts_evt.conn_handle,
+                                                               &auth_reply);
+                    APP_ERROR_CHECK(err_code);
+                }
+            }
+        } break; // BLE_GATTS_EVT_RW_AUTHORIZE_REQUEST
+
+#if (NRF_SD_BLE_API_VERSION == 3)
+        case BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST:
+            err_code = sd_ble_gatts_exchange_mtu_reply(p_ble_evt->evt.gatts_evt.conn_handle,
+                                                       NRF_BLE_MAX_MTU_SIZE);
+            APP_ERROR_CHECK(err_code);
+            break; // BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST
+#endif
+
+        default:
+            // No implementation needed.
+            break;
+    }
+}
+
+
+//170228 [TODO] : BLE_EVT_T GAT_EVT-> RSSI CHANGED??
+//170228 [TODO] : If Max DISC QUEUE OVER??
+void net_collect(ble_evt_t * p_ble_evt){
+  static gap_disc disc_result;
+  static int disc_count = 0;
+  
+  ble_gap_evt_adv_report_t* p_adv_report =  & p_ble_evt->evt.gap_evt.params.adv_report;
+  
+  for(int i=0;i<disc_count;i++){
+    if(!memcmp(disc_result.data[i].peer_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
+      disc_result.data[i].rssi= p_adv_report->rssi;
+      return;
+    }
+  }
+  
+  disc_result.data[disc_count].peer_addr=p_adv_report->peer_addr;
+  disc_result.data[disc_count].rssi= p_adv_report->rssi;
+  
+  for(int i=0;i<=disc_count;i++){
+      NRF_LOG_INFO("ADDR TYPE :%02x%02x%02x%02x%02x%02x \r\n",
+                             disc_result.data[i].peer_addr.addr[5],
+                             disc_result.data[i].peer_addr.addr[4],
+                             disc_result.data[i].peer_addr.addr[3],
+                             disc_result.data[i].peer_addr.addr[2],
+                             disc_result.data[i].peer_addr.addr[1],
+                             disc_result.data[i].peer_addr.addr[0]
+                             );
+      NRF_LOG_INFO("ADDR RSSI :%d \r\n",disc_result.data[i].rssi);
+  }
+    disc_count +=1;
+
+}
+    
 
 /**@brief Function for handling advertising events.
  *
@@ -553,10 +890,20 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
     // Based on the role this device plays in the connection, dispatch to the right applications.
     if (role == BLE_GAP_ROLE_PERIPH)
     {
+        on_ble_peripheral_evt(p_ble_evt);
+
     }
     else if ((role == BLE_GAP_ROLE_CENTRAL) || (p_ble_evt->header.evt_id == BLE_GAP_EVT_ADV_REPORT))
     {
+        if(!app_net_established){
+            net_collect(p_ble_evt);
+        }
+        else{
+            on_ble_central_evt(p_ble_evt);
+        }
     }
+    
+    
     ble_conn_params_on_ble_evt(p_ble_evt);
     bsp_btn_ble_on_ble_evt(p_ble_evt);
     on_ble_evt(p_ble_evt);
@@ -774,13 +1121,48 @@ static void power_manage(void)
 }
 
 
+/**@brief Function for starting scanning.
+ */
+static void scan_start(void)
+{
+    ret_code_t err_code;
+
+    (void) sd_ble_gap_scan_stop();
+
+    err_code = sd_ble_gap_scan_start(&m_scan_params);
+    // It is okay to ignore this error since we are stopping the scan anyway.
+    if (err_code != NRF_ERROR_INVALID_STATE)
+    {
+        APP_ERROR_CHECK(err_code);
+    }
+}
+
+
 /**@brief Function for starting advertising.
  */
 static void advertising_start(void)
 {
     uint32_t err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
-
     APP_ERROR_CHECK(err_code);
+}
+
+
+static void adv_scan_start(void)
+{
+    ret_code_t err_code;
+    uint32_t count;
+
+    //check if there are no flash operations in progress
+    err_code = fs_queued_op_count_get(&count);
+    APP_ERROR_CHECK(err_code);
+
+    if (count == 0)
+    {
+        // Start scanning for peripherals and initiate connection to devices which
+        scan_start();
+
+        advertising_start();
+    }
 }
 
 
@@ -803,6 +1185,9 @@ int main(void)
     {
         NRF_LOG_INFO("Bonds erased!\r\n");
     }
+    
+    db_discovery_init();
+
     gap_params_init();
     advertising_init();
     services_init();
@@ -811,7 +1196,7 @@ int main(void)
     // Start execution.
     NRF_LOG_INFO("Template started\r\n");
     application_timers_start();
-    err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
+    adv_scan_start();
     APP_ERROR_CHECK(err_code);
 
     // Enter main loop.
