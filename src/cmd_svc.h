@@ -17,9 +17,11 @@
 
 typedef struct
 {
+    uint16_t    service_handle;
+    ble_gatts_char_handles_t     header_handles;                                          /**< Handles related to the Heart Rate Measurement characteristic. */
+    ble_gatts_char_handles_t     data_handles;                                          /**< Handles related to the Body Sensor Location characteristic. */
+    ble_gatts_char_handles_t     result_handles;                                         /**< Handles related to the Heart Rate Control Point characteristic. */  
     uint16_t                    conn_handle; 
-    uint16_t    service_handle;     /**< Handle of Our Service (as provided by the BLE stack). */
-    ble_gatts_char_handles_t    char_handles;
 
 }ble_cmd_svc_t;
 

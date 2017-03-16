@@ -756,31 +756,40 @@ static void on_ble_peripheral_evt(ble_evt_t * p_ble_evt)
 void net_disc(ble_evt_t * p_ble_evt){
   static int disc_count = 0;
   
-  ble_gap_evt_adv_report_t* p_adv_report =  & p_ble_evt->evt.gap_evt.params.adv_report;
-  
-  for(int i=0;i<disc_count;i++){
-    if(!memcmp(net_disc_result.data[i].peer_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
-      net_disc_result.data[i].rssi= p_adv_report->rssi;
-      return;
-    }
-  }
-  
-  net_disc_result.data[disc_count].peer_addr=p_adv_report->peer_addr;
-  net_disc_result.data[disc_count].rssi= p_adv_report->rssi;
-  
-  for(int i=0;i<=disc_count;i++){
-      NRF_LOG_INFO("ADDR TYPE :%02x%02x%02x%02x%02x%02x \r\n",
-                             net_disc_result.data[i].peer_addr.addr[5],
-                             net_disc_result.data[i].peer_addr.addr[4],
-                             net_disc_result.data[i].peer_addr.addr[3],
-                             net_disc_result.data[i].peer_addr.addr[2],
-                             net_disc_result.data[i].peer_addr.addr[1],
-                             net_disc_result.data[i].peer_addr.addr[0]
-                             );
-      NRF_LOG_INFO("ADDR RSSI :%d \r\n",net_disc_result.data[i].rssi);
-  }
-    disc_count +=1;
+  if(disc_count < MAX_DISC_QUEUE){
+    ble_gap_evt_adv_report_t* p_adv_report =  & p_ble_evt->evt.gap_evt.params.adv_report;
 
+    for(int i=0;i<disc_count;i++){
+      if(!memcmp(net_disc_result.data[i].peer_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
+        if(net_disc_result.data[i].rssi_count <= MAX_RSSI_COUNT){
+          uint8_t base_rssi = net_disc_result.data[i].rssi * net_disc_result.data[i].rssi_count;
+          net_disc_result.data[i].rssi_count++;
+          net_disc_result.data[i].rssi = (base_rssi + p_adv_report->rssi)/net_disc_result.data[i].rssi_count;
+        }
+        return;
+      }
+    }
+
+    net_disc_result.data[disc_count].peer_addr=p_adv_report->peer_addr;
+    net_disc_result.data[disc_count].rssi= p_adv_report->rssi;
+    net_disc_result.data[disc_count].rssi_count=1;
+
+    for(int i=0;i<=disc_count;i++){
+        NRF_LOG_INFO("ADDR TYPE :%02x%02x%02x%02x%02x%02x \r\n",
+                               net_disc_result.data[i].peer_addr.addr[5],
+                               net_disc_result.data[i].peer_addr.addr[4],
+                               net_disc_result.data[i].peer_addr.addr[3],
+                               net_disc_result.data[i].peer_addr.addr[2],
+                               net_disc_result.data[i].peer_addr.addr[1],
+                               net_disc_result.data[i].peer_addr.addr[0]
+                               );
+        NRF_LOG_INFO("ADDR RSSI :%d \r\n",net_disc_result.data[i].rssi);
+    }
+      disc_count +=1;
+  }
+  else{
+   NRF_LOG_ERROR("MAX_DISC_COUNT OVER!!\r\n");
+  }
 }
     
 
@@ -924,6 +933,9 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
     if (role == BLE_GAP_ROLE_PERIPH)
     {
         on_ble_peripheral_evt(p_ble_evt);
+      
+        ble_advertising_on_ble_evt(p_ble_evt);
+        ble_conn_params_on_ble_evt(p_ble_evt);
 
     }
     else if ((role == BLE_GAP_ROLE_CENTRAL) || (p_ble_evt->header.evt_id == BLE_GAP_EVT_ADV_REPORT))
@@ -937,10 +949,8 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
     }
     
     
-    ble_conn_params_on_ble_evt(p_ble_evt);
     bsp_btn_ble_on_ble_evt(p_ble_evt);
     on_ble_evt(p_ble_evt);
-    ble_advertising_on_ble_evt(p_ble_evt);
     /*YOUR_JOB add calls to _on_ble_evt functions from each service your application is using
        ble_xxs_on_ble_evt(&m_xxs, p_ble_evt);
        ble_yys_on_ble_evt(&m_yys, p_ble_evt);
