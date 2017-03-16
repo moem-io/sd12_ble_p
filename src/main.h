@@ -13,6 +13,11 @@
 #define APP_STATUS_UNKNOWN              0x0001
 #define APP_STATUS_ERR_MAX_DISC_QUEUE_FULL              0x0010
 
+#define UUID16_SIZE             2                               /**< Size of 16 bit UUID */
+#define UUID32_SIZE             4                               /**< Size of 32 bit UUID */
+#define UUID128_SIZE            16                              /**< Size of 128 bit UUID */
+
+
 typedef struct
 {
   ble_gap_addr_t peer_addr;                     /**< Bluetooth address of the peer device. */

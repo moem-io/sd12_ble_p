@@ -64,10 +64,10 @@
 
 #define APP_FEATURE_NOT_SUPPORTED       BLE_GATT_STATUS_ATTERR_APP_BEGIN + 2        /**< Reply when unsupported features are requested. */
 
-#define CENTRAL_LINK_COUNT              1                                           /**< Number of central links used by the application. When changing this number remember to adjust the RAM settings*/
-#define PERIPHERAL_LINK_COUNT           1                                           /**< Number of peripheral links used by the application. When changing this number remember to adjust the RAM settings*/
+#define CENTRAL_LINK_COUNT              1
+#define PERIPHERAL_LINK_COUNT           1
 
-#define DEVICE_NAME                     "Mx04"                           /**< Name of device. Will be included in the advertising data. */
+#define DEVICE_NAME                     "Mx03" 
 #define MANUFACTURER_NAME               "DIYT"                       /**< Manufacturer. Will be passed to Device Information Service. */
 #define APP_ADV_INTERVAL                300                                         /**< The advertising interval (in units of 0.625 ms. This value corresponds to 187.5 ms). */
 #define APP_ADV_TIMEOUT_IN_SECONDS      180                                         /**< The advertising timeout in units of seconds. */
@@ -105,6 +105,7 @@ bool app_net_established = false;
 gap_disc net_disc_result;
 
 ble_cmd_svc_t  m_cmd_s;
+
 
 static const ble_gap_scan_params_t m_scan_params =
 {
@@ -750,6 +751,89 @@ static void on_ble_peripheral_evt(ble_evt_t * p_ble_evt)
 }
 
 
+/**@brief Reads an advertising report and checks if a uuid is present in the service list.
+*
+* @details The function is able to search for 16-bit, 32-bit and 128-bit service uuids.
+*          To see the format of a advertisement packet, see
+*          https://www.bluetooth.org/Technical/AssignedNumbers/generic_access_profile.htm
+*
+* @param[in]   p_target_uuid The uuid to search fir
+* @param[in]   p_adv_report  Pointer to the advertisement report.
+*
+* @retval      true if the UUID is present in the advertisement report. Otherwise false
+*/
+static bool is_uuid_present(const ble_uuid_t *p_target_uuid,
+  const ble_gap_evt_adv_report_t *p_adv_report)
+  {
+    uint32_t err_code;
+    uint32_t index = 0;
+    uint8_t *p_data = (uint8_t *)p_adv_report->data;
+    ble_uuid_t extracted_uuid;
+    
+    while (index < p_adv_report->dlen)
+    {
+      uint8_t field_length = p_data[index];
+      uint8_t field_type   = p_data[index + 1];
+      
+      if ( (field_type == BLE_GAP_AD_TYPE_16BIT_SERVICE_UUID_MORE_AVAILABLE)
+      || (field_type == BLE_GAP_AD_TYPE_16BIT_SERVICE_UUID_COMPLETE))
+    {
+      for (uint32_t u_index = 0; u_index < (field_length / UUID16_SIZE); u_index++)
+      {
+        err_code = sd_ble_uuid_decode(  UUID16_SIZE,
+          &p_data[u_index * UUID16_SIZE + index + 2],
+          &extracted_uuid);
+          if (err_code == NRF_SUCCESS)
+          {
+            if ((extracted_uuid.uuid == p_target_uuid->uuid)
+            && (extracted_uuid.type == p_target_uuid->type))
+            {
+              return true;
+            }
+          }
+        }
+      }
+      
+      else if ( (field_type == BLE_GAP_AD_TYPE_32BIT_SERVICE_UUID_MORE_AVAILABLE)
+      || (field_type == BLE_GAP_AD_TYPE_32BIT_SERVICE_UUID_COMPLETE))
+    {
+      for (uint32_t u_index = 0; u_index < (field_length / UUID32_SIZE); u_index++)
+      {
+        err_code = sd_ble_uuid_decode(UUID16_SIZE,
+          &p_data[u_index * UUID32_SIZE + index + 2],
+          &extracted_uuid);
+          if (err_code == NRF_SUCCESS)
+          {
+            if ((extracted_uuid.uuid == p_target_uuid->uuid)
+            && (extracted_uuid.type == p_target_uuid->type))
+            {
+              return true;
+            }
+          }
+        }
+      }
+      
+      else if ( (field_type == BLE_GAP_AD_TYPE_128BIT_SERVICE_UUID_MORE_AVAILABLE)
+      || (field_type == BLE_GAP_AD_TYPE_128BIT_SERVICE_UUID_COMPLETE))
+    {
+      err_code = sd_ble_uuid_decode(UUID128_SIZE,
+        &p_data[index + 2],
+        &extracted_uuid);
+        if (err_code == NRF_SUCCESS)
+        {
+          if ((extracted_uuid.uuid == p_target_uuid->uuid)
+          && (extracted_uuid.type == p_target_uuid->type))
+          {
+            return true;
+          }
+        }
+      }
+      index += field_length + 1;
+    }
+    return false;
+  }
+
+
 //170228 [TODO] : BLE_EVT_T GAT_EVT-> RSSI CHANGED??
 void net_disc(ble_evt_t * p_ble_evt){
   static int disc_count = 0;
@@ -757,39 +841,43 @@ void net_disc(ble_evt_t * p_ble_evt){
   
   if(disc_count < MAX_DISC_QUEUE){
     ble_gap_evt_adv_report_t* p_adv_report =  & p_ble_evt->evt.gap_evt.params.adv_report;
+    if (is_uuid_present(&m_cmd_svc_uuid, p_adv_report))
+    {
+      NRF_LOG_DEBUG("CMD SVC FOUND!!\r\n");
 
-    for(int i=0;i<disc_count;i++){
-      if(!memcmp(net_disc_result.data[i].peer_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
-        if(net_disc_result.data[i].rssi_count < MAX_RSSI_COUNT){
-          base_rssi[i] +=  p_adv_report->rssi;
-          net_disc_result.data[i].rssi_count++;
-          net_disc_result.data[i].rssi = base_rssi[i]/net_disc_result.data[i].rssi_count;
+      for(int i=0;i<disc_count;i++){
+        if(!memcmp(net_disc_result.data[i].peer_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
+          if(net_disc_result.data[i].rssi_count < MAX_RSSI_COUNT){
+            base_rssi[i] +=  p_adv_report->rssi;
+            net_disc_result.data[i].rssi_count++;
+            net_disc_result.data[i].rssi = base_rssi[i]/net_disc_result.data[i].rssi_count;
+          }
+          return;
         }
-        return;
       }
-    }
 
-    net_disc_result.data[disc_count].peer_addr=p_adv_report->peer_addr;
-    net_disc_result.data[disc_count].rssi= p_adv_report->rssi;
-    net_disc_result.data[disc_count].rssi_count=1;
-    base_rssi[disc_count] = p_adv_report->rssi;
+      net_disc_result.data[disc_count].peer_addr=p_adv_report->peer_addr;
+      net_disc_result.data[disc_count].rssi= p_adv_report->rssi;
+      net_disc_result.data[disc_count].rssi_count=1;
+      base_rssi[disc_count] = p_adv_report->rssi;
 
-    for(int i=0;i<=disc_count;i++){
-        NRF_LOG_INFO("No %d",i);
-        NRF_LOG_INFO("ADDR TYPE :%02x%02x%02x%02x%02x%02x \r\n",
-                               net_disc_result.data[i].peer_addr.addr[5],
-                               net_disc_result.data[i].peer_addr.addr[4],
-                               net_disc_result.data[i].peer_addr.addr[3],
-                               net_disc_result.data[i].peer_addr.addr[2],
-                               net_disc_result.data[i].peer_addr.addr[1],
-                               net_disc_result.data[i].peer_addr.addr[0]
-                               );
-        NRF_LOG_INFO("ADDR RSSI :%d \r\n",net_disc_result.data[i].rssi);
+      for(int i=0;i<=disc_count;i++){
+          NRF_LOG_INFO("No %d",i);
+          NRF_LOG_INFO("ADDR TYPE :%02x%02x%02x%02x%02x%02x \r\n",
+                                 net_disc_result.data[i].peer_addr.addr[5],
+                                 net_disc_result.data[i].peer_addr.addr[4],
+                                 net_disc_result.data[i].peer_addr.addr[3],
+                                 net_disc_result.data[i].peer_addr.addr[2],
+                                 net_disc_result.data[i].peer_addr.addr[1],
+                                 net_disc_result.data[i].peer_addr.addr[0]
+                                 );
+          NRF_LOG_INFO("ADDR RSSI :%d \r\n",net_disc_result.data[i].rssi);
+      }
+        disc_count +=1;
     }
-      disc_count +=1;
   }
   else{
-   NRF_LOG_ERROR("MAX_DISC_COUNT OVER!!\r\n");
+    NRF_LOG_ERROR("MAX_DISC_COUNT OVER!!\r\n");
   }
 }
     
@@ -1110,25 +1198,25 @@ static void advertising_init(void)
     ble_advdata_t          srdata;
     ble_adv_modes_config_t options;
     
-    // YOUR_JOB: Use UUIDs for service(s) used in your application.
-    static ble_uuid_t m_adv_uuids[] = {{BLE_UUID_CMD_SVC, BLE_UUID_TYPE_BLE}}; /**< Universally unique service identifiers. */
+    static ble_uuid_t m_adv_uuids[] = {{BLE_UUID_CMD_SVC, BLE_UUID_TYPE_VENDOR_BEGIN}};
 
     // Build advertising data struct to pass into @ref ble_advertising_init.
     memset(&advdata, 0, sizeof(advdata));
 
+    advdata.name_type = BLE_ADVDATA_FULL_NAME;
     advdata.include_appearance      = false;
     advdata.flags                   = BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE;
     advdata.uuids_complete.uuid_cnt = sizeof(m_adv_uuids) / sizeof(m_adv_uuids[0]);
     advdata.uuids_complete.p_uuids  = m_adv_uuids;
+  
+    memset(&srdata, 0, sizeof(srdata));
+    srdata.name_type = BLE_ADVDATA_FULL_NAME;
 
     memset(&options, 0, sizeof(options));
     options.ble_adv_fast_enabled  = true;
     options.ble_adv_fast_interval = APP_ADV_INTERVAL;
     options.ble_adv_fast_timeout  = APP_ADV_TIMEOUT_IN_SECONDS;
     
-    memset(&srdata, 0, sizeof(srdata));
-    srdata.name_type = BLE_ADVDATA_FULL_NAME;
-
     err_code = ble_advertising_init(&advdata, &srdata, &options, on_adv_evt, NULL);
     APP_ERROR_CHECK(err_code);
 }
@@ -1207,14 +1295,15 @@ int main(void)
     db_discovery_init();
 
     gap_params_init();
-    advertising_init();
     services_init();
+    advertising_init();
     conn_params_init();
 
     // Start execution.
     NRF_LOG_INFO("Template started\r\n");
     application_timers_start();
     advertising_start();
+//    adv_scan_start();
     APP_ERROR_CHECK(err_code);
 
     // Enter main loop.

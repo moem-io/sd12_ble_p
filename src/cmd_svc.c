@@ -210,7 +210,6 @@ void cmd_service_init(ble_cmd_svc_t * p_cmd_service)
                                         &p_cmd_service->service_handle);
     APP_ERROR_CHECK(err_code);
 
-    NRF_LOG_INFO("Exectuing our_service_init().\r\n");
     NRF_LOG_INFO("Service UUID: 0x%04x\r\n", service_uuid.uuid); // Print service UUID should match definition BLE_UUID_CMD_SVC
     NRF_LOG_INFO("Service handle: 0x%04x\r\n", p_cmd_service->service_handle); // Print out the service handle. Should match service handle shown in MCP under Attribute values
     
