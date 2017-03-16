@@ -658,7 +658,7 @@
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
-      <PathWithFileName>C:\Keil_v5\ARM\PACK\nRF5_SDK_12.2.0_f012efa\components\ble\ble_db_discovery\ble_db_discovery.c</PathWithFileName>
+      <PathWithFileName>..\sdk_root\components\ble\ble_db_discovery\ble_db_discovery.c</PathWithFileName>
       <FilenameWithoutPath>ble_db_discovery.c</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
