@@ -16,7 +16,7 @@
 typedef struct
 {
   ble_gap_addr_t peer_addr;                     /**< Bluetooth address of the peer device. */
-  uint8_t         rssi;                          /**< Received Signal Strength Indication in dBm. */
+  int8_t         rssi;                          /**< Received Signal Strength Indication in dBm. */
   uint8_t         rssi_count;
 } gap_data;
 

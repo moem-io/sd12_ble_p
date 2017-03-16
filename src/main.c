@@ -104,7 +104,6 @@ static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        
 bool app_net_established = false;
 gap_disc net_disc_result;
 
-/* YOUR_JOB: Declare all services structure your application is using */
 ble_cmd_svc_t  m_cmd_s;
 
 static const ble_gap_scan_params_t m_scan_params =
@@ -752,19 +751,19 @@ static void on_ble_peripheral_evt(ble_evt_t * p_ble_evt)
 
 
 //170228 [TODO] : BLE_EVT_T GAT_EVT-> RSSI CHANGED??
-//170228 [TODO] : If Max DISC QUEUE OVER??
 void net_disc(ble_evt_t * p_ble_evt){
   static int disc_count = 0;
+  static int base_rssi[MAX_DISC_QUEUE];
   
   if(disc_count < MAX_DISC_QUEUE){
     ble_gap_evt_adv_report_t* p_adv_report =  & p_ble_evt->evt.gap_evt.params.adv_report;
 
     for(int i=0;i<disc_count;i++){
       if(!memcmp(net_disc_result.data[i].peer_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
-        if(net_disc_result.data[i].rssi_count <= MAX_RSSI_COUNT){
-          uint8_t base_rssi = net_disc_result.data[i].rssi * net_disc_result.data[i].rssi_count;
+        if(net_disc_result.data[i].rssi_count < MAX_RSSI_COUNT){
+          base_rssi[i] +=  p_adv_report->rssi;
           net_disc_result.data[i].rssi_count++;
-          net_disc_result.data[i].rssi = (base_rssi + p_adv_report->rssi)/net_disc_result.data[i].rssi_count;
+          net_disc_result.data[i].rssi = base_rssi[i]/net_disc_result.data[i].rssi_count;
         }
         return;
       }
@@ -773,8 +772,10 @@ void net_disc(ble_evt_t * p_ble_evt){
     net_disc_result.data[disc_count].peer_addr=p_adv_report->peer_addr;
     net_disc_result.data[disc_count].rssi= p_adv_report->rssi;
     net_disc_result.data[disc_count].rssi_count=1;
+    base_rssi[disc_count] = p_adv_report->rssi;
 
     for(int i=0;i<=disc_count;i++){
+        NRF_LOG_INFO("No %d",i);
         NRF_LOG_INFO("ADDR TYPE :%02x%02x%02x%02x%02x%02x \r\n",
                                net_disc_result.data[i].peer_addr.addr[5],
                                net_disc_result.data[i].peer_addr.addr[4],
