@@ -24,4 +24,33 @@ typedef struct
   gap_data data[MAX_DISC_QUEUE];
 } gap_disc;
 
+#include <stdint.h>
+
+typedef struct {
+  uint8_t node;
+  uint8_t sensor;
+}p_address;
+
+typedef struct {
+  uint8_t now;
+  uint8_t total;
+}p_index;
+
+typedef struct {
+  uint8_t type;
+  p_address source;
+  p_address target;
+  p_index index;
+}p_header;
+
+typedef struct {
+  uint8_t p_data[20];
+}p_body;
+
+typedef struct {
+  p_header header;
+  p_body data;
+}packet;
+
+
 #endif

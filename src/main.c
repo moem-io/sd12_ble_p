@@ -102,6 +102,7 @@
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                            /**< Handle of the current connection. */
 
 bool app_net_established = false;
+gap_disc net_disc_result;
 
 /* YOUR_JOB: Declare all services structure your application is using */
 ble_cmd_svc_t  m_cmd_s;
@@ -428,6 +429,35 @@ static void db_discovery_init(void)
     APP_ERROR_CHECK(err_code);
 }
 
+
+/**@brief Function for starting scanning.
+ */
+static void scan_start(void)
+{
+    ret_code_t err_code;
+
+    (void) sd_ble_gap_scan_stop();
+
+    err_code = sd_ble_gap_scan_start(&m_scan_params);
+    // It is okay to ignore this error since we are stopping the scan anyway.
+    if (err_code != NRF_ERROR_INVALID_STATE)
+    {
+        APP_ERROR_CHECK(err_code);
+    }
+    NRF_LOG_INFO("Start Scanning\r\n");
+}
+
+
+/**@brief Function for starting advertising.
+ */
+static void advertising_start(void)
+{
+    uint32_t err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
+    APP_ERROR_CHECK(err_code);
+    NRF_LOG_INFO("Start Advertising\r\n");
+}
+
+
 /**@brief Function for starting timers.
  */
 static void application_timers_start(void)
@@ -646,6 +676,10 @@ static void on_ble_peripheral_evt(ble_evt_t * p_ble_evt)
     {
         case BLE_GAP_EVT_CONNECTED:
             NRF_LOG_INFO("Peripheral connected\r\n");
+            if(!app_net_established){
+                NRF_LOG_INFO("Network Not Established.\r\n");
+                scan_start();
+            }
             break; //BLE_GAP_EVT_CONNECTED
 
         case BLE_GAP_EVT_DISCONNECTED:
@@ -719,32 +753,31 @@ static void on_ble_peripheral_evt(ble_evt_t * p_ble_evt)
 
 //170228 [TODO] : BLE_EVT_T GAT_EVT-> RSSI CHANGED??
 //170228 [TODO] : If Max DISC QUEUE OVER??
-void net_collect(ble_evt_t * p_ble_evt){
-  static gap_disc disc_result;
+void net_disc(ble_evt_t * p_ble_evt){
   static int disc_count = 0;
   
   ble_gap_evt_adv_report_t* p_adv_report =  & p_ble_evt->evt.gap_evt.params.adv_report;
   
   for(int i=0;i<disc_count;i++){
-    if(!memcmp(disc_result.data[i].peer_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
-      disc_result.data[i].rssi= p_adv_report->rssi;
+    if(!memcmp(net_disc_result.data[i].peer_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
+      net_disc_result.data[i].rssi= p_adv_report->rssi;
       return;
     }
   }
   
-  disc_result.data[disc_count].peer_addr=p_adv_report->peer_addr;
-  disc_result.data[disc_count].rssi= p_adv_report->rssi;
+  net_disc_result.data[disc_count].peer_addr=p_adv_report->peer_addr;
+  net_disc_result.data[disc_count].rssi= p_adv_report->rssi;
   
   for(int i=0;i<=disc_count;i++){
       NRF_LOG_INFO("ADDR TYPE :%02x%02x%02x%02x%02x%02x \r\n",
-                             disc_result.data[i].peer_addr.addr[5],
-                             disc_result.data[i].peer_addr.addr[4],
-                             disc_result.data[i].peer_addr.addr[3],
-                             disc_result.data[i].peer_addr.addr[2],
-                             disc_result.data[i].peer_addr.addr[1],
-                             disc_result.data[i].peer_addr.addr[0]
+                             net_disc_result.data[i].peer_addr.addr[5],
+                             net_disc_result.data[i].peer_addr.addr[4],
+                             net_disc_result.data[i].peer_addr.addr[3],
+                             net_disc_result.data[i].peer_addr.addr[2],
+                             net_disc_result.data[i].peer_addr.addr[1],
+                             net_disc_result.data[i].peer_addr.addr[0]
                              );
-      NRF_LOG_INFO("ADDR RSSI :%d \r\n",disc_result.data[i].rssi);
+      NRF_LOG_INFO("ADDR RSSI :%d \r\n",net_disc_result.data[i].rssi);
   }
     disc_count +=1;
 
@@ -896,7 +929,7 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
     else if ((role == BLE_GAP_ROLE_CENTRAL) || (p_ble_evt->header.evt_id == BLE_GAP_EVT_ADV_REPORT))
     {
         if(!app_net_established){
-            net_collect(p_ble_evt);
+            net_disc(p_ble_evt);
         }
         else{
             on_ble_central_evt(p_ble_evt);
@@ -1121,32 +1154,6 @@ static void power_manage(void)
 }
 
 
-/**@brief Function for starting scanning.
- */
-static void scan_start(void)
-{
-    ret_code_t err_code;
-
-    (void) sd_ble_gap_scan_stop();
-
-    err_code = sd_ble_gap_scan_start(&m_scan_params);
-    // It is okay to ignore this error since we are stopping the scan anyway.
-    if (err_code != NRF_ERROR_INVALID_STATE)
-    {
-        APP_ERROR_CHECK(err_code);
-    }
-}
-
-
-/**@brief Function for starting advertising.
- */
-static void advertising_start(void)
-{
-    uint32_t err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
-    APP_ERROR_CHECK(err_code);
-}
-
-
 static void adv_scan_start(void)
 {
     ret_code_t err_code;
@@ -1196,7 +1203,7 @@ int main(void)
     // Start execution.
     NRF_LOG_INFO("Template started\r\n");
     application_timers_start();
-    adv_scan_start();
+    advertising_start();
     APP_ERROR_CHECK(err_code);
 
     // Enter main loop.
