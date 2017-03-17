@@ -323,7 +323,11 @@ static void gap_params_init(void)
  */
 static void services_init(void)
 {
-    cmd_service_init(&m_cmd_s);
+    uint32_t       err_code;
+    
+    err_code = cmd_service_init(&m_cmd_s);
+    APP_ERROR_CHECK(err_code);
+
     /* YOUR_JOB: Add code to initialize the services used by the application.
        uint32_t                           err_code;
        ble_xxs_init_t                     xxs_init;
@@ -1009,12 +1013,10 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
 {
     uint16_t conn_handle;
     uint16_t role;
-    /** The Connection state module has to be fed BLE events in order to function correctly
-     * Remember to call ble_conn_state_on_ble_evt before calling any ble_conns_state_* functions. */
+
     ble_conn_state_on_ble_evt(p_ble_evt);
     pm_on_ble_evt(p_ble_evt);
     
-    // The connection handle should really be retrievable for any event type.
     conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
     role        = ble_conn_state_role(conn_handle);
     
@@ -1022,10 +1024,10 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
     if (role == BLE_GAP_ROLE_PERIPH)
     {
         on_ble_peripheral_evt(p_ble_evt);
-      
+        ble_cmd_svc_on_ble_evt(&m_cmd_s,p_ble_evt);
+        
         ble_advertising_on_ble_evt(p_ble_evt);
         ble_conn_params_on_ble_evt(p_ble_evt);
-
     }
     else if ((role == BLE_GAP_ROLE_CENTRAL) || (p_ble_evt->header.evt_id == BLE_GAP_EVT_ADV_REPORT))
     {
@@ -1040,10 +1042,6 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
     
     bsp_btn_ble_on_ble_evt(p_ble_evt);
     on_ble_evt(p_ble_evt);
-    /*YOUR_JOB add calls to _on_ble_evt functions from each service your application is using
-       ble_xxs_on_ble_evt(&m_xxs, p_ble_evt);
-       ble_yys_on_ble_evt(&m_yys, p_ble_evt);
-     */
 }
 
 
@@ -1302,8 +1300,8 @@ int main(void)
     // Start execution.
     NRF_LOG_INFO("Template started\r\n");
     application_timers_start();
-    advertising_start();
-//    adv_scan_start();
+//    advertising_start();
+    adv_scan_start();
     APP_ERROR_CHECK(err_code);
 
     // Enter main loop.
