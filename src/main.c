@@ -67,7 +67,7 @@
 #define CENTRAL_LINK_COUNT              1
 #define PERIPHERAL_LINK_COUNT           1
 
-#define DEVICE_NAME                     "Mx03" 
+#define DEVICE_NAME                     "Mx04" 
 #define MANUFACTURER_NAME               "DIYT"                       /**< Manufacturer. Will be passed to Device Information Service. */
 #define APP_ADV_INTERVAL                300                                         /**< The advertising interval (in units of 0.625 ms. This value corresponds to 187.5 ms). */
 #define APP_ADV_TIMEOUT_IN_SECONDS      180                                         /**< The advertising timeout in units of seconds. */
@@ -101,11 +101,12 @@
 
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                            /**< Handle of the current connection. */
 
-bool app_net_established = false;
-gap_disc net_disc_result;
+app_condition app_state;
 
 ble_cmd_svc_t  m_cmd_s;
 
+APP_TIMER_DEF(m_single_timer);
+#define NET_DISC_TIMER_INTERVAL     APP_TIMER_TICKS(10000, APP_TIMER_PRESCALER) // 1000 ms intervals
 
 static const ble_gap_scan_params_t m_scan_params =
 {
@@ -242,25 +243,25 @@ static void pm_evt_handler(pm_evt_t const * p_evt)
 }
 
 
+
+static void timer_timeout_handler(void * p_context)
+{
+    NRF_LOG_DEBUG("Timer Timeout!!\r\n");
+    app_state.timer.status = APP_TIMER_STATUS_DISABLED;
+    app_state.timer.timeout = APP_TIMER_TIMEOUT_TRUE;
+}
+
 /**@brief Function for the Timer initialization.
  *
  * @details Initializes the timer module. This creates and starts application timers.
  */
 static void timers_init(void)
 {
-
-    // Initialize timer module.
     APP_TIMER_INIT(APP_TIMER_PRESCALER, APP_TIMER_OP_QUEUE_SIZE, false);
-
-    // Create timers.
-
-    /* YOUR_JOB: Create any timers to be used by the application.
-                 Below is an example of how to create a timer.
-                 For every new timer needed, increase the value of the macro APP_TIMER_MAX_TIMERS by
-                 one.
-       uint32_t err_code;
-       err_code = app_timer_create(&m_app_timer_id, APP_TIMER_MODE_REPEATED, timer_timeout_handler);
-       APP_ERROR_CHECK(err_code); */
+    
+    uint32_t err_code;
+    err_code = app_timer_create(&m_single_timer, APP_TIMER_MODE_SINGLE_SHOT, timer_timeout_handler);
+    APP_ERROR_CHECK(err_code);
 }
 
 
@@ -680,7 +681,7 @@ static void on_ble_peripheral_evt(ble_evt_t * p_ble_evt)
     {
         case BLE_GAP_EVT_CONNECTED:
             NRF_LOG_INFO("Peripheral connected\r\n");
-            if(!app_net_established){
+            if(app_state.net.established == APP_NET_ESTABLISHED_FALSE){
                 NRF_LOG_INFO("Network Not Established.\r\n");
                 scan_start();
             }
@@ -839,6 +840,7 @@ static bool is_uuid_present(const ble_uuid_t *p_target_uuid,
 
 
 //170228 [TODO] : BLE_EVT_T GAT_EVT-> RSSI CHANGED??
+//170228 [TODO] : IF NO NODE FOUND??
 void net_disc(ble_evt_t * p_ble_evt){
   static int disc_count = 0;
   static int base_rssi[MAX_DISC_QUEUE];
@@ -850,32 +852,32 @@ void net_disc(ble_evt_t * p_ble_evt){
       NRF_LOG_DEBUG("CMD SVC FOUND!!\r\n");
 
       for(int i=0;i<disc_count;i++){
-        if(!memcmp(net_disc_result.data[i].peer_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
-          if(net_disc_result.data[i].rssi_count < MAX_RSSI_COUNT){
+        if(!memcmp(app_state.net.disc.data[i].peer_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
+          if(app_state.net.disc.data[i].rssi_count < MAX_RSSI_COUNT){
             base_rssi[i] +=  p_adv_report->rssi;
-            net_disc_result.data[i].rssi_count++;
-            net_disc_result.data[i].rssi = base_rssi[i]/net_disc_result.data[i].rssi_count;
+            app_state.net.disc.data[i].rssi_count++;
+            app_state.net.disc.data[i].rssi = base_rssi[i]/app_state.net.disc.data[i].rssi_count;
           }
           return;
         }
       }
 
-      net_disc_result.data[disc_count].peer_addr=p_adv_report->peer_addr;
-      net_disc_result.data[disc_count].rssi= p_adv_report->rssi;
-      net_disc_result.data[disc_count].rssi_count=1;
+      app_state.net.disc.data[disc_count].peer_addr=p_adv_report->peer_addr;
+      app_state.net.disc.data[disc_count].rssi= p_adv_report->rssi;
+      app_state.net.disc.data[disc_count].rssi_count=1;
       base_rssi[disc_count] = p_adv_report->rssi;
 
       for(int i=0;i<=disc_count;i++){
-          NRF_LOG_INFO("No %d",i);
-          NRF_LOG_INFO("ADDR TYPE :%02x%02x%02x%02x%02x%02x \r\n",
-                                 net_disc_result.data[i].peer_addr.addr[5],
-                                 net_disc_result.data[i].peer_addr.addr[4],
-                                 net_disc_result.data[i].peer_addr.addr[3],
-                                 net_disc_result.data[i].peer_addr.addr[2],
-                                 net_disc_result.data[i].peer_addr.addr[1],
-                                 net_disc_result.data[i].peer_addr.addr[0]
+          NRF_LOG_DEBUG("No %d",i);
+          NRF_LOG_DEBUG("ADDR TYPE :%02x%02x%02x%02x%02x%02x \r\n",
+                                 app_state.net.disc.data[i].peer_addr.addr[5],
+                                 app_state.net.disc.data[i].peer_addr.addr[4],
+                                 app_state.net.disc.data[i].peer_addr.addr[3],
+                                 app_state.net.disc.data[i].peer_addr.addr[2],
+                                 app_state.net.disc.data[i].peer_addr.addr[1],
+                                 app_state.net.disc.data[i].peer_addr.addr[0]
                                  );
-          NRF_LOG_INFO("ADDR RSSI :%d \r\n",net_disc_result.data[i].rssi);
+          NRF_LOG_DEBUG("ADDR RSSI :%d \r\n",app_state.net.disc.data[i].rssi);
       }
         disc_count +=1;
     }
@@ -1031,10 +1033,27 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
     }
     else if ((role == BLE_GAP_ROLE_CENTRAL) || (p_ble_evt->header.evt_id == BLE_GAP_EVT_ADV_REPORT))
     {
-        if(!app_net_established){
-            net_disc(p_ble_evt);
+        if(app_state.net.established == APP_NET_ESTABLISHED_FALSE)
+        {
+            if(app_state.timer.timeout == APP_TIMER_TIMEOUT_FALSE)
+            {
+                if(app_state.timer.status == APP_TIMER_STATUS_DISABLED)
+                {
+                    app_timer_start(m_single_timer, NET_DISC_TIMER_INTERVAL, NULL);
+                    app_state.timer.status = APP_TIMER_STATUS_ENABLED;
+                }
+                net_disc(p_ble_evt);
+            }
+            else
+            {
+                app_timer_stop(m_single_timer);
+                app_state.timer.timeout = APP_TIMER_TIMEOUT_FALSE;
+                app_state.net.established = APP_NET_ESTABLISHED_TRUE;
+                NRF_LOG_DEBUG("Net Scan Complete!!\r\n");
+            }
         }
-        else{
+        else
+        {
             on_ble_central_evt(p_ble_evt);
         }
     }
@@ -1277,6 +1296,8 @@ int main(void)
     uint32_t err_code;
     bool     erase_bonds;
 
+    memset(&app_state, 0, sizeof(app_state));
+
     // Initialize.
     err_code = NRF_LOG_INIT(NULL);
     APP_ERROR_CHECK(err_code);
@@ -1298,7 +1319,7 @@ int main(void)
     conn_params_init();
 
     // Start execution.
-    NRF_LOG_INFO("Template started\r\n");
+    NRF_LOG_INFO(DEVICE_NAME" started\r\n");
     application_timers_start();
 //    advertising_start();
     adv_scan_start();

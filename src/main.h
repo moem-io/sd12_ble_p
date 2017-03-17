@@ -2,12 +2,14 @@
 #define MAIN_H__
 
 #include "cmd_svc.h"
+#include <stdint.h>
 
 #define NRF_LOG_MODULE_NAME "APP"
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
 
 #define MAX_DISC_QUEUE 10  /** Max Discovery Queue **/
+#define MAX_RSSI_COUNT 255  /** Max RSSI NORMALIZE COUNT **/
 
 #define APP_STATUS_SUCCESS              0x0000
 #define APP_STATUS_UNKNOWN              0x0001
@@ -17,22 +19,43 @@
 #define UUID32_SIZE             4                               /**< Size of 32 bit UUID */
 #define UUID128_SIZE            16                              /**< Size of 128 bit UUID */
 
+#define APP_TIMER_STATUS_DISABLED                 false
+#define APP_TIMER_STATUS_ENABLED                  true
+#define APP_TIMER_TIMEOUT_FALSE                  false
+#define APP_TIMER_TIMEOUT_TRUE                   true
+    
+#define APP_NET_ESTABLISHED_FALSE                   false
+#define APP_NET_ESTABLISHED_TRUE                   true
 
 typedef struct
 {
-  ble_gap_addr_t peer_addr;                     /**< Bluetooth address of the peer device. */
-  int8_t         rssi;                          /**< Received Signal Strength Indication in dBm. */
+  ble_gap_addr_t peer_addr;
+  int8_t         rssi;
   uint8_t         rssi_count;
 } gap_data;
-
-#define MAX_RSSI_COUNT 255  /** Max RSSI NORMALIZE COUNT **/
 
 typedef struct
 {
   gap_data data[MAX_DISC_QUEUE];
 } gap_disc;
 
-#include <stdint.h>
+typedef struct
+{
+    bool status;
+    bool timeout;  
+} app_timer_condition;
+
+typedef struct
+{
+    bool established;
+    gap_disc disc;  
+} app_net_condition;
+
+typedef struct
+{
+    app_net_condition net;
+    app_timer_condition timer;
+} app_condition;
 
 typedef struct {
   uint8_t node;
