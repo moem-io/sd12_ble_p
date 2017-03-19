@@ -1,47 +1,59 @@
 #include "cmd_svc.h"
 
+void nrf_log_string(int length, uint8_t *data_buffer)
+{
+    for(int i = 0; i < length; i++){
+        NRF_LOG_INFO("%#01x ", data_buffer[i]);
+    }
+}
 static void on_write(ble_cmd_svc_t * p_cmd_svc, ble_evt_t * p_ble_evt)
 {
     // Decclare buffer variable to hold received data. The data can only be 32 bit long.
-    uint32_t data_buffer;
+    uint8_t data_buffer[20];
     // Pupulate ble_gatts_value_t structure to hold received data and metadata.
     ble_gatts_value_t rx_data;
-    rx_data.len = sizeof(uint32_t);
+    rx_data.len = sizeof(data_buffer);
     rx_data.offset = 0;
-    rx_data.p_value = (uint8_t*)&data_buffer;
+    rx_data.p_value = data_buffer;
     
     // Check if write event is performed on our characteristic or the CCCD
     if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmd_svc->header_handles.value_handle)
     {
         sd_ble_gatts_value_get(p_cmd_svc->conn_handle, p_cmd_svc->header_handles.value_handle, &rx_data);
-        NRF_LOG_INFO("Value received on handle %#06x: %#010x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle, data_buffer);
+        NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
+        nrf_log_string(rx_data.len,data_buffer);
     }
     else if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmd_svc->header_handles.cccd_handle)
     {
         sd_ble_gatts_value_get(p_cmd_svc->conn_handle, p_cmd_svc->header_handles.cccd_handle, &rx_data);
-        NRF_LOG_INFO("Value received on handle %#06x: %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle, data_buffer);
+        NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
+        nrf_log_string(rx_data.len,data_buffer);
     }
     
     if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmd_svc->data_handles.value_handle)
     {
         sd_ble_gatts_value_get(p_cmd_svc->conn_handle, p_cmd_svc->data_handles.value_handle, &rx_data);
-        NRF_LOG_INFO("Value received on handle %#06x: %#010x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle, data_buffer);
+        NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
+        nrf_log_string(rx_data.len,data_buffer);
     }
     else if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmd_svc->data_handles.cccd_handle)
     {
         sd_ble_gatts_value_get(p_cmd_svc->conn_handle, p_cmd_svc->data_handles.cccd_handle, &rx_data);
-        NRF_LOG_INFO("Value received on handle %#06x: %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle, data_buffer);
+        NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
+        nrf_log_string(rx_data.len,data_buffer);
     }
     
     if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmd_svc->result_handles.value_handle)
     {
         sd_ble_gatts_value_get(p_cmd_svc->conn_handle, p_cmd_svc->result_handles.value_handle, &rx_data);
-        NRF_LOG_INFO("Value received on handle %#06x: %#010x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle, data_buffer);
+        NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
+        nrf_log_string(rx_data.len,data_buffer);
     }
     else if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmd_svc->result_handles.cccd_handle)
     {
         sd_ble_gatts_value_get(p_cmd_svc->conn_handle, p_cmd_svc->result_handles.cccd_handle, &rx_data);
-        NRF_LOG_INFO("Value received on handle %#06x: %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle, data_buffer);
+        NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
+        nrf_log_string(rx_data.len,data_buffer);
     }
 }
 
@@ -71,16 +83,25 @@ void ble_cmd_svc_on_ble_evt(ble_cmd_svc_t * p_cmd_svc, ble_evt_t * p_ble_evt)
 static uint32_t cmd_char_header_add(ble_cmd_svc_t * p_cmd_service)
 {
     ble_gatts_char_md_t char_md;
+    ble_gatts_attr_md_t cccd_md;
     ble_gatts_attr_t    attr_char_value;
     ble_uuid_t          char_uuid;
     ble_gatts_attr_md_t attr_md; 
-    
+
     char_uuid.type      = p_cmd_service->uuid_type;
     char_uuid.uuid      = BLE_UUID_CMD_CHAR_HEADER_UUID;
     
     memset(&char_md, 0, sizeof(char_md));
     char_md.char_props.read = 1;
     char_md.char_props.write = 1;
+    
+    memset(&cccd_md, 0, sizeof(cccd_md));
+
+    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.read_perm);
+    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.write_perm);
+    cccd_md.vloc       = BLE_GATTS_VLOC_STACK;
+    char_md.p_cccd_md           = &cccd_md;
+    char_md.char_props.notify   = 1;
     
     memset(&attr_md, 0, sizeof(attr_md));
     attr_md.vloc        = BLE_GATTS_VLOC_STACK;
@@ -91,9 +112,7 @@ static uint32_t cmd_char_header_add(ble_cmd_svc_t * p_cmd_service)
     attr_char_value.p_uuid      = &char_uuid;
     attr_char_value.p_attr_md   = &attr_md;
     attr_char_value.max_len     = 20;
-    attr_char_value.init_len    = 4;
-    uint8_t value[4]            = {0x12,0x34,0x56,0x78};
-    attr_char_value.p_value     = value;
+
     
     return sd_ble_gatts_characteristic_add(p_cmd_service->service_handle,
                                    &char_md,
@@ -104,6 +123,7 @@ static uint32_t cmd_char_header_add(ble_cmd_svc_t * p_cmd_service)
 static uint32_t cmd_char_data_add(ble_cmd_svc_t * p_cmd_service)
 {
     ble_gatts_char_md_t char_md;
+    ble_gatts_attr_md_t cccd_md;
     ble_gatts_attr_t    attr_char_value;
     ble_gatts_attr_md_t attr_md;
     ble_uuid_t          char_uuid;
@@ -115,6 +135,14 @@ static uint32_t cmd_char_data_add(ble_cmd_svc_t * p_cmd_service)
     char_md.char_props.read = 1;
     char_md.char_props.write = 1;
     
+    memset(&cccd_md, 0, sizeof(cccd_md));
+
+    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.read_perm);
+    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.write_perm);
+    cccd_md.vloc       = BLE_GATTS_VLOC_STACK;
+    char_md.p_cccd_md           = &cccd_md;
+    char_md.char_props.notify   = 1;
+    
     memset(&attr_md, 0, sizeof(attr_md));
     attr_md.vloc        = BLE_GATTS_VLOC_STACK;
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.read_perm);
@@ -124,9 +152,7 @@ static uint32_t cmd_char_data_add(ble_cmd_svc_t * p_cmd_service)
     attr_char_value.p_uuid      = &char_uuid;
     attr_char_value.p_attr_md   = &attr_md;
     attr_char_value.max_len     = 20;
-    attr_char_value.init_len    = 4;
-    uint8_t value[4]            = {0x12,0x34,0x56,0x78};
-    attr_char_value.p_value     = value;
+
     
     return sd_ble_gatts_characteristic_add(p_cmd_service->service_handle,
                                    &char_md,
@@ -137,6 +163,7 @@ static uint32_t cmd_char_data_add(ble_cmd_svc_t * p_cmd_service)
 static uint32_t cmd_char_result_add(ble_cmd_svc_t * p_cmd_service)
 {
     ble_gatts_char_md_t char_md;
+    ble_gatts_attr_md_t cccd_md;
     ble_gatts_attr_t    attr_char_value;
     ble_gatts_attr_md_t attr_md;
     ble_uuid_t          char_uuid;
@@ -147,6 +174,14 @@ static uint32_t cmd_char_result_add(ble_cmd_svc_t * p_cmd_service)
     memset(&char_md, 0, sizeof(char_md));
     char_md.char_props.read = 1;
     char_md.char_props.write = 1;
+    
+    memset(&cccd_md, 0, sizeof(cccd_md));
+
+    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.read_perm);
+    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.write_perm);
+    cccd_md.vloc       = BLE_GATTS_VLOC_STACK;
+    char_md.p_cccd_md           = &cccd_md;
+    char_md.char_props.notify   = 1;
     
     memset(&attr_md, 0, sizeof(attr_md));
     attr_md.vloc        = BLE_GATTS_VLOC_STACK;
