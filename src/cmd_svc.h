@@ -18,6 +18,10 @@
 #define BLE_CMD_SVC_MAX_DATA_LEN (GATT_MTU_SIZE_DEFAULT - 3)
 #define BLE_CMD_SVC_RESULT_CHAR_MAX_DATA_LEN 2
 
+#define BLE_CMD_SVC_PACKET_TYPE_NETWORK_SCAN_REQUEST 1
+#define BLE_CMD_SVC_PACKET_TYPE_NETWORK_SCAN_RESPONSE 2
+
+
 typedef struct
 {
     uint8_t                                 uuid_type;

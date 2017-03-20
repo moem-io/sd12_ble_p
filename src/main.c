@@ -108,7 +108,16 @@ ble_cmd_svc_t  m_cmd_s;
 APP_TIMER_DEF(m_single_timer);
 #define NET_DISC_TIMER_INTERVAL     APP_TIMER_TICKS(10000, APP_TIMER_PRESCALER) // 1000 ms intervals
 
-static const ble_gap_scan_params_t m_scan_params =
+
+const ble_gap_conn_params_t m_connection_param =
+  {
+    (uint16_t)MIN_CONN_INTERVAL,  // Minimum connection
+    (uint16_t)MAX_CONN_INTERVAL,  // Maximum connection
+    (uint16_t)SLAVE_LATENCY,            // Slave latency
+    (uint16_t)CONN_SUP_TIMEOUT       // Supervision time-out
+  };
+
+const ble_gap_scan_params_t m_scan_params =
 {
     .active   = 1,
     .interval = SCAN_INTERVAL,
@@ -437,7 +446,7 @@ static void db_discovery_init(void)
 
 /**@brief Function for starting scanning.
  */
-static void scan_start(void)
+void scan_start(void)
 {
     ret_code_t err_code;
 
@@ -681,10 +690,6 @@ static void on_ble_peripheral_evt(ble_evt_t * p_ble_evt)
     {
         case BLE_GAP_EVT_CONNECTED:
             NRF_LOG_INFO("Peripheral connected\r\n");
-            if(app_state.net.established == APP_NET_ESTABLISHED_FALSE){
-                NRF_LOG_INFO("Network Not Established.\r\n");
-                scan_start();
-            }
             break; //BLE_GAP_EVT_CONNECTED
 
         case BLE_GAP_EVT_DISCONNECTED:
@@ -842,44 +847,44 @@ static bool is_uuid_present(const ble_uuid_t *p_target_uuid,
 //170228 [TODO] : BLE_EVT_T GAT_EVT-> RSSI CHANGED??
 //170228 [TODO] : IF NO NODE FOUND??
 void net_disc(ble_evt_t * p_ble_evt){
-  static int disc_count = 0;
+  gap_disc * disc = &app_state.net.disc;
   static int base_rssi[MAX_DISC_QUEUE];
   
-  if(disc_count < MAX_DISC_QUEUE){
+  if(disc->count < MAX_DISC_QUEUE){
     ble_gap_evt_adv_report_t* p_adv_report =  & p_ble_evt->evt.gap_evt.params.adv_report;
     if (is_uuid_present(&m_cmd_svc_uuid, p_adv_report))
     {
       NRF_LOG_DEBUG("CMD SVC FOUND!!\r\n");
 
-      for(int i=0;i<disc_count;i++){
-        if(!memcmp(app_state.net.disc.data[i].peer_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
-          if(app_state.net.disc.data[i].rssi_count < MAX_RSSI_COUNT){
+      for(int i=0;i<disc->count;i++){
+        if(!memcmp(disc->data[i].peer_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
+          if(disc->data[i].rssi_count < MAX_RSSI_COUNT){
             base_rssi[i] +=  p_adv_report->rssi;
-            app_state.net.disc.data[i].rssi_count++;
-            app_state.net.disc.data[i].rssi = base_rssi[i]/app_state.net.disc.data[i].rssi_count;
+            disc->data[i].rssi_count++;
+            disc->data[i].rssi = base_rssi[i]/disc->data[i].rssi_count;
           }
           return;
         }
       }
 
-      app_state.net.disc.data[disc_count].peer_addr=p_adv_report->peer_addr;
-      app_state.net.disc.data[disc_count].rssi= p_adv_report->rssi;
-      app_state.net.disc.data[disc_count].rssi_count=1;
-      base_rssi[disc_count] = p_adv_report->rssi;
+      disc->data[disc->count].peer_addr=p_adv_report->peer_addr;
+      disc->data[disc->count].rssi= p_adv_report->rssi;
+      disc->data[disc->count].rssi_count=1;
+      base_rssi[disc->count] = p_adv_report->rssi;
 
-      for(int i=0;i<=disc_count;i++){
+      for(int i=0;i<=disc->count;i++){
           NRF_LOG_DEBUG("No %d",i);
           NRF_LOG_DEBUG("ADDR TYPE :%02x%02x%02x%02x%02x%02x \r\n",
-                                 app_state.net.disc.data[i].peer_addr.addr[5],
-                                 app_state.net.disc.data[i].peer_addr.addr[4],
-                                 app_state.net.disc.data[i].peer_addr.addr[3],
-                                 app_state.net.disc.data[i].peer_addr.addr[2],
-                                 app_state.net.disc.data[i].peer_addr.addr[1],
-                                 app_state.net.disc.data[i].peer_addr.addr[0]
+                                 disc->data[i].peer_addr.addr[5],
+                                 disc->data[i].peer_addr.addr[4],
+                                 disc->data[i].peer_addr.addr[3],
+                                 disc->data[i].peer_addr.addr[2],
+                                 disc->data[i].peer_addr.addr[1],
+                                 disc->data[i].peer_addr.addr[0]
                                  );
-          NRF_LOG_DEBUG("ADDR RSSI :%d \r\n",app_state.net.disc.data[i].rssi);
+          NRF_LOG_DEBUG("ADDR RSSI :%d \r\n",disc->data[i].rssi);
       }
-        disc_count +=1;
+        disc->count +=1;
     }
   }
   else{
@@ -1050,6 +1055,9 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
                 app_state.timer.timeout = APP_TIMER_TIMEOUT_FALSE;
                 app_state.net.established = APP_NET_ESTABLISHED_TRUE;
                 NRF_LOG_DEBUG("Net Scan Complete!!\r\n");
+                
+              NRF_LOG_INFO("NET SCANED RESPONSE\r\n");
+              
             }
         }
         else
@@ -1302,6 +1310,8 @@ int main(void)
     err_code = NRF_LOG_INIT(NULL);
     APP_ERROR_CHECK(err_code);
 
+
+
     timers_init();
     buttons_leds_init(&erase_bonds);
     ble_stack_init();
@@ -1310,6 +1320,18 @@ int main(void)
     {
         NRF_LOG_INFO("Bonds erased!\r\n");
     }
+
+    err_code=sd_ble_gap_address_get(&app_state.dev.p_addr);
+    APP_ERROR_CHECK(err_code);
+
+    NRF_LOG_DEBUG("Total Ram Size : %d kb \r\n",sizeof(app_state)/1024);    
+    NRF_LOG_DEBUG("Device Addr : %02x%02x%02x%02x%02x%02x\r\n",
+    app_state.dev.p_addr.addr[5],
+    app_state.dev.p_addr.addr[4],
+    app_state.dev.p_addr.addr[3],
+    app_state.dev.p_addr.addr[2],
+    app_state.dev.p_addr.addr[1],
+    app_state.dev.p_addr.addr[0]);
     
     db_discovery_init();
 
@@ -1321,8 +1343,8 @@ int main(void)
     // Start execution.
     NRF_LOG_INFO(DEVICE_NAME" started\r\n");
     application_timers_start();
-//    advertising_start();
-    adv_scan_start();
+    advertising_start();
+//    adv_scan_start();
     APP_ERROR_CHECK(err_code);
 
     // Enter main loop.
