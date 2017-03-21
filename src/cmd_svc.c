@@ -14,7 +14,8 @@ int8_t gap_disc_addr_check(uint8_t *p_data){
 void packet_interpret(uint8_t packet_no)
 {
     uint32_t              err_code;
-  
+    NRF_LOG_DEBUG("PACKET INTERPRET!\r\n");
+
     p_packet *ppacket = &(app_state.packet.packet[packet_no]);
    
     switch(ppacket->header.type)
@@ -23,7 +24,7 @@ void packet_interpret(uint8_t packet_no)
             if(app_state.dev.id == 0)
             {
                 NRF_LOG_DEBUG("Device ID not set!\r\n");
-              
+
                 if(memcmp(app_state.dev.p_addr.addr,ppacket->data.p_data, BLE_GAP_ADDR_LEN))
                 {
                 NRF_LOG_ERROR("SET Device ID FIRST!!\r\n");
@@ -73,6 +74,11 @@ void packet_interpret(uint8_t packet_no)
 void packet_count(uint8_t *packet_type)
 {
     *packet_type = *packet_type+1;
+    NRF_LOG_DEBUG("PACKET COUNT : %d HEADER : %d DATA : %d \r\n",
+    app_state.packet.packet_count, 
+    app_state.packet.header_count,
+    app_state.packet.data_count);
+
     if(app_state.packet.packet_count<*packet_type)
     {
         app_state.packet.packet_count++;
@@ -88,13 +94,16 @@ void header_parser(uint8_t * data_buffer)
 {
     p_header *pheader = &(app_state.packet.packet[app_state.packet.header_count].header);
     
+    NRF_LOG_DEBUG("Header : %02x%02x%02x%02x%02x%02x\n",
+    data_buffer[5],data_buffer[4],data_buffer[3],data_buffer[2],data_buffer[1],data_buffer[0]);
+
     pheader->type = data_buffer[6];
     pheader->index.now = data_buffer[5];
     pheader->index.total = data_buffer[4];
     pheader->source.node = data_buffer[3];
     pheader->source.sensor = data_buffer[2];
     pheader->target.node = data_buffer[1];
-    pheader->target.node = data_buffer[0];
+    pheader->target.sensor = data_buffer[0];
     NRF_LOG_DEBUG("Header received\r\n");
     NRF_LOG_DEBUG("Header TYPE : %02x\r\n",pheader->type);
     NRF_LOG_DEBUG("Header INDEX : %02x / %02x\r\n",pheader->index.now , pheader->index.total);
@@ -106,9 +115,15 @@ void header_parser(uint8_t * data_buffer)
 }
 
 void data_parser(uint8_t *data_buffer){
-    p_data *pdata = &(app_state.packet.packet[app_state.packet.data_count].data);
+    NRF_LOG_DEBUG("Data received\r\n");
+    uint8_t *pdata = app_state.packet.packet[app_state.packet.data_count].data.p_data;
 
     memcpy(pdata, data_buffer, sizeof(uint8_t)*20);
+
+    for(int i=4;i>0;i--){
+        NRF_LOG_DEBUG("Data : %02x%02x%02x%02x%02x\n",
+        pdata[5*i],pdata[5*i-1],pdata[5*i-2],pdata[5*i-3],pdata[5*i-4]);
+    }
     
     packet_count(&app_state.packet.data_count);
 }
