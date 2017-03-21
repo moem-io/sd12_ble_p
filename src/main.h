@@ -12,6 +12,7 @@
 #define MAX_RSSI_COUNT 255  /** Max RSSI NORMALIZE COUNT **/
 #define MAX_PACKET_COUNT 40
 #define MAX_DATA_LENGTH 80
+#define MAX_DEV_NAME 10
 
 #define APP_STATUS_SUCCESS              0x0000
 #define APP_STATUS_UNKNOWN              0x0001
@@ -74,6 +75,7 @@ typedef struct
 typedef struct
 {
   uint8_t id;
+  char name[MAX_DEV_NAME];
   ble_gap_addr_t p_addr;
 }app_dev_condition;
 

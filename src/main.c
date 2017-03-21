@@ -67,8 +67,7 @@
 #define CENTRAL_LINK_COUNT              1
 #define PERIPHERAL_LINK_COUNT           1
 
-#define DEVICE_NAME                     "Mx04" 
-#define MANUFACTURER_NAME               "DIYT"                       /**< Manufacturer. Will be passed to Device Information Service. */
+#define DEVICE_NAME_PREFIX                     "Mx" 
 #define APP_ADV_INTERVAL                300                                         /**< The advertising interval (in units of 0.625 ms. This value corresponds to 187.5 ms). */
 #define APP_ADV_TIMEOUT_IN_SECONDS      180                                         /**< The advertising timeout in units of seconds. */
 
@@ -288,8 +287,8 @@ static void gap_params_init(void)
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
 
     err_code = sd_ble_gap_device_name_set(&sec_mode,
-                                          (const uint8_t *)DEVICE_NAME,
-                                          strlen(DEVICE_NAME));
+                                          (const uint8_t *)app_state.dev.name,
+                                          strlen(app_state.dev.name));
     APP_ERROR_CHECK(err_code);
                                           
     memset(&gap_conn_params, 0, sizeof(gap_conn_params));
@@ -1295,7 +1294,35 @@ static void adv_scan_start(void)
         advertising_start();
     }
 }
+static void device_preset()
+{
+    uint32_t err_code;
 
+    err_code=sd_ble_gap_address_get(&app_state.dev.p_addr);
+    APP_ERROR_CHECK(err_code);
+
+    NRF_LOG_DEBUG("Total Ram Size : %d kb \r\n",sizeof(app_state)/1024);    
+    NRF_LOG_DEBUG("Device Addr : %02x%02x%02x%02x%02x%02x\r\n",
+    app_state.dev.p_addr.addr[5],
+    app_state.dev.p_addr.addr[4],
+    app_state.dev.p_addr.addr[3],
+    app_state.dev.p_addr.addr[2],
+    app_state.dev.p_addr.addr[1],
+    app_state.dev.p_addr.addr[0]);
+        
+    uint8_t num_rand_bytes_available;
+    err_code = sd_rand_application_bytes_available_get(&num_rand_bytes_available);
+    APP_ERROR_CHECK(err_code);
+    uint8_t rand_number;
+    if (num_rand_bytes_available > 0)
+    {
+        err_code = sd_rand_application_vector_get(&rand_number, 1);
+        APP_ERROR_CHECK(err_code);
+    }
+    
+    NRF_LOG_DEBUG("RANDOM NUM GENERATED : %d\r\n",rand_number);
+    sprintf(app_state.dev.name, "%s%d", DEVICE_NAME_PREFIX,rand_number);
+}
 
 /**@brief Function for application main entry.
  */
@@ -1321,17 +1348,7 @@ int main(void)
         NRF_LOG_INFO("Bonds erased!\r\n");
     }
 
-    err_code=sd_ble_gap_address_get(&app_state.dev.p_addr);
-    APP_ERROR_CHECK(err_code);
-
-    NRF_LOG_DEBUG("Total Ram Size : %d kb \r\n",sizeof(app_state)/1024);    
-    NRF_LOG_DEBUG("Device Addr : %02x%02x%02x%02x%02x%02x\r\n",
-    app_state.dev.p_addr.addr[5],
-    app_state.dev.p_addr.addr[4],
-    app_state.dev.p_addr.addr[3],
-    app_state.dev.p_addr.addr[2],
-    app_state.dev.p_addr.addr[1],
-    app_state.dev.p_addr.addr[0]);
+    device_preset();
     
     db_discovery_init();
 
@@ -1341,7 +1358,7 @@ int main(void)
     conn_params_init();
 
     // Start execution.
-    NRF_LOG_INFO(DEVICE_NAME" started\r\n");
+    NRF_LOG_INFO("%s started\r\n",nrf_log_push(app_state.dev.name));
     application_timers_start();
     advertising_start();
 //    adv_scan_start();
