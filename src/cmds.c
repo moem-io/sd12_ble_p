@@ -94,21 +94,19 @@ void packet_count(uint8_t *packet_type)
 }
 
 
-void header_parser(uint8_t * data_buffer)
+void header_parser(ble_gatts_value_t * rx_data)
 {
     p_header *pheader = &(app_state.packet.packet[app_state.packet.header_count].header);
     
-    NRF_LOG_DEBUG("Header : %02x%02x%02x%02x%02x%02x\n",
-    data_buffer[0],data_buffer[1],data_buffer[2],data_buffer[3],data_buffer[4],data_buffer[5]);
+    NRF_LOG_DEBUG("Header : %s\r\n",nrf_log_push(uint8_t_to_str(rx_data->p_value,rx_data->len,0)));
 
-    pheader->type = data_buffer[0];
-    pheader->index.now = data_buffer[1];
-    pheader->index.total = data_buffer[2];
-    pheader->source.node = data_buffer[3];
-    pheader->source.sensor = data_buffer[4];
-    pheader->target.node = data_buffer[5];
-    pheader->target.sensor = data_buffer[6];
-    NRF_LOG_DEBUG("Header received\r\n");
+    pheader->type = rx_data->p_value[0];
+    pheader->index.now = rx_data->p_value[1];
+    pheader->index.total = rx_data->p_value[2];
+    pheader->source.node = rx_data->p_value[3];
+    pheader->source.sensor = rx_data->p_value[4];
+    pheader->target.node = rx_data->p_value[5];
+    pheader->target.sensor = rx_data->p_value[6];
     NRF_LOG_DEBUG("Header TYPE : %02x\r\n",pheader->type);
     NRF_LOG_DEBUG("Header INDEX : %02x / %02x\r\n",pheader->index.now , pheader->index.total);
     NRF_LOG_DEBUG("Header SOURCE : %02x - %02x\r\n",pheader->source.node , pheader->source.sensor);
@@ -118,29 +116,26 @@ void header_parser(uint8_t * data_buffer)
 
 }
 
-void data_parser(uint8_t *data_buffer){
-    NRF_LOG_DEBUG("Data received\r\n");
+void data_parser(ble_gatts_value_t *rx_data){
     uint8_t *pdata = app_state.packet.packet[app_state.packet.data_count].data.p_data;
-
-    memcpy(pdata, data_buffer, sizeof(uint8_t)*20);
-
-    for(int i=4;i>0;i--){
-        NRF_LOG_DEBUG("Data : %02x%02x%02x%02x%02x\n",
-        pdata[5*i],pdata[5*i-1],pdata[5*i-2],pdata[5*i-3],pdata[5*i-4]);
-    }
+    memcpy(pdata, rx_data->p_value, rx_data->len);
+    
+    NRF_LOG_DEBUG("Data : %s\r\n",nrf_log_push(uint8_t_to_str(rx_data->p_value,rx_data->len,0)));
     
     packet_count(&app_state.packet.data_count);
 }
 
 
-void nrf_log_string(int length, uint8_t *data_buffer)
+void gatts_value_get(ble_cmds_t * p_cmds, uint16_t handle, ble_gatts_value_t* rx_data)
 {
-    for(int i = 0; i < length; i++){
-        NRF_LOG_INFO("%02x ", data_buffer[i]);
-    }
+    sd_ble_gatts_value_get(p_cmds->conn_handle, handle, rx_data);
+    NRF_LOG_INFO("[R] Handle %#06x Value : %s \r\n", handle, nrf_log_push(uint8_t_to_str(rx_data->p_value,rx_data->len,0)));
 }
+
 static void on_write(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
 {
+    ble_gatts_evt_write_t * p_evt_write = &p_ble_evt->evt.gatts_evt.params.write;
+
     // Decclare buffer variable to hold received data. The data can only be 32 bit long.
     uint8_t data_buffer[20];
     // Pupulate ble_gatts_value_t structure to hold received data and metadata.
@@ -150,46 +145,31 @@ static void on_write(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
     rx_data.p_value = data_buffer;
     
     // Check if write event is performed on our characteristic or the CCCD
-    if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmds->header_handles.value_handle)
+    if(p_evt_write->handle == p_cmds->header_handles.value_handle)
     {
-        sd_ble_gatts_value_get(p_cmds->conn_handle, p_cmds->header_handles.value_handle, &rx_data);
-        NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
-        nrf_log_string(rx_data.len,data_buffer);
-        
-        header_parser(data_buffer);
+        gatts_value_get(p_cmds,p_cmds->header_handles.value_handle,&rx_data);
+        header_parser(&rx_data);
     }
-    else if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmds->header_handles.cccd_handle)
+    else if(p_evt_write->handle == p_cmds->header_handles.cccd_handle)
     {
-        sd_ble_gatts_value_get(p_cmds->conn_handle, p_cmds->header_handles.cccd_handle, &rx_data);
-        NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
-        nrf_log_string(rx_data.len,data_buffer);
+        gatts_value_get(p_cmds,p_cmds->header_handles.cccd_handle,&rx_data);
     }
-    
-    if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmds->data_handles.value_handle)
+    else if(p_evt_write->handle == p_cmds->data_handles.value_handle)
     {
-        sd_ble_gatts_value_get(p_cmds->conn_handle, p_cmds->data_handles.value_handle, &rx_data);
-        NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
-        nrf_log_string(rx_data.len,data_buffer);
-        data_parser(data_buffer);
+        gatts_value_get(p_cmds,p_cmds->data_handles.value_handle,&rx_data);
+        data_parser(&rx_data);
     }
-    else if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmds->data_handles.cccd_handle)
+    else if(p_evt_write->handle == p_cmds->data_handles.cccd_handle)
     {
-        sd_ble_gatts_value_get(p_cmds->conn_handle, p_cmds->data_handles.cccd_handle, &rx_data);
-        NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
-        nrf_log_string(rx_data.len,data_buffer);
+        gatts_value_get(p_cmds,p_cmds->data_handles.cccd_handle,&rx_data);
     }
-    
-    if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmds->result_handles.value_handle)
+    else if(p_evt_write->handle == p_cmds->result_handles.value_handle)
     {
-        sd_ble_gatts_value_get(p_cmds->conn_handle, p_cmds->result_handles.value_handle, &rx_data);
-        NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
-        nrf_log_string(rx_data.len,data_buffer);
+        gatts_value_get(p_cmds,p_cmds->result_handles.value_handle,&rx_data);
     }
-    else if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmds->result_handles.cccd_handle)
+    else if(p_evt_write->handle == p_cmds->result_handles.cccd_handle)
     {
-        sd_ble_gatts_value_get(p_cmds->conn_handle, p_cmds->result_handles.cccd_handle, &rx_data);
-        NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
-        nrf_log_string(rx_data.len,data_buffer);
+        gatts_value_get(p_cmds,p_cmds->result_handles.cccd_handle,&rx_data);
     }
 }
 
@@ -374,9 +354,6 @@ uint32_t cmd_service_init(ble_cmds_t * p_cmd_service)
                                         &p_cmd_service->service_handle);
     APP_ERROR_CHECK(err_code);
 
-    NRF_LOG_INFO("Service UUID: 0x%04x\r\n", service_uuid.uuid); // Print service UUID should match definition BLE_UUID_CMD_SVC
-    NRF_LOG_INFO("Service handle: 0x%04x\r\n", p_cmd_service->service_handle); // Print out the service handle. Should match service handle shown in MCP under Attribute values
-    
     err_code = cmd_char_header_add(p_cmd_service);
     APP_ERROR_CHECK(err_code);
 

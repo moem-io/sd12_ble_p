@@ -56,6 +56,7 @@
 #include "ble_advertising.h"
 #include "ble_conn_state.h"
 
+#include "util.h"
 #include "main.h"
 
 #define IS_SRVC_CHANGED_CHARACT_PRESENT 1                                           /**< Include or not the service_changed characteristic. if not enabled, the server's database cannot be changed for the lifetime of the device*/
@@ -304,32 +305,6 @@ static void gap_params_init(void)
     APP_ERROR_CHECK(err_code);
 }
 
-
-/**@brief Function for handling the YYY Service events.
- * YOUR_JOB implement a service handler function depending on the event the service you are using can generate
- *
- * @details This function will be called for all YY Service events which are passed to
- *          the application.
- *
- * @param[in]   p_yy_service   YY Service structure.
- * @param[in]   p_evt          Event received from the YY Service.
- *
- *
-   static void on_yys_evt(ble_yy_service_t     * p_yy_service,
-                       ble_yy_service_evt_t * p_evt)
-   {
-    switch (p_evt->evt_type)
-    {
-        case BLE_YY_NAME_EVT_WRITE:
-            APPL_LOG("[APPL]: charact written with value %s. \r\n", p_evt->params.char_xx.value.p_str);
-            break;
-
-        default:
-            // No implementation needed.
-            break;
-    }
-   }*/
-
 /**@brief Function for initializing services that will be used by the application.
  */
 static void services_init(void)
@@ -338,30 +313,6 @@ static void services_init(void)
     
     err_code = cmd_service_init(&m_cmd_s);
     APP_ERROR_CHECK(err_code);
-
-    /* YOUR_JOB: Add code to initialize the services used by the application.
-       uint32_t                           err_code;
-       ble_xxs_init_t                     xxs_init;
-       ble_yys_init_t                     yys_init;
-
-       // Initialize XXX Service.
-       memset(&xxs_init, 0, sizeof(xxs_init));
-
-       xxs_init.evt_handler                = NULL;
-       xxs_init.is_xxx_notify_supported    = true;
-       xxs_init.ble_xx_initial_value.level = 100;
-
-       err_code = ble_bas_init(&m_xxs, &xxs_init);
-       APP_ERROR_CHECK(err_code);
-
-       // Initialize YYY Service.
-       memset(&yys_init, 0, sizeof(yys_init));
-       yys_init.evt_handler                  = on_yys_evt;
-       yys_init.ble_yy_initial_value.counter = 0;
-
-       err_code = ble_yy_service_init(&yys_init, &yy_init);
-       APP_ERROR_CHECK(err_code);
-     */
 }
 
 
@@ -469,7 +420,6 @@ static void advertising_start(void)
 {
     uint32_t err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
     APP_ERROR_CHECK(err_code);
-    NRF_LOG_INFO("Start Advertising\r\n");
 }
 
 
@@ -874,16 +824,8 @@ void net_disc(ble_evt_t * p_ble_evt){
       base_rssi[disc->count] = p_adv_report->rssi;
 
       for(int i=0;i<=disc->count;i++){
-          NRF_LOG_DEBUG("No %d",i);
-          NRF_LOG_DEBUG("ADDR TYPE :%02x%02x%02x%02x%02x%02x \r\n",
-                                 disc->data[i].peer_addr.addr[5],
-                                 disc->data[i].peer_addr.addr[4],
-                                 disc->data[i].peer_addr.addr[3],
-                                 disc->data[i].peer_addr.addr[2],
-                                 disc->data[i].peer_addr.addr[1],
-                                 disc->data[i].peer_addr.addr[0]
-                                 );
-          NRF_LOG_DEBUG("ADDR RSSI :%d \r\n",disc->data[i].rssi);
+          NRF_LOG_DEBUG("No %d : Addr : %s Rssi : %d \r\n",
+            i, nrf_log_push(uint8_t_to_str(disc->data[i].peer_addr.addr,sizeof(disc->data[i].peer_addr.addr),1)),disc->data[i].rssi);
       }
         disc->count +=1;
     }
@@ -1296,6 +1238,7 @@ static void adv_scan_start(void)
         advertising_start();
     }
 }
+
 static void device_preset()
 {
     uint32_t err_code;
@@ -1305,15 +1248,6 @@ static void device_preset()
 
     err_code=sd_ble_gap_address_get(&app_state.dev.p_addr);
     APP_ERROR_CHECK(err_code);
-
-    NRF_LOG_DEBUG("Total Ram Size : %d kb \r\n",sizeof(app_state)/1024);    
-    NRF_LOG_DEBUG("Device Addr : %02x%02x%02x%02x%02x%02x\r\n",
-    app_state.dev.p_addr.addr[5],
-    app_state.dev.p_addr.addr[4],
-    app_state.dev.p_addr.addr[3],
-    app_state.dev.p_addr.addr[2],
-    app_state.dev.p_addr.addr[1],
-    app_state.dev.p_addr.addr[0]);
     
     nrf_delay_ms(100); // wait for random pool to be filled.
     err_code = sd_rand_application_bytes_available_get(&num_rand_bytes_available);
@@ -1324,9 +1258,9 @@ static void device_preset()
         APP_ERROR_CHECK(err_code);
     }
     
-    NRF_LOG_DEBUG("RANDOM NUM GENERATED : %d\r\n",rand_number);
     sprintf(app_state.dev.name, "%s%d", DEVICE_NAME_PREFIX,rand_number);
 }
+
 
 /**@brief Function for application main entry.
  */
@@ -1359,7 +1293,11 @@ int main(void)
     advertising_init();
     conn_params_init();
 
-    NRF_LOG_INFO("%s started\r\n",nrf_log_push(app_state.dev.name));
+    NRF_LOG_DEBUG("Ram Size : %d kb \r\n",sizeof(app_state)/1024);    
+    NRF_LOG_DEBUG("%s  Addr : %s\r\n",
+        nrf_log_push(app_state.dev.name), 
+        nrf_log_push(uint8_t_to_str(app_state.dev.p_addr.addr,sizeof(app_state.dev.p_addr.addr),1)));
+
     application_timers_start();
     advertising_start();
 //    adv_scan_start();

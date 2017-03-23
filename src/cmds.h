@@ -1,11 +1,12 @@
-#ifndef CMD_SVC_H__
-#define CMD_SVC_H__
+#ifndef CMDS_H__
+#define CMDS_H__
 
 #include <stdint.h>
 #include "ble.h"
 #include "ble_srv_common.h"
 #include "app_error.h"
 
+#include "util.h"
 #include "main.h"
 
 #define BLE_UUID_CMD_SVC_BASE_UUID              {0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x00, 0x00, 0x80, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00} // 128-bit base UUID
