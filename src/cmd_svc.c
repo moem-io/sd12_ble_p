@@ -11,6 +11,10 @@ int8_t gap_disc_addr_check(uint8_t *p_data){
     return GAP_DISC_ADDR_NOT_FOUND;
 }
 
+void packet_route()
+{
+}
+ 
 void packet_interpret(uint8_t packet_no)
 {
     uint32_t              err_code;
@@ -95,15 +99,15 @@ void header_parser(uint8_t * data_buffer)
     p_header *pheader = &(app_state.packet.packet[app_state.packet.header_count].header);
     
     NRF_LOG_DEBUG("Header : %02x%02x%02x%02x%02x%02x\n",
-    data_buffer[5],data_buffer[4],data_buffer[3],data_buffer[2],data_buffer[1],data_buffer[0]);
+    data_buffer[0],data_buffer[1],data_buffer[2],data_buffer[3],data_buffer[4],data_buffer[5]);
 
-    pheader->type = data_buffer[6];
-    pheader->index.now = data_buffer[5];
-    pheader->index.total = data_buffer[4];
+    pheader->type = data_buffer[0];
+    pheader->index.now = data_buffer[1];
+    pheader->index.total = data_buffer[2];
     pheader->source.node = data_buffer[3];
-    pheader->source.sensor = data_buffer[2];
-    pheader->target.node = data_buffer[1];
-    pheader->target.sensor = data_buffer[0];
+    pheader->source.sensor = data_buffer[4];
+    pheader->target.node = data_buffer[5];
+    pheader->target.sensor = data_buffer[6];
     NRF_LOG_DEBUG("Header received\r\n");
     NRF_LOG_DEBUG("Header TYPE : %02x\r\n",pheader->type);
     NRF_LOG_DEBUG("Header INDEX : %02x / %02x\r\n",pheader->index.now , pheader->index.total);

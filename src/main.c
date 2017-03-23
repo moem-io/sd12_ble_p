@@ -49,6 +49,8 @@
 #include "bsp_btn_ble.h"
 #include "sensorsim.h"
 #include "nrf_gpio.h"
+#include "nrf_delay.h"
+
 #include "ble_hci.h"
 #include "ble_advdata.h"
 #include "ble_advertising.h"
@@ -1298,6 +1300,9 @@ static void device_preset()
 {
     uint32_t err_code;
 
+    uint8_t num_rand_bytes_available;
+    uint8_t rand_number;
+
     err_code=sd_ble_gap_address_get(&app_state.dev.p_addr);
     APP_ERROR_CHECK(err_code);
 
@@ -1309,11 +1314,10 @@ static void device_preset()
     app_state.dev.p_addr.addr[2],
     app_state.dev.p_addr.addr[1],
     app_state.dev.p_addr.addr[0]);
-        
-    uint8_t num_rand_bytes_available;
+    
+    nrf_delay_ms(100); // wait for random pool to be filled.
     err_code = sd_rand_application_bytes_available_get(&num_rand_bytes_available);
     APP_ERROR_CHECK(err_code);
-    uint8_t rand_number;
     if (num_rand_bytes_available > 0)
     {
         err_code = sd_rand_application_vector_get(&rand_number, 1);
@@ -1337,8 +1341,6 @@ int main(void)
     err_code = NRF_LOG_INIT(NULL);
     APP_ERROR_CHECK(err_code);
 
-
-
     timers_init();
     buttons_leds_init(&erase_bonds);
     ble_stack_init();
@@ -1347,24 +1349,22 @@ int main(void)
     {
         NRF_LOG_INFO("Bonds erased!\r\n");
     }
-
-    device_preset();
     
-    db_discovery_init();
+    device_preset();
 
+    db_discovery_init();
+    
     gap_params_init();
     services_init();
     advertising_init();
     conn_params_init();
 
-    // Start execution.
     NRF_LOG_INFO("%s started\r\n",nrf_log_push(app_state.dev.name));
     application_timers_start();
     advertising_start();
 //    adv_scan_start();
     APP_ERROR_CHECK(err_code);
 
-    // Enter main loop.
     for (;;)
     {
         if (NRF_LOG_PROCESS() == false)
