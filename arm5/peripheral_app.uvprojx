@@ -390,9 +390,9 @@
               <FilePath>config\sdk_config.h</FilePath>
             </File>
             <File>
-              <FileName>cmd_svc.c</FileName>
+              <FileName>cmds.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\src\cmd_svc.c</FilePath>
+              <FilePath>..\src\cmds.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -3262,9 +3262,9 @@
               <FilePath>config\sdk_config.h</FilePath>
             </File>
             <File>
-              <FileName>cmd_svc.c</FileName>
+              <FileName>cmds.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\src\cmd_svc.c</FilePath>
+              <FilePath>..\src\cmds.c</FilePath>
             </File>
           </Files>
         </Group>

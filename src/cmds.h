@@ -32,20 +32,20 @@ typedef struct
     uint16_t                    conn_handle; 
     bool                     is_notification_enabled; /**< Variable to indicate if the peer has enabled notification of the RX characteristic.*/
 
-}ble_cmd_svc_t;
+}ble_cmds_t;
 
-static const ble_uuid_t m_cmd_svc_uuid =
+static const ble_uuid_t m_cmds_uuid =
   {
     .uuid = BLE_UUID_CMD_SVC,
     .type = BLE_UUID_TYPE_VENDOR_BEGIN
   };
 
 
-uint32_t cmd_service_init(ble_cmd_svc_t * p_cmd_service);
-void ble_cmd_svc_on_ble_evt(ble_cmd_svc_t * p_cmd_svc, ble_evt_t * p_ble_evt);
-uint32_t cmd_header_char_update(ble_cmd_svc_t *p_cmd_service, uint8_t * p_string, uint16_t length);
-uint32_t cmd_header_data_update(ble_cmd_svc_t *p_cmd_service, uint8_t * p_string, uint16_t length);
-uint32_t cmd_header_result_update(ble_cmd_svc_t *p_cmd_service, uint8_t * p_string, uint16_t length);
+uint32_t cmd_service_init(ble_cmds_t * p_cmd_service);
+void ble_cmds_on_ble_evt(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt);
+uint32_t cmd_header_char_update(ble_cmds_t *p_cmd_service, uint8_t * p_string, uint16_t length);
+uint32_t cmd_header_data_update(ble_cmds_t *p_cmd_service, uint8_t * p_string, uint16_t length);
+uint32_t cmd_header_result_update(ble_cmds_t *p_cmd_service, uint8_t * p_string, uint16_t length);
 
 
 #endif

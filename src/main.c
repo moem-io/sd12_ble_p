@@ -104,7 +104,7 @@ static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        
 
 app_condition app_state;
 
-ble_cmd_svc_t  m_cmd_s;
+ble_cmds_t  m_cmd_s;
 
 APP_TIMER_DEF(m_single_timer);
 #define NET_DISC_TIMER_INTERVAL     APP_TIMER_TICKS(10000, APP_TIMER_PRESCALER) // 1000 ms intervals
@@ -853,7 +853,7 @@ void net_disc(ble_evt_t * p_ble_evt){
   
   if(disc->count < MAX_DISC_QUEUE){
     ble_gap_evt_adv_report_t* p_adv_report =  & p_ble_evt->evt.gap_evt.params.adv_report;
-    if (is_uuid_present(&m_cmd_svc_uuid, p_adv_report))
+    if (is_uuid_present(&m_cmds_uuid, p_adv_report))
     {
       NRF_LOG_DEBUG("CMD SVC FOUND!!\r\n");
 
@@ -1032,7 +1032,7 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
     if (role == BLE_GAP_ROLE_PERIPH)
     {
         on_ble_peripheral_evt(p_ble_evt);
-        ble_cmd_svc_on_ble_evt(&m_cmd_s,p_ble_evt);
+        ble_cmds_on_ble_evt(&m_cmd_s,p_ble_evt);
         
         ble_advertising_on_ble_evt(p_ble_evt);
         ble_conn_params_on_ble_evt(p_ble_evt);

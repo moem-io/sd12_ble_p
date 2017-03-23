@@ -1,7 +1,7 @@
 #ifndef MAIN_H__
 #define MAIN_H__
 
-#include "cmd_svc.h"
+#include "cmds.h"
 #include <stdint.h>
 
 #define NRF_LOG_MODULE_NAME "APP"

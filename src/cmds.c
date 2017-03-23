@@ -1,4 +1,4 @@
-#include "cmd_svc.h"
+#include "cmds.h"
 
 int8_t gap_disc_addr_check(uint8_t *p_data){
     for(int i=0;i<app_state.net.disc.count;i++){
@@ -139,7 +139,7 @@ void nrf_log_string(int length, uint8_t *data_buffer)
         NRF_LOG_INFO("%02x ", data_buffer[i]);
     }
 }
-static void on_write(ble_cmd_svc_t * p_cmd_svc, ble_evt_t * p_ble_evt)
+static void on_write(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
 {
     // Decclare buffer variable to hold received data. The data can only be 32 bit long.
     uint8_t data_buffer[20];
@@ -150,63 +150,63 @@ static void on_write(ble_cmd_svc_t * p_cmd_svc, ble_evt_t * p_ble_evt)
     rx_data.p_value = data_buffer;
     
     // Check if write event is performed on our characteristic or the CCCD
-    if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmd_svc->header_handles.value_handle)
+    if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmds->header_handles.value_handle)
     {
-        sd_ble_gatts_value_get(p_cmd_svc->conn_handle, p_cmd_svc->header_handles.value_handle, &rx_data);
+        sd_ble_gatts_value_get(p_cmds->conn_handle, p_cmds->header_handles.value_handle, &rx_data);
         NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
         nrf_log_string(rx_data.len,data_buffer);
         
         header_parser(data_buffer);
     }
-    else if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmd_svc->header_handles.cccd_handle)
+    else if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmds->header_handles.cccd_handle)
     {
-        sd_ble_gatts_value_get(p_cmd_svc->conn_handle, p_cmd_svc->header_handles.cccd_handle, &rx_data);
+        sd_ble_gatts_value_get(p_cmds->conn_handle, p_cmds->header_handles.cccd_handle, &rx_data);
         NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
         nrf_log_string(rx_data.len,data_buffer);
     }
     
-    if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmd_svc->data_handles.value_handle)
+    if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmds->data_handles.value_handle)
     {
-        sd_ble_gatts_value_get(p_cmd_svc->conn_handle, p_cmd_svc->data_handles.value_handle, &rx_data);
+        sd_ble_gatts_value_get(p_cmds->conn_handle, p_cmds->data_handles.value_handle, &rx_data);
         NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
         nrf_log_string(rx_data.len,data_buffer);
         data_parser(data_buffer);
     }
-    else if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmd_svc->data_handles.cccd_handle)
+    else if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmds->data_handles.cccd_handle)
     {
-        sd_ble_gatts_value_get(p_cmd_svc->conn_handle, p_cmd_svc->data_handles.cccd_handle, &rx_data);
+        sd_ble_gatts_value_get(p_cmds->conn_handle, p_cmds->data_handles.cccd_handle, &rx_data);
         NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
         nrf_log_string(rx_data.len,data_buffer);
     }
     
-    if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmd_svc->result_handles.value_handle)
+    if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmds->result_handles.value_handle)
     {
-        sd_ble_gatts_value_get(p_cmd_svc->conn_handle, p_cmd_svc->result_handles.value_handle, &rx_data);
+        sd_ble_gatts_value_get(p_cmds->conn_handle, p_cmds->result_handles.value_handle, &rx_data);
         NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
         nrf_log_string(rx_data.len,data_buffer);
     }
-    else if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmd_svc->result_handles.cccd_handle)
+    else if(p_ble_evt->evt.gatts_evt.params.write.handle == p_cmds->result_handles.cccd_handle)
     {
-        sd_ble_gatts_value_get(p_cmd_svc->conn_handle, p_cmd_svc->result_handles.cccd_handle, &rx_data);
+        sd_ble_gatts_value_get(p_cmds->conn_handle, p_cmds->result_handles.cccd_handle, &rx_data);
         NRF_LOG_INFO("Value received on handle %#06x\r\n", p_ble_evt->evt.gatts_evt.params.write.handle);
         nrf_log_string(rx_data.len,data_buffer);
     }
 }
 
-void ble_cmd_svc_on_ble_evt(ble_cmd_svc_t * p_cmd_svc, ble_evt_t * p_ble_evt)
+void ble_cmds_on_ble_evt(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
 {
     switch (p_ble_evt->header.evt_id)
     {
         case BLE_GAP_EVT_CONNECTED:
-            p_cmd_svc->conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
+            p_cmds->conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
-            p_cmd_svc->conn_handle = BLE_CONN_HANDLE_INVALID;
+            p_cmds->conn_handle = BLE_CONN_HANDLE_INVALID;
             break;
 
         case BLE_GATTS_EVT_WRITE:
-            on_write(p_cmd_svc, p_ble_evt);
+            on_write(p_cmds, p_ble_evt);
             break;
 
         default:
@@ -216,7 +216,7 @@ void ble_cmd_svc_on_ble_evt(ble_cmd_svc_t * p_cmd_svc, ble_evt_t * p_ble_evt)
 }
 
 
-static uint32_t cmd_char_header_add(ble_cmd_svc_t * p_cmd_service)
+static uint32_t cmd_char_header_add(ble_cmds_t * p_cmd_service)
 {
     ble_gatts_char_md_t char_md;
     ble_gatts_attr_md_t cccd_md;
@@ -262,7 +262,7 @@ static uint32_t cmd_char_header_add(ble_cmd_svc_t * p_cmd_service)
                                    &p_cmd_service->header_handles);
 }
 
-static uint32_t cmd_char_data_add(ble_cmd_svc_t * p_cmd_service)
+static uint32_t cmd_char_data_add(ble_cmds_t * p_cmd_service)
 {
     ble_gatts_char_md_t char_md;
     ble_gatts_attr_md_t cccd_md;
@@ -309,7 +309,7 @@ static uint32_t cmd_char_data_add(ble_cmd_svc_t * p_cmd_service)
                                    &p_cmd_service->data_handles);
 }
 
-static uint32_t cmd_char_result_add(ble_cmd_svc_t * p_cmd_service)
+static uint32_t cmd_char_result_add(ble_cmds_t * p_cmd_service)
 {
     ble_gatts_char_md_t char_md;
     ble_gatts_attr_md_t cccd_md;
@@ -353,7 +353,7 @@ static uint32_t cmd_char_result_add(ble_cmd_svc_t * p_cmd_service)
                                    &p_cmd_service->result_handles);
 }
 
-uint32_t cmd_service_init(ble_cmd_svc_t * p_cmd_service)
+uint32_t cmd_service_init(ble_cmds_t * p_cmd_service)
 {
     uint32_t   err_code;
     ble_uuid_t        service_uuid;
@@ -390,7 +390,7 @@ uint32_t cmd_service_init(ble_cmd_svc_t * p_cmd_service)
 }
 
 
-uint32_t cmd_header_char_update(ble_cmd_svc_t *p_cmd_service, uint8_t * p_string, uint16_t length)
+uint32_t cmd_header_char_update(ble_cmds_t *p_cmd_service, uint8_t * p_string, uint16_t length)
 {
     if ((p_cmd_service->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_cmd_service->is_notification_enabled))
     {
@@ -414,7 +414,7 @@ uint32_t cmd_header_char_update(ble_cmd_svc_t *p_cmd_service, uint8_t * p_string
     return sd_ble_gatts_hvx(p_cmd_service->conn_handle, &hvx_params);
 }
 
-uint32_t cmd_header_data_update(ble_cmd_svc_t *p_cmd_service, uint8_t * p_string, uint16_t length)
+uint32_t cmd_header_data_update(ble_cmds_t *p_cmd_service, uint8_t * p_string, uint16_t length)
 {
     if ((p_cmd_service->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_cmd_service->is_notification_enabled))
     {
@@ -438,7 +438,7 @@ uint32_t cmd_header_data_update(ble_cmd_svc_t *p_cmd_service, uint8_t * p_string
     return sd_ble_gatts_hvx(p_cmd_service->conn_handle, &hvx_params);
 }
 
-uint32_t cmd_header_result_update(ble_cmd_svc_t *p_cmd_service, uint8_t * p_string, uint16_t length)
+uint32_t cmd_header_result_update(ble_cmds_t *p_cmd_service, uint8_t * p_string, uint16_t length)
 {
     if ((p_cmd_service->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_cmd_service->is_notification_enabled))
     {
