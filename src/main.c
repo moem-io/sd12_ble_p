@@ -70,6 +70,9 @@
 #define CENTRAL_LINK_COUNT              1
 #define PERIPHERAL_LINK_COUNT           1
 
+#define CENTRAL_SCANNING_LED        BSP_BOARD_LED_0
+#define CENTRAL_CONNECTED_LED       BSP_BOARD_LED_1
+
 #define DEVICE_NAME_PREFIX                     "Mx" 
 #define APP_ADV_INTERVAL                300                                         /**< The advertising interval (in units of 0.625 ms. This value corresponds to 187.5 ms). */
 #define APP_ADV_TIMEOUT_IN_SECONDS      180                                         /**< The advertising timeout in units of seconds. */
@@ -105,7 +108,9 @@ static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        
 
 app_condition app_state;
 
-ble_cmds_t  m_cmd_s;
+static ble_cmds_t                  m_cmds_s;
+static ble_cmds_c_t              m_cmds_c_s;
+static ble_db_discovery_t       m_ble_db_discovery;             /**< Instance of database discovery module. Must be passed to all db_discovert API calls */
 
 APP_TIMER_DEF(m_single_timer);
 #define NET_DISC_TIMER_INTERVAL     APP_TIMER_TICKS(10000, APP_TIMER_PRESCALER) // 1000 ms intervals
@@ -311,7 +316,7 @@ static void services_init(void)
 {
     uint32_t       err_code;
     
-    err_code = cmd_service_init(&m_cmd_s);
+    err_code = cmds_init(&m_cmds_s);
     APP_ERROR_CHECK(err_code);
 }
 
@@ -381,8 +386,7 @@ static void conn_params_init(void)
  */
 static void db_disc_handler(ble_db_discovery_evt_t * p_evt)
 {
-//    ble_rscs_on_db_disc_evt(&m_ble_rsc_c, p_evt);
-//    ble_hrs_on_db_disc_evt(&m_ble_hrs_c, p_evt);
+    ble_cmds_c_on_db_disc_evt(&m_cmds_c_s, p_evt);
 }
 
 
@@ -455,6 +459,130 @@ static void sleep_mode_enter(void)
 }
 
 
+/**@brief Reads an advertising report and checks if a uuid is present in the service list.
+*
+* @details The function is able to search for 16-bit, 32-bit and 128-bit service uuids.
+*          To see the format of a advertisement packet, see
+*          https://www.bluetooth.org/Technical/AssignedNumbers/generic_access_profile.htm
+*
+* @param[in]   p_target_uuid The uuid to search fir
+* @param[in]   p_adv_report  Pointer to the advertisement report.
+*
+* @retval      true if the UUID is present in the advertisement report. Otherwise false
+*/
+static bool is_uuid_present(const ble_uuid_t *p_target_uuid,
+  const ble_gap_evt_adv_report_t *p_adv_report)
+  {
+    uint32_t err_code;
+    uint32_t index = 0;
+    uint8_t *p_data = (uint8_t *)p_adv_report->data;
+    ble_uuid_t extracted_uuid;
+    
+    while (index < p_adv_report->dlen)
+    {
+      uint8_t field_length = p_data[index];
+      uint8_t field_type   = p_data[index + 1];
+      
+      if ( (field_type == BLE_GAP_AD_TYPE_16BIT_SERVICE_UUID_MORE_AVAILABLE)
+      || (field_type == BLE_GAP_AD_TYPE_16BIT_SERVICE_UUID_COMPLETE))
+    {
+      for (uint32_t u_index = 0; u_index < (field_length / UUID16_SIZE); u_index++)
+      {
+        err_code = sd_ble_uuid_decode(  UUID16_SIZE,
+          &p_data[u_index * UUID16_SIZE + index + 2],
+          &extracted_uuid);
+          if (err_code == NRF_SUCCESS)
+          {
+            if ((extracted_uuid.uuid == p_target_uuid->uuid)
+            && (extracted_uuid.type == p_target_uuid->type))
+            {
+              return true;
+            }
+          }
+        }
+      }
+      
+      else if ( (field_type == BLE_GAP_AD_TYPE_32BIT_SERVICE_UUID_MORE_AVAILABLE)
+      || (field_type == BLE_GAP_AD_TYPE_32BIT_SERVICE_UUID_COMPLETE))
+    {
+      for (uint32_t u_index = 0; u_index < (field_length / UUID32_SIZE); u_index++)
+      {
+        err_code = sd_ble_uuid_decode(UUID16_SIZE,
+          &p_data[u_index * UUID32_SIZE + index + 2],
+          &extracted_uuid);
+          if (err_code == NRF_SUCCESS)
+          {
+            if ((extracted_uuid.uuid == p_target_uuid->uuid)
+            && (extracted_uuid.type == p_target_uuid->type))
+            {
+              return true;
+            }
+          }
+        }
+      }
+      
+      else if ( (field_type == BLE_GAP_AD_TYPE_128BIT_SERVICE_UUID_MORE_AVAILABLE)
+      || (field_type == BLE_GAP_AD_TYPE_128BIT_SERVICE_UUID_COMPLETE))
+    {
+      err_code = sd_ble_uuid_decode(UUID128_SIZE,
+        &p_data[index + 2],
+        &extracted_uuid);
+        if (err_code == NRF_SUCCESS)
+        {
+          if ((extracted_uuid.uuid == p_target_uuid->uuid)
+          && (extracted_uuid.type == p_target_uuid->type))
+          {
+            return true;
+          }
+        }
+      }
+      index += field_length + 1;
+    }
+    return false;
+  }
+
+
+//170228 [TODO] : BLE_EVT_T GAT_EVT-> RSSI CHANGED??
+//170228 [TODO] : IF NO NODE FOUND??
+void net_disc(const ble_evt_t * const p_ble_evt){
+  gap_disc * disc = &app_state.net.disc;
+  static int base_rssi[MAX_DISC_QUEUE];
+  
+  if(disc->count < MAX_DISC_QUEUE){
+    const ble_gap_evt_adv_report_t* p_adv_report =  & p_ble_evt->evt.gap_evt.params.adv_report;
+    if (is_uuid_present(&m_cmds_uuid, p_adv_report))
+    {
+      NRF_LOG_DEBUG("CMD SVC FOUND!!\r\n");
+
+      for(int i=0;i<disc->count;i++){
+        if(!memcmp(disc->data[i].peer_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
+          if(disc->data[i].rssi_count < MAX_RSSI_COUNT){
+            base_rssi[i] +=  p_adv_report->rssi;
+            disc->data[i].rssi_count++;
+            disc->data[i].rssi = base_rssi[i]/disc->data[i].rssi_count;
+          }
+          return;
+        }
+      }
+
+      disc->data[disc->count].peer_addr=p_adv_report->peer_addr;
+      disc->data[disc->count].rssi= p_adv_report->rssi;
+      disc->data[disc->count].rssi_count=1;
+      base_rssi[disc->count] = p_adv_report->rssi;
+
+      for(int i=0;i<=disc->count;i++){
+          NRF_LOG_DEBUG("No %d : Addr : %s Rssi : %d \r\n",
+            i, nrf_log_push(uint8_t_to_str(disc->data[i].peer_addr.addr,sizeof(disc->data[i].peer_addr.addr),1)),disc->data[i].rssi);
+      }
+        disc->count +=1;
+    }
+  }
+  else{
+    NRF_LOG_ERROR("MAX_DISC_COUNT OVER!!\r\n");
+  }
+}
+    
+
 /**@brief Function for handling BLE Stack events concerning central applications.
  *
  * @details This function keeps the connection handles of central applications up-to-date. It
@@ -474,111 +602,46 @@ static void on_ble_central_evt(const ble_evt_t * const p_ble_evt)
 
     switch (p_ble_evt->header.evt_id)
     {
-        /** Upon connection, check which peripheral has connected (HR or RSC), initiate DB
-         *  discovery, update LEDs status and resume scanning if necessary. */
         case BLE_GAP_EVT_CONNECTED:
         {
             NRF_LOG_INFO("Central Connected \r\n");
-            /** If no Heart Rate sensor or RSC sensor is currently connected, try to find them on this peripheral*/
-//            if ((m_conn_handle_hrs_c == BLE_CONN_HANDLE_INVALID)
-//                ||(m_conn_handle_rscs_c == BLE_CONN_HANDLE_INVALID))
-//            {
-//                NRF_LOG_INFO("try to find HRS or RSC on conn_handle 0x%x\r\n", p_gap_evt->conn_handle);
-
-//                APP_ERROR_CHECK_BOOL(p_gap_evt->conn_handle < CENTRAL_LINK_COUNT + PERIPHERAL_LINK_COUNT);
-//                err_code = ble_db_discovery_start(&m_ble_db_discovery[p_gap_evt->conn_handle], p_gap_evt->conn_handle);
-//                APP_ERROR_CHECK(err_code);
-//            }
-
-//            /** Update LEDs status, and check if we should be looking for more
-//             *  peripherals to connect to. */
-//            bsp_board_led_on(CENTRAL_CONNECTED_LED);
-//            if (ble_conn_state_n_centrals() == CENTRAL_LINK_COUNT)
-//            {
-//                bsp_board_led_off(CENTRAL_SCANNING_LED);
-//            }
-//            else
-//            {
-//                // Resume scanning.
-//                bsp_board_led_on(CENTRAL_SCANNING_LED);
-//                scan_start();
-//            }
+            
+            bsp_board_led_on(CENTRAL_CONNECTED_LED);
+            err_code = ble_db_discovery_start(&m_ble_db_discovery, p_gap_evt->conn_handle);
+            APP_ERROR_CHECK(err_code);
         } break; // BLE_GAP_EVT_CONNECTED
 
-        /** Upon disconnection, reset the connection handle of the peer which disconnected, update
-         * the LEDs status and start scanning again. */
         case BLE_GAP_EVT_DISCONNECTED:
         {
-//            uint8_t n_centrals;
-
-//            if (p_gap_evt->conn_handle == m_conn_handle_hrs_c)
-//            {
-//                NRF_LOG_INFO("HRS central disconnected (reason: %d)\r\n",
-//                       p_gap_evt->params.disconnected.reason);
-
-//                m_conn_handle_hrs_c = BLE_CONN_HANDLE_INVALID;
-//            }
-//            if (p_gap_evt->conn_handle == m_conn_handle_rscs_c)
-//            {
-//                NRF_LOG_INFO("RSC central disconnected (reason: %d)\r\n",
-//                       p_gap_evt->params.disconnected.reason);
-
-//                m_conn_handle_rscs_c = BLE_CONN_HANDLE_INVALID;
-//            }
-
-//            if ((m_conn_handle_rscs_c == BLE_CONN_HANDLE_INVALID)||
-//                (m_conn_handle_hrs_c == BLE_CONN_HANDLE_INVALID))
-//            {
-//                // Start scanning
-//                scan_start();
-
-//                // Update LEDs status.
-//                bsp_board_led_on(CENTRAL_SCANNING_LED);
-//            }
-//            n_centrals = ble_conn_state_n_centrals();
-
-//            if (n_centrals == 0)
-//            {
-//                bsp_board_led_off(CENTRAL_CONNECTED_LED);
-//            }
+            NRF_LOG_INFO("Central disconnected (reason: %d)\r\n",
+                   p_gap_evt->params.disconnected.reason);
+            
+            bsp_board_led_off(CENTRAL_CONNECTED_LED);
         } break; // BLE_GAP_EVT_DISCONNECTED
 
         case BLE_GAP_EVT_ADV_REPORT:
         {
-//            if (strlen(m_target_periph_name) != 0)
-//            {
-//                if (find_adv_name(&p_gap_evt->params.adv_report, m_target_periph_name))
-//                {
-//                    // Initiate connection.
-//                    err_code = sd_ble_gap_connect(&p_gap_evt->params.adv_report.peer_addr,
-//                                                  &m_scan_params,
-//                                                  &m_connection_param);
-//                    if (err_code != NRF_SUCCESS)
-//                    {
-//                        NRF_LOG_INFO("Connection Request Failed, reason %d\r\n", err_code);
-//                    }
-//                }
-//            }
-//            else
-//            {
-//               /** We do not want to connect to two peripherals offering the same service, so when
-//                *  a UUID is matched, we check that we are not already connected to a peer which
-//                *  offers the same service. */
-//                if ((find_adv_uuid(&p_gap_evt->params.adv_report, BLE_UUID_HEART_RATE_SERVICE)&&
-//                     (m_conn_handle_hrs_c == BLE_CONN_HANDLE_INVALID))||
-//                     (find_adv_uuid(&p_gap_evt->params.adv_report, BLE_UUID_RUNNING_SPEED_AND_CADENCE)&&
-//                     (m_conn_handle_rscs_c == BLE_CONN_HANDLE_INVALID)))
-//                {
-//                    // Initiate connection.
-//                    err_code = sd_ble_gap_connect(&p_gap_evt->params.adv_report.peer_addr,
-//                                                  &m_scan_params,
-//                                                  &m_connection_param);
-//                    if (err_code != NRF_SUCCESS)
-//                    {
-//                        NRF_LOG_INFO("Connection Request Failed, reason %d\r\n", err_code);
-//                    }
-//                }
-//            }
+            if(app_state.net.established == APP_NET_ESTABLISHED_FALSE)
+            {
+                if(app_state.timer.timeout == APP_TIMER_TIMEOUT_FALSE)
+                {
+                    if(app_state.timer.status == APP_TIMER_STATUS_DISABLED)
+                    {
+                        app_timer_start(m_single_timer, NET_DISC_TIMER_INTERVAL, NULL);
+                        app_state.timer.status = APP_TIMER_STATUS_ENABLED;
+                    }
+                    net_disc(p_ble_evt);
+                }
+                else
+                {
+                    app_timer_stop(m_single_timer);
+                    app_state.timer.timeout = APP_TIMER_TIMEOUT_FALSE;
+                    app_state.net.established = APP_NET_ESTABLISHED_TRUE;
+                    NRF_LOG_DEBUG("Net Scan Complete!!\r\n");
+                    
+                    NRF_LOG_INFO("NET SCANED RESPONSE\r\n");
+                }
+            }
         } break; // BLE_GAP_ADV_REPORT
 
         case BLE_GAP_EVT_TIMEOUT:
@@ -712,130 +775,6 @@ static void on_ble_peripheral_evt(ble_evt_t * p_ble_evt)
 }
 
 
-/**@brief Reads an advertising report and checks if a uuid is present in the service list.
-*
-* @details The function is able to search for 16-bit, 32-bit and 128-bit service uuids.
-*          To see the format of a advertisement packet, see
-*          https://www.bluetooth.org/Technical/AssignedNumbers/generic_access_profile.htm
-*
-* @param[in]   p_target_uuid The uuid to search fir
-* @param[in]   p_adv_report  Pointer to the advertisement report.
-*
-* @retval      true if the UUID is present in the advertisement report. Otherwise false
-*/
-static bool is_uuid_present(const ble_uuid_t *p_target_uuid,
-  const ble_gap_evt_adv_report_t *p_adv_report)
-  {
-    uint32_t err_code;
-    uint32_t index = 0;
-    uint8_t *p_data = (uint8_t *)p_adv_report->data;
-    ble_uuid_t extracted_uuid;
-    
-    while (index < p_adv_report->dlen)
-    {
-      uint8_t field_length = p_data[index];
-      uint8_t field_type   = p_data[index + 1];
-      
-      if ( (field_type == BLE_GAP_AD_TYPE_16BIT_SERVICE_UUID_MORE_AVAILABLE)
-      || (field_type == BLE_GAP_AD_TYPE_16BIT_SERVICE_UUID_COMPLETE))
-    {
-      for (uint32_t u_index = 0; u_index < (field_length / UUID16_SIZE); u_index++)
-      {
-        err_code = sd_ble_uuid_decode(  UUID16_SIZE,
-          &p_data[u_index * UUID16_SIZE + index + 2],
-          &extracted_uuid);
-          if (err_code == NRF_SUCCESS)
-          {
-            if ((extracted_uuid.uuid == p_target_uuid->uuid)
-            && (extracted_uuid.type == p_target_uuid->type))
-            {
-              return true;
-            }
-          }
-        }
-      }
-      
-      else if ( (field_type == BLE_GAP_AD_TYPE_32BIT_SERVICE_UUID_MORE_AVAILABLE)
-      || (field_type == BLE_GAP_AD_TYPE_32BIT_SERVICE_UUID_COMPLETE))
-    {
-      for (uint32_t u_index = 0; u_index < (field_length / UUID32_SIZE); u_index++)
-      {
-        err_code = sd_ble_uuid_decode(UUID16_SIZE,
-          &p_data[u_index * UUID32_SIZE + index + 2],
-          &extracted_uuid);
-          if (err_code == NRF_SUCCESS)
-          {
-            if ((extracted_uuid.uuid == p_target_uuid->uuid)
-            && (extracted_uuid.type == p_target_uuid->type))
-            {
-              return true;
-            }
-          }
-        }
-      }
-      
-      else if ( (field_type == BLE_GAP_AD_TYPE_128BIT_SERVICE_UUID_MORE_AVAILABLE)
-      || (field_type == BLE_GAP_AD_TYPE_128BIT_SERVICE_UUID_COMPLETE))
-    {
-      err_code = sd_ble_uuid_decode(UUID128_SIZE,
-        &p_data[index + 2],
-        &extracted_uuid);
-        if (err_code == NRF_SUCCESS)
-        {
-          if ((extracted_uuid.uuid == p_target_uuid->uuid)
-          && (extracted_uuid.type == p_target_uuid->type))
-          {
-            return true;
-          }
-        }
-      }
-      index += field_length + 1;
-    }
-    return false;
-  }
-
-
-//170228 [TODO] : BLE_EVT_T GAT_EVT-> RSSI CHANGED??
-//170228 [TODO] : IF NO NODE FOUND??
-void net_disc(ble_evt_t * p_ble_evt){
-  gap_disc * disc = &app_state.net.disc;
-  static int base_rssi[MAX_DISC_QUEUE];
-  
-  if(disc->count < MAX_DISC_QUEUE){
-    ble_gap_evt_adv_report_t* p_adv_report =  & p_ble_evt->evt.gap_evt.params.adv_report;
-    if (is_uuid_present(&m_cmds_uuid, p_adv_report))
-    {
-      NRF_LOG_DEBUG("CMD SVC FOUND!!\r\n");
-
-      for(int i=0;i<disc->count;i++){
-        if(!memcmp(disc->data[i].peer_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
-          if(disc->data[i].rssi_count < MAX_RSSI_COUNT){
-            base_rssi[i] +=  p_adv_report->rssi;
-            disc->data[i].rssi_count++;
-            disc->data[i].rssi = base_rssi[i]/disc->data[i].rssi_count;
-          }
-          return;
-        }
-      }
-
-      disc->data[disc->count].peer_addr=p_adv_report->peer_addr;
-      disc->data[disc->count].rssi= p_adv_report->rssi;
-      disc->data[disc->count].rssi_count=1;
-      base_rssi[disc->count] = p_adv_report->rssi;
-
-      for(int i=0;i<=disc->count;i++){
-          NRF_LOG_DEBUG("No %d : Addr : %s Rssi : %d \r\n",
-            i, nrf_log_push(uint8_t_to_str(disc->data[i].peer_addr.addr,sizeof(disc->data[i].peer_addr.addr),1)),disc->data[i].rssi);
-      }
-        disc->count +=1;
-    }
-  }
-  else{
-    NRF_LOG_ERROR("MAX_DISC_COUNT OVER!!\r\n");
-  }
-}
-    
-
 /**@brief Function for handling advertising events.
  *
  * @details This function will be called for advertising events which are passed to the application.
@@ -864,94 +803,6 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt)
 }
 
 
-/**@brief Function for handling the Application's BLE Stack events.
- *
- * @param[in] p_ble_evt  Bluetooth stack event.
- */
-static void on_ble_evt(ble_evt_t * p_ble_evt)
-{
-    uint32_t err_code = NRF_SUCCESS;
-
-    switch (p_ble_evt->header.evt_id)
-    {
-        case BLE_GAP_EVT_DISCONNECTED:
-            NRF_LOG_INFO("Disconnected.\r\n");
-            err_code = bsp_indication_set(BSP_INDICATE_IDLE);
-            APP_ERROR_CHECK(err_code);
-            break; // BLE_GAP_EVT_DISCONNECTED
-
-        case BLE_GAP_EVT_CONNECTED:
-            NRF_LOG_INFO("Connected.\r\n");
-            err_code = bsp_indication_set(BSP_INDICATE_CONNECTED);
-            APP_ERROR_CHECK(err_code);
-            m_conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
-            break; // BLE_GAP_EVT_CONNECTED
-
-        case BLE_GATTC_EVT_TIMEOUT:
-            // Disconnect on GATT Client timeout event.
-            NRF_LOG_DEBUG("GATT Client Timeout.\r\n");
-            err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
-                                             BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-            APP_ERROR_CHECK(err_code);
-            break; // BLE_GATTC_EVT_TIMEOUT
-
-        case BLE_GATTS_EVT_TIMEOUT:
-            // Disconnect on GATT Server timeout event.
-            NRF_LOG_DEBUG("GATT Server Timeout.\r\n");
-            err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle,
-                                             BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-            APP_ERROR_CHECK(err_code);
-            break; // BLE_GATTS_EVT_TIMEOUT
-
-        case BLE_EVT_USER_MEM_REQUEST:
-            err_code = sd_ble_user_mem_reply(p_ble_evt->evt.gattc_evt.conn_handle, NULL);
-            APP_ERROR_CHECK(err_code);
-            break; // BLE_EVT_USER_MEM_REQUEST
-
-        case BLE_GATTS_EVT_RW_AUTHORIZE_REQUEST:
-        {
-            ble_gatts_evt_rw_authorize_request_t  req;
-            ble_gatts_rw_authorize_reply_params_t auth_reply;
-
-            req = p_ble_evt->evt.gatts_evt.params.authorize_request;
-
-            if (req.type != BLE_GATTS_AUTHORIZE_TYPE_INVALID)
-            {
-                if ((req.request.write.op == BLE_GATTS_OP_PREP_WRITE_REQ)     ||
-                    (req.request.write.op == BLE_GATTS_OP_EXEC_WRITE_REQ_NOW) ||
-                    (req.request.write.op == BLE_GATTS_OP_EXEC_WRITE_REQ_CANCEL))
-                {
-                    if (req.type == BLE_GATTS_AUTHORIZE_TYPE_WRITE)
-                    {
-                        auth_reply.type = BLE_GATTS_AUTHORIZE_TYPE_WRITE;
-                    }
-                    else
-                    {
-                        auth_reply.type = BLE_GATTS_AUTHORIZE_TYPE_READ;
-                    }
-                    auth_reply.params.write.gatt_status = APP_FEATURE_NOT_SUPPORTED;
-                    err_code = sd_ble_gatts_rw_authorize_reply(p_ble_evt->evt.gatts_evt.conn_handle,
-                                                               &auth_reply);
-                    APP_ERROR_CHECK(err_code);
-                }
-            }
-        } break; // BLE_GATTS_EVT_RW_AUTHORIZE_REQUEST
-
-#if (NRF_SD_BLE_API_VERSION == 3)
-        case BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST:
-            err_code = sd_ble_gatts_exchange_mtu_reply(p_ble_evt->evt.gatts_evt.conn_handle,
-                                                       NRF_BLE_MAX_MTU_SIZE);
-            APP_ERROR_CHECK(err_code);
-            break; // BLE_GATTS_EVT_EXCHANGE_MTU_REQUEST
-#endif
-
-        default:
-            // No implementation needed.
-            break;
-    }
-}
-
-
 /**@brief Function for dispatching a BLE stack event to all modules with a BLE stack event handler.
  *
  * @details This function is called from the BLE Stack event interrupt handler after a BLE stack
@@ -974,44 +825,19 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
     if (role == BLE_GAP_ROLE_PERIPH)
     {
         on_ble_peripheral_evt(p_ble_evt);
-        ble_cmds_on_ble_evt(&m_cmd_s,p_ble_evt);
+        ble_cmds_on_ble_evt(&m_cmds_s,p_ble_evt);
         
         ble_advertising_on_ble_evt(p_ble_evt);
         ble_conn_params_on_ble_evt(p_ble_evt);
     }
     else if ((role == BLE_GAP_ROLE_CENTRAL) || (p_ble_evt->header.evt_id == BLE_GAP_EVT_ADV_REPORT))
     {
-        if(app_state.net.established == APP_NET_ESTABLISHED_FALSE)
-        {
-            if(app_state.timer.timeout == APP_TIMER_TIMEOUT_FALSE)
-            {
-                if(app_state.timer.status == APP_TIMER_STATUS_DISABLED)
-                {
-                    app_timer_start(m_single_timer, NET_DISC_TIMER_INTERVAL, NULL);
-                    app_state.timer.status = APP_TIMER_STATUS_ENABLED;
-                }
-                net_disc(p_ble_evt);
-            }
-            else
-            {
-                app_timer_stop(m_single_timer);
-                app_state.timer.timeout = APP_TIMER_TIMEOUT_FALSE;
-                app_state.net.established = APP_NET_ESTABLISHED_TRUE;
-                NRF_LOG_DEBUG("Net Scan Complete!!\r\n");
-                
-              NRF_LOG_INFO("NET SCANED RESPONSE\r\n");
-              
-            }
-        }
-        else
-        {
-            on_ble_central_evt(p_ble_evt);
-        }
+        on_ble_central_evt(p_ble_evt);
+        ble_db_discovery_on_ble_evt(&m_ble_db_discovery, p_ble_evt);
+        ble_cmds_c_on_ble_evt(&m_cmds_c_s,p_ble_evt);
     }
     
-    
     bsp_btn_ble_on_ble_evt(p_ble_evt);
-    on_ble_evt(p_ble_evt);
 }
 
 
@@ -1166,7 +992,7 @@ static void advertising_init(void)
     ble_advdata_t          srdata;
     ble_adv_modes_config_t options;
     
-    static ble_uuid_t m_adv_uuids[] = {{BLE_UUID_CMD_SVC, BLE_UUID_TYPE_VENDOR_BEGIN}};
+    static ble_uuid_t m_adv_uuids[] = {{BLE_UUID_CMDS, BLE_UUID_TYPE_VENDOR_BEGIN}};
 
     // Build advertising data struct to pass into @ref ble_advertising_init.
     memset(&advdata, 0, sizeof(advdata));
@@ -1287,6 +1113,8 @@ int main(void)
     device_preset();
 
     db_discovery_init();
+    err_code = ble_cmds_c_init(&m_cmds_c_s);
+    APP_ERROR_CHECK(err_code);
     
     gap_params_init();
     services_init();

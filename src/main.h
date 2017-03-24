@@ -2,6 +2,7 @@
 #define MAIN_H__
 
 #include "cmds.h"
+#include "cmds_c.h"
 #include <stdint.h>
 
 #define NRF_LOG_MODULE_NAME "APP"

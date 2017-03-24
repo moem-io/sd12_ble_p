@@ -24,7 +24,7 @@ void packet_interpret(uint8_t packet_no)
    
     switch(ppacket->header.type)
     {
-        case BLE_CMD_SVC_PACKET_TYPE_NETWORK_SCAN_REQUEST:
+        case BLE_CMDS_PACKET_TYPE_NETWORK_SCAN_REQUEST:
             if(app_state.dev.id == 0)
             {
                 NRF_LOG_DEBUG("Device ID not set!\r\n");
@@ -67,7 +67,7 @@ void packet_interpret(uint8_t packet_no)
             }
             break;
         
-        case BLE_CMD_SVC_PACKET_TYPE_NETWORK_SCAN_RESPONSE: 
+        case BLE_CMDS_PACKET_TYPE_NETWORK_SCAN_RESPONSE: 
             break;
         
         default:
@@ -196,7 +196,7 @@ void ble_cmds_on_ble_evt(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
 }
 
 
-static uint32_t cmd_char_header_add(ble_cmds_t * p_cmd_service)
+static uint32_t cmd_char_header_add(ble_cmds_t * p_cmds)
 {
     ble_gatts_char_md_t char_md;
     ble_gatts_attr_md_t cccd_md;
@@ -204,8 +204,8 @@ static uint32_t cmd_char_header_add(ble_cmds_t * p_cmd_service)
     ble_uuid_t          char_uuid;
     ble_gatts_attr_md_t attr_md; 
 
-    char_uuid.type      = p_cmd_service->uuid_type;
-    char_uuid.uuid      = BLE_UUID_CMD_CHAR_HEADER_UUID;
+    char_uuid.type      = p_cmds->uuid_type;
+    char_uuid.uuid      = BLE_UUID_CMDS_CHAR_HEADER_UUID;
     
     memset(&char_md, 0, sizeof(char_md));
     char_md.char_props.read = 1;
@@ -236,13 +236,13 @@ static uint32_t cmd_char_header_add(ble_cmds_t * p_cmd_service)
     
     attr_char_value.p_value     = value;
     
-    return sd_ble_gatts_characteristic_add(p_cmd_service->service_handle,
+    return sd_ble_gatts_characteristic_add(p_cmds->service_handle,
                                    &char_md,
                                    &attr_char_value,
-                                   &p_cmd_service->header_handles);
+                                   &p_cmds->header_handles);
 }
 
-static uint32_t cmd_char_data_add(ble_cmds_t * p_cmd_service)
+static uint32_t cmd_char_data_add(ble_cmds_t * p_cmds)
 {
     ble_gatts_char_md_t char_md;
     ble_gatts_attr_md_t cccd_md;
@@ -250,8 +250,8 @@ static uint32_t cmd_char_data_add(ble_cmds_t * p_cmd_service)
     ble_gatts_attr_md_t attr_md;
     ble_uuid_t          char_uuid;
     
-    char_uuid.type      = p_cmd_service->uuid_type;
-    char_uuid.uuid      = BLE_UUID_CMD_CHAR_DATA_UUID;
+    char_uuid.type      = p_cmds->uuid_type;
+    char_uuid.uuid      = BLE_UUID_CMDS_CHAR_DATA_UUID;
     
     memset(&char_md, 0, sizeof(char_md));
     char_md.char_props.read = 1;
@@ -283,13 +283,13 @@ static uint32_t cmd_char_data_add(ble_cmds_t * p_cmd_service)
     attr_char_value.p_value     = value;
     
     
-    return sd_ble_gatts_characteristic_add(p_cmd_service->service_handle,
+    return sd_ble_gatts_characteristic_add(p_cmds->service_handle,
                                    &char_md,
                                    &attr_char_value,
-                                   &p_cmd_service->data_handles);
+                                   &p_cmds->data_handles);
 }
 
-static uint32_t cmd_char_result_add(ble_cmds_t * p_cmd_service)
+static uint32_t cmd_char_result_add(ble_cmds_t * p_cmds)
 {
     ble_gatts_char_md_t char_md;
     ble_gatts_attr_md_t cccd_md;
@@ -297,8 +297,8 @@ static uint32_t cmd_char_result_add(ble_cmds_t * p_cmd_service)
     ble_gatts_attr_md_t attr_md;
     ble_uuid_t          char_uuid;
     
-    char_uuid.type      = p_cmd_service->uuid_type;
-    char_uuid.uuid      = BLE_UUID_CMD_CHAR_RESULT_UUID;
+    char_uuid.type      = p_cmds->uuid_type;
+    char_uuid.uuid      = BLE_UUID_CMDS_CHAR_RESULT_UUID;
     
     memset(&char_md, 0, sizeof(char_md));
     char_md.char_props.read = 1;
@@ -327,54 +327,53 @@ static uint32_t cmd_char_result_add(ble_cmds_t * p_cmd_service)
     uint8_t value[4]            = {0x00};
     attr_char_value.p_value     = value;
     
-    return sd_ble_gatts_characteristic_add(p_cmd_service->service_handle,
+    return sd_ble_gatts_characteristic_add(p_cmds->service_handle,
                                    &char_md,
                                    &attr_char_value,
-                                   &p_cmd_service->result_handles);
+                                   &p_cmds->result_handles);
 }
 
-uint32_t cmd_service_init(ble_cmds_t * p_cmd_service)
+uint32_t cmds_init(ble_cmds_t * p_cmds)
 {
     uint32_t   err_code;
-    ble_uuid_t        service_uuid;
-    ble_uuid128_t     base_uuid = BLE_UUID_CMD_SVC_BASE_UUID;
+    ble_uuid_t        cmds_uuid;
+    ble_uuid128_t     base_uuid = BLE_UUID_CMDS_BASE_UUID;
 
-    
-    err_code = sd_ble_uuid_vs_add(&base_uuid, &service_uuid.type);
+    err_code = sd_ble_uuid_vs_add(&base_uuid, &cmds_uuid.type);
     APP_ERROR_CHECK(err_code);
     
-    p_cmd_service->conn_handle             = BLE_CONN_HANDLE_INVALID;
-    p_cmd_service->is_notification_enabled = false;
-    p_cmd_service->uuid_type = service_uuid.type;
+    p_cmds->conn_handle             = BLE_CONN_HANDLE_INVALID;
+    p_cmds->is_notification_enabled = false;
+    p_cmds->uuid_type = cmds_uuid.type;
     
-    service_uuid.uuid = BLE_UUID_CMD_SVC;
+    cmds_uuid.uuid = BLE_UUID_CMDS;
 
     err_code = sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY,
-                                        &service_uuid,
-                                        &p_cmd_service->service_handle);
+                                        &cmds_uuid,
+                                        &p_cmds->service_handle);
     APP_ERROR_CHECK(err_code);
 
-    err_code = cmd_char_header_add(p_cmd_service);
+    err_code = cmd_char_header_add(p_cmds);
     APP_ERROR_CHECK(err_code);
 
-    err_code = cmd_char_data_add(p_cmd_service);
+    err_code = cmd_char_data_add(p_cmds);
     APP_ERROR_CHECK(err_code);
 
-    err_code = cmd_char_result_add(p_cmd_service);
+    err_code = cmd_char_result_add(p_cmds);
     APP_ERROR_CHECK(err_code);
     
     return NRF_SUCCESS;
 }
 
 
-uint32_t cmd_header_char_update(ble_cmds_t *p_cmd_service, uint8_t * p_string, uint16_t length)
+uint32_t cmd_header_char_update(ble_cmds_t *p_cmds, uint8_t * p_string, uint16_t length)
 {
-    if ((p_cmd_service->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_cmd_service->is_notification_enabled))
+    if ((p_cmds->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_cmds->is_notification_enabled))
     {
         return NRF_ERROR_INVALID_STATE;
     }
     
-     if (length > BLE_CMD_SVC_MAX_DATA_LEN)
+     if (length > BLE_CMDS_MAX_DATA_LEN)
     {
         return NRF_ERROR_INVALID_PARAM;
     }
@@ -382,23 +381,23 @@ uint32_t cmd_header_char_update(ble_cmds_t *p_cmd_service, uint8_t * p_string, u
     ble_gatts_hvx_params_t hvx_params;
     memset(&hvx_params, 0, sizeof(hvx_params));
 
-    hvx_params.handle = p_cmd_service->header_handles.value_handle;
+    hvx_params.handle = p_cmds->header_handles.value_handle;
     hvx_params.offset = 0;
     hvx_params.p_len  = &length;
     hvx_params.p_data = p_string;  
     hvx_params.type   = BLE_GATT_HVX_NOTIFICATION;
 
-    return sd_ble_gatts_hvx(p_cmd_service->conn_handle, &hvx_params);
+    return sd_ble_gatts_hvx(p_cmds->conn_handle, &hvx_params);
 }
 
-uint32_t cmd_header_data_update(ble_cmds_t *p_cmd_service, uint8_t * p_string, uint16_t length)
+uint32_t cmd_header_data_update(ble_cmds_t *p_cmds, uint8_t * p_string, uint16_t length)
 {
-    if ((p_cmd_service->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_cmd_service->is_notification_enabled))
+    if ((p_cmds->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_cmds->is_notification_enabled))
     {
         return NRF_ERROR_INVALID_STATE;
     }
     
-     if (length > BLE_CMD_SVC_MAX_DATA_LEN)
+     if (length > BLE_CMDS_MAX_DATA_LEN)
     {
         return NRF_ERROR_INVALID_PARAM;
     }
@@ -406,23 +405,23 @@ uint32_t cmd_header_data_update(ble_cmds_t *p_cmd_service, uint8_t * p_string, u
     ble_gatts_hvx_params_t hvx_params;
     memset(&hvx_params, 0, sizeof(hvx_params));
 
-    hvx_params.handle = p_cmd_service->data_handles.value_handle;
+    hvx_params.handle = p_cmds->data_handles.value_handle;
     hvx_params.offset = 0;
     hvx_params.p_len  = &length;
     hvx_params.p_data = p_string;  
     hvx_params.type   = BLE_GATT_HVX_NOTIFICATION;
 
-    return sd_ble_gatts_hvx(p_cmd_service->conn_handle, &hvx_params);
+    return sd_ble_gatts_hvx(p_cmds->conn_handle, &hvx_params);
 }
 
-uint32_t cmd_header_result_update(ble_cmds_t *p_cmd_service, uint8_t * p_string, uint16_t length)
+uint32_t cmd_header_result_update(ble_cmds_t *p_cmds, uint8_t * p_string, uint16_t length)
 {
-    if ((p_cmd_service->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_cmd_service->is_notification_enabled))
+    if ((p_cmds->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_cmds->is_notification_enabled))
     {
         return NRF_ERROR_INVALID_STATE;
     }
     
-     if (length > BLE_CMD_SVC_RESULT_CHAR_MAX_DATA_LEN)
+     if (length > BLE_CMDS_RESULT_CHAR_MAX_DATA_LEN)
     {
         return NRF_ERROR_INVALID_PARAM;
     }
@@ -430,11 +429,11 @@ uint32_t cmd_header_result_update(ble_cmds_t *p_cmd_service, uint8_t * p_string,
     ble_gatts_hvx_params_t hvx_params;
     memset(&hvx_params, 0, sizeof(hvx_params));
 
-    hvx_params.handle = p_cmd_service->result_handles.value_handle;
+    hvx_params.handle = p_cmds->result_handles.value_handle;
     hvx_params.offset = 0;
     hvx_params.p_len  = &length;
     hvx_params.p_data = p_string;  
     hvx_params.type   = BLE_GATT_HVX_NOTIFICATION;
 
-    return sd_ble_gatts_hvx(p_cmd_service->conn_handle, &hvx_params);
+    return sd_ble_gatts_hvx(p_cmds->conn_handle, &hvx_params);
 }

@@ -394,6 +394,16 @@
               <FileType>1</FileType>
               <FilePath>..\src\cmds.c</FilePath>
             </File>
+            <File>
+              <FileName>util.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\util.c</FilePath>
+            </File>
+            <File>
+              <FileName>cmds_c.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\cmds_c.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -3265,6 +3275,16 @@
               <FileName>cmds.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\src\cmds.c</FilePath>
+            </File>
+            <File>
+              <FileName>util.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\util.c</FilePath>
+            </File>
+            <File>
+              <FileName>cmds_c.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\cmds_c.c</FilePath>
             </File>
           </Files>
         </Group>
