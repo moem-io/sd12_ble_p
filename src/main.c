@@ -102,7 +102,7 @@
 //CENTRAL SETTINGS
 #define SCAN_INTERVAL               0x00A0                                        /**< Determines scan interval in units of 0.625 millisecond. */
 #define SCAN_WINDOW                 0x0050                                        /**< Determines scan window in units of 0.625 millisecond. */
-#define SCAN_TIMEOUT                0
+#define SCAN_TIMEOUT                0x0005
 
 #define DEAD_BEEF                       0xDEADBEEF                                  /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
@@ -554,7 +554,7 @@ void net_disc(const ble_evt_t * const p_ble_evt){
     const ble_gap_evt_adv_report_t* p_adv_report =  & p_ble_evt->evt.gap_evt.params.adv_report;
     if (is_uuid_present(&m_cmds_uuid, p_adv_report))
     {
-      NRF_LOG_DEBUG("CMD SVC FOUND!!\r\n");
+      NRF_LOG_INFO("CMD SVC FOUND!!\r\n");
 
       for(int i=0;i<disc->count;i++){
         if(!memcmp(disc->data[i].peer_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
@@ -562,6 +562,8 @@ void net_disc(const ble_evt_t * const p_ble_evt){
             base_rssi[i] +=  p_adv_report->rssi;
             disc->data[i].rssi_count++;
             disc->data[i].rssi = base_rssi[i]/disc->data[i].rssi_count;
+            NRF_LOG_DEBUG("count %d : Addr : %s Rssi : %d \r\n",
+            disc->data[i].rssi_count, nrf_log_push(uint8_t_to_str(disc->data[i].peer_addr.addr,sizeof(disc->data[i].peer_addr.addr),1)),disc->data[i].rssi);
           }
           return;
         }
@@ -573,7 +575,7 @@ void net_disc(const ble_evt_t * const p_ble_evt){
       base_rssi[disc->count] = p_adv_report->rssi;
 
       for(int i=0;i<=disc->count;i++){
-          NRF_LOG_DEBUG("No %d : Addr : %s Rssi : %d \r\n",
+          NRF_LOG_INFO("No %d : Addr : %s Rssi : %d \r\n",
             i, nrf_log_push(uint8_t_to_str(disc->data[i].peer_addr.addr,sizeof(disc->data[i].peer_addr.addr),1)),disc->data[i].rssi);
       }
         disc->count +=1;
@@ -623,33 +625,21 @@ static void on_ble_central_evt(const ble_evt_t * const p_ble_evt)
 
         case BLE_GAP_EVT_ADV_REPORT:
         {
-            if(app_state.net.established == APP_NET_ESTABLISHED_FALSE)
-            {
-                if(app_state.timer.timeout == APP_TIMER_TIMEOUT_FALSE)
-                {
-                    if(app_state.timer.status == APP_TIMER_STATUS_DISABLED)
-                    {
-                        app_timer_start(m_single_timer, NET_DISC_TIMER_INTERVAL, NULL);
-                        app_state.timer.status = APP_TIMER_STATUS_ENABLED;
-                    }
-                    net_disc(p_ble_evt);
-                }
-                else
-                {
-                    app_timer_stop(m_single_timer);
-                    app_state.timer.timeout = APP_TIMER_TIMEOUT_FALSE;
-                    app_state.net.established = APP_NET_ESTABLISHED_TRUE;
-                    NRF_LOG_DEBUG("Net Scan Complete!!\r\n");
-                    
-                    NRF_LOG_INFO("NET SCANED RESPONSE\r\n");
-                }
-            }
+            net_disc(p_ble_evt);
         } break; // BLE_GAP_ADV_REPORT
 
         case BLE_GAP_EVT_TIMEOUT:
         {
-            // We have not specified a timeout for scanning, so only connection attemps can timeout.
-            if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_CONN)
+            if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_SCAN)
+            {
+                NRF_LOG_INFO("NET SCANNING TIMEOUT.\r\n");
+                NRF_LOG_DEBUG("%d FOUND!!\r\n",app_state.net.disc.count);
+                
+                if(app_state.net.disc.count >0){
+                    app_state.net.discovered = APP_NET_DISCOVERED_TRUE; 
+                }
+            }
+            else if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_CONN)
             {
                 NRF_LOG_INFO("Connection Request timed out.\r\n");
             }
@@ -832,7 +822,9 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
         ble_advertising_on_ble_evt(p_ble_evt);
         ble_conn_params_on_ble_evt(p_ble_evt);
     }
-    else if ((role == BLE_GAP_ROLE_CENTRAL) || (p_ble_evt->header.evt_id == BLE_GAP_EVT_ADV_REPORT))
+    else if ((role == BLE_GAP_ROLE_CENTRAL) 
+        || (p_ble_evt->header.evt_id == BLE_GAP_EVT_ADV_REPORT)
+        || (p_ble_evt->header.evt_id == BLE_GAP_EVT_TIMEOUT))
     {
         on_ble_central_evt(p_ble_evt);
         ble_db_discovery_on_ble_evt(&m_ble_db_discovery, p_ble_evt);

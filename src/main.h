@@ -27,9 +27,12 @@
 #define APP_TIMER_STATUS_ENABLED                  true
 #define APP_TIMER_TIMEOUT_FALSE                  false
 #define APP_TIMER_TIMEOUT_TRUE                   true
-    
+
 #define APP_NET_ESTABLISHED_FALSE                   false
 #define APP_NET_ESTABLISHED_TRUE                   true
+
+#define APP_NET_DISCOVERED_FALSE                   false
+#define APP_NET_DISCOVERED_TRUE                   true
 
 #define GAP_DISC_ADDR_NOT_FOUND                   -1
 
@@ -90,7 +93,8 @@ typedef struct
 {
     uint8_t my_id;
     bool established;
-    gap_disc disc;  
+    bool discovered;
+    gap_disc disc;
 } app_net_condition;
 
 typedef struct

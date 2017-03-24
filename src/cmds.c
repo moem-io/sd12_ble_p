@@ -31,40 +31,42 @@ void packet_interpret(uint8_t packet_no)
 
                 if(memcmp(app_state.dev.p_addr.addr,ppacket->data.p_data, BLE_GAP_ADDR_LEN))
                 {
-                NRF_LOG_ERROR("SET Device ID FIRST!!\r\n");
+                    NRF_LOG_ERROR("SET Device ID FIRST!!\r\n");
                 }
                 else
                 {
-                app_state.dev.id = ppacket->header.target.node; //ID SETTING
-                NRF_LOG_INFO("Device ID SET : %d !!\r\n",app_state.dev.id);
-                    if(app_state.net.established == APP_NET_ESTABLISHED_FALSE)
-                    {
-                        NRF_LOG_INFO("Network Not Established.\r\n");
-                        scan_start(); //NET SCAN INIT
-                    }
+                    app_state.dev.id = ppacket->header.target.node; //ID SETTING
+                    NRF_LOG_INFO("Device ID SET : %d !!\r\n",app_state.dev.id);
+
+                    NRF_LOG_INFO("Network Not Discovered.\r\n");
+                    scan_start();
                 }
+            }
+            else if(app_state.dev.id == ppacket->header.target.node)
+            {
+              app_state.net.discovered = APP_NET_DISCOVERED_FALSE;
+              NRF_LOG_INFO("Network Re-Scan Initialized.\r\n");
+              scan_start();
             }
             else if(app_state.dev.id != ppacket->header.target.node)
             {
                 NRF_LOG_DEBUG("PACKET ROUTE!\r\n");
-
-              int8_t result = gap_disc_addr_check(ppacket->data.p_data);
-                if(result != GAP_DISC_ADDR_NOT_FOUND){
-                    err_code = sd_ble_gap_connect(&app_state.net.disc.data[result].peer_addr,
-                              &m_scan_params,
-                              &m_connection_param);
-                    APP_ERROR_CHECK(err_code);
-                  
-                    NRF_LOG_DEBUG("CONNECTED TO PERIPHERAL!\r\n");  
-                }
                 
+                if(app_state.net.discovered)
+                {
+                    int8_t result = gap_disc_addr_check(ppacket->data.p_data);
+                    if(result != GAP_DISC_ADDR_NOT_FOUND)
+                    {
+                        err_code = sd_ble_gap_connect(&app_state.net.disc.data[result].peer_addr,
+                                  &m_scan_params,
+                                  &m_connection_param);
+                        APP_ERROR_CHECK(err_code);
+                      
+                        NRF_LOG_DEBUG("CONNECTED TO PERIPHERAL!\r\n");  
+                    }
+                }
             }
-            else if(app_state.dev.id == ppacket->header.target.node)
-            {
-              app_state.net.established = APP_NET_ESTABLISHED_FALSE;
-              NRF_LOG_INFO("Network Re-Scan Initialized.\r\n");
-              scan_start();
-            }
+
             break;
         
         case BLE_CMDS_PACKET_TYPE_NETWORK_SCAN_RESPONSE: 
