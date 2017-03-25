@@ -25,16 +25,17 @@ typedef struct
     ble_gatts_char_handles_t     data_handles;                                          /**< Handles related to the Body Sensor Location characteristic. */
     ble_gatts_char_handles_t     result_handles;                                         /**< Handles related to the Heart Rate Control Point characteristic. */  
     uint16_t                    conn_handle; 
-    bool                     is_notification_enabled; /**< Variable to indicate if the peer has enabled notification of each characteristic.*/
+    bool                    header_notification_enabled;
+    bool                    data_notification_enabled;
+    bool                    result_notification_enabled;
+    bool                     is_notification_enabled;
 }ble_cmds_t;
 
 
 
 uint32_t cmds_init(ble_cmds_t * p_cmd_service);
 void ble_cmds_on_ble_evt(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt);
-uint32_t cmd_header_char_update(ble_cmds_t *p_cmd_service, uint8_t * p_string, uint16_t length);
-uint32_t cmd_header_data_update(ble_cmds_t *p_cmd_service, uint8_t * p_string, uint16_t length);
-uint32_t cmd_header_result_update(ble_cmds_t *p_cmd_service, uint8_t * p_string, uint16_t length);
 
+uint32_t cmds_value_update(ble_cmds_t *p_cmds,ble_gatts_char_handles_t* data_handle, uint8_t * p_string, uint16_t length);
 
 #endif

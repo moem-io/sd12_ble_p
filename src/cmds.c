@@ -118,6 +118,16 @@ void header_parser(ble_gatts_value_t * rx_data)
 
 }
 
+static void notification_enable(ble_cmds_t * p_cmds, bool *notification_type){
+    *notification_type = true;
+    p_cmds->is_notification_enabled=
+        p_cmds->header_notification_enabled && p_cmds->data_notification_enabled && p_cmds->result_notification_enabled;
+    if(p_cmds->is_notification_enabled){
+        NRF_LOG_DEBUG("NOTIFICATION ALL ENABLED!!");
+    }
+}
+
+
 void data_parser(ble_gatts_value_t *rx_data){
     uint8_t *pdata = app_state.packet.packet[app_state.packet.data_count].data.p_data;
     memcpy(pdata, rx_data->p_value, rx_data->len);
@@ -155,6 +165,7 @@ static void on_write(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
     else if(p_evt_write->handle == p_cmds->header_handles.cccd_handle)
     {
         gatts_value_get(p_cmds,p_cmds->header_handles.cccd_handle,&rx_data);
+        notification_enable(p_cmds,&p_cmds->header_notification_enabled);
     }
     else if(p_evt_write->handle == p_cmds->data_handles.value_handle)
     {
@@ -164,6 +175,7 @@ static void on_write(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
     else if(p_evt_write->handle == p_cmds->data_handles.cccd_handle)
     {
         gatts_value_get(p_cmds,p_cmds->data_handles.cccd_handle,&rx_data);
+        notification_enable(p_cmds,&p_cmds->data_notification_enabled);
     }
     else if(p_evt_write->handle == p_cmds->result_handles.value_handle)
     {
@@ -172,6 +184,7 @@ static void on_write(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
     else if(p_evt_write->handle == p_cmds->result_handles.cccd_handle)
     {
         gatts_value_get(p_cmds,p_cmds->result_handles.cccd_handle,&rx_data);
+        notification_enable(p_cmds,&p_cmds->result_notification_enabled);
     }
 }
 
@@ -368,55 +381,7 @@ uint32_t cmds_init(ble_cmds_t * p_cmds)
 }
 
 
-uint32_t cmd_header_char_update(ble_cmds_t *p_cmds, uint8_t * p_string, uint16_t length)
-{
-    if ((p_cmds->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_cmds->is_notification_enabled))
-    {
-        return NRF_ERROR_INVALID_STATE;
-    }
-    
-     if (length > BLE_CMDS_MAX_DATA_LEN)
-    {
-        return NRF_ERROR_INVALID_PARAM;
-    }
-    
-    ble_gatts_hvx_params_t hvx_params;
-    memset(&hvx_params, 0, sizeof(hvx_params));
-
-    hvx_params.handle = p_cmds->header_handles.value_handle;
-    hvx_params.offset = 0;
-    hvx_params.p_len  = &length;
-    hvx_params.p_data = p_string;  
-    hvx_params.type   = BLE_GATT_HVX_NOTIFICATION;
-
-    return sd_ble_gatts_hvx(p_cmds->conn_handle, &hvx_params);
-}
-
-uint32_t cmd_header_data_update(ble_cmds_t *p_cmds, uint8_t * p_string, uint16_t length)
-{
-    if ((p_cmds->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_cmds->is_notification_enabled))
-    {
-        return NRF_ERROR_INVALID_STATE;
-    }
-    
-     if (length > BLE_CMDS_MAX_DATA_LEN)
-    {
-        return NRF_ERROR_INVALID_PARAM;
-    }
-    
-    ble_gatts_hvx_params_t hvx_params;
-    memset(&hvx_params, 0, sizeof(hvx_params));
-
-    hvx_params.handle = p_cmds->data_handles.value_handle;
-    hvx_params.offset = 0;
-    hvx_params.p_len  = &length;
-    hvx_params.p_data = p_string;  
-    hvx_params.type   = BLE_GATT_HVX_NOTIFICATION;
-
-    return sd_ble_gatts_hvx(p_cmds->conn_handle, &hvx_params);
-}
-
-uint32_t cmd_header_result_update(ble_cmds_t *p_cmds, uint8_t * p_string, uint16_t length)
+uint32_t cmds_value_update(ble_cmds_t *p_cmds,ble_gatts_char_handles_t* data_handle, uint8_t * p_string, uint16_t length)
 {
     if ((p_cmds->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_cmds->is_notification_enabled))
     {
@@ -431,10 +396,10 @@ uint32_t cmd_header_result_update(ble_cmds_t *p_cmds, uint8_t * p_string, uint16
     ble_gatts_hvx_params_t hvx_params;
     memset(&hvx_params, 0, sizeof(hvx_params));
 
-    hvx_params.handle = p_cmds->result_handles.value_handle;
+    hvx_params.handle = data_handle->value_handle;
     hvx_params.offset = 0;
     hvx_params.p_len  = &length;
-    hvx_params.p_data = p_string;  
+    hvx_params.p_data = p_string;
     hvx_params.type   = BLE_GATT_HVX_NOTIFICATION;
 
     return sd_ble_gatts_hvx(p_cmds->conn_handle, &hvx_params);
