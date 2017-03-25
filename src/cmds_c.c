@@ -1,7 +1,10 @@
 #include "cmds_c.h"
 
+static uint32_t cccd_configure(uint16_t conn_handle, uint16_t cccd_handle, bool enable);
+
 void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t * p_evt)
 {
+    uint32_t err_code;
     ble_gatt_db_char_t * p_chars = p_evt->params.discovered_db.charateristics;
 
     // Check if the CMDS was discovered.
@@ -35,8 +38,24 @@ void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t *
                     break;
             }
         }
+
         p_cmds_c->handles.assigned=true;
         NRF_LOG_DEBUG("HANDLER ASSIGNED\r\n");
+        
+        NRF_LOG_DEBUG("HEADER :%02x , CCCD : %02x",p_cmds_c->handles.header_handle, p_cmds_c->handles.header_cccd_handle);
+        NRF_LOG_DEBUG("DATA :%02x , CCCD : %02x",p_cmds_c->handles.data_handle, p_cmds_c->handles.data_cccd_handle);
+        NRF_LOG_DEBUG("RESULT :%02x , CCCD : %02x",p_cmds_c->handles.result_handle, p_cmds_c->handles.result_cccd_handle);
+        
+        err_code = cccd_configure(p_cmds_c->conn_handle,p_cmds_c->handles.header_cccd_handle, true);
+        APP_ERROR_CHECK(err_code);
+        
+        err_code = cccd_configure(p_cmds_c->conn_handle,p_cmds_c->handles.data_cccd_handle, true);
+        APP_ERROR_CHECK(err_code);
+        
+        err_code = cccd_configure(p_cmds_c->conn_handle,p_cmds_c->handles.result_cccd_handle, true);
+        APP_ERROR_CHECK(err_code);
+        
+        NRF_LOG_DEBUG("NOTIFICATION ENABLED\r\n");
     }
 }
 
@@ -119,3 +138,23 @@ uint32_t ble_cmds_c_init(ble_cmds_c_t * p_cmds_c)
     return ble_db_discovery_evt_register(&cmds_c_uuid);
 }
 
+/**@brief Function for creating a message for writing to the CCCD.
+ */
+static uint32_t cccd_configure(uint16_t conn_handle, uint16_t cccd_handle, bool enable)
+{
+    uint8_t buf[BLE_CCCD_VALUE_LEN];
+
+    buf[0] = enable ? BLE_GATT_HVX_NOTIFICATION : 0;
+    buf[1] = 0;
+
+    const ble_gattc_write_params_t write_params = {
+        .write_op = BLE_GATT_OP_WRITE_REQ,
+        .flags    = BLE_GATT_EXEC_WRITE_FLAG_PREPARED_WRITE,
+        .handle   = cccd_handle,
+        .offset   = 0,
+        .len      = sizeof(buf),
+        .p_value  = buf
+    };
+
+    return sd_ble_gattc_write(conn_handle, &write_params);
+}

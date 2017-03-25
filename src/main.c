@@ -102,7 +102,7 @@
 //CENTRAL SETTINGS
 #define SCAN_INTERVAL               0x00A0                                        /**< Determines scan interval in units of 0.625 millisecond. */
 #define SCAN_WINDOW                 0x0050                                        /**< Determines scan window in units of 0.625 millisecond. */
-#define SCAN_TIMEOUT                0x0005
+#define SCAN_TIMEOUT                0x000A
 
 #define DEAD_BEEF                       0xDEADBEEF                                  /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
@@ -119,12 +119,12 @@ APP_TIMER_DEF(m_single_timer);
 
 
 const ble_gap_conn_params_t m_connection_param =
-  {
+{
     (uint16_t)MIN_CONN_INTERVAL,  // Minimum connection
     (uint16_t)MAX_CONN_INTERVAL,  // Maximum connection
     (uint16_t)SLAVE_LATENCY,            // Slave latency
     (uint16_t)CONN_SUP_TIMEOUT       // Supervision time-out
-  };
+};
 
 const ble_gap_scan_params_t m_scan_params =
 {
@@ -426,18 +426,6 @@ static void advertising_start(void)
 {
     uint32_t err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
     APP_ERROR_CHECK(err_code);
-}
-
-
-/**@brief Function for starting timers.
- */
-static void application_timers_start(void)
-{
-    /* YOUR_JOB: Start your timers. below is an example of how to start a timer.
-       uint32_t err_code;
-       err_code = app_timer_start(m_app_timer_id, TIMER_INTERVAL, NULL);
-       APP_ERROR_CHECK(err_code); */
-
 }
 
 
@@ -1120,7 +1108,6 @@ int main(void)
         nrf_log_push(app_state.dev.name), 
         nrf_log_push(uint8_t_to_str(app_state.dev.p_addr.addr,sizeof(app_state.dev.p_addr.addr),1)));
 
-    application_timers_start();
     advertising_start();
 //    adv_scan_start();
     APP_ERROR_CHECK(err_code);
