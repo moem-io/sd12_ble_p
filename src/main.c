@@ -551,7 +551,7 @@ void net_disc(const ble_evt_t * const p_ble_evt){
             disc->data[i].rssi_count++;
             disc->data[i].rssi = base_rssi[i]/disc->data[i].rssi_count;
             NRF_LOG_DEBUG("count %d : Addr : %s Rssi : %d \r\n",
-            disc->data[i].rssi_count, nrf_log_push(uint8_t_to_str(disc->data[i].peer_addr.addr,sizeof(disc->data[i].peer_addr.addr),1)),disc->data[i].rssi);
+            disc->data[i].rssi_count, STR_PUSH(disc->data[i].peer_addr.addr,1),disc->data[i].rssi);
           }
           return;
         }
@@ -563,8 +563,7 @@ void net_disc(const ble_evt_t * const p_ble_evt){
       base_rssi[disc->count] = p_adv_report->rssi;
 
       for(int i=0;i<=disc->count;i++){
-          NRF_LOG_INFO("No %d : Addr : %s Rssi : %d \r\n",
-            i, nrf_log_push(uint8_t_to_str(disc->data[i].peer_addr.addr,sizeof(disc->data[i].peer_addr.addr),1)),disc->data[i].rssi);
+          NRF_LOG_INFO("No %d : Addr : %s Rssi : %d \r\n",i, STR_PUSH(disc->data[i].peer_addr.addr,1),disc->data[i].rssi);
       }
         disc->count +=1;
     }
@@ -783,6 +782,20 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt)
 }
 
 
+static void app_cmd_evt(ble_evt_t* p_ble_evt)
+{
+    switch(app_state.dev.app_cmd){
+        case APP_CMD_INVALID:
+            break;
+        
+        case APP_CMD_SET_PARENT_ID:
+            memcpy(&app_state.dev.parent_addr, &p_ble_evt->evt.gap_evt.params.connected.peer_addr, sizeof(ble_gap_addr_t));
+            
+            NRF_LOG_DEBUG("Parent Addr set : %s\r\n",STR_PUSH(app_state.dev.parent_addr.addr,1));
+            app_state.dev.app_cmd = APP_CMD_INVALID;
+            break;
+    }
+}
 /**@brief Function for dispatching a BLE stack event to all modules with a BLE stack event handler.
  *
  * @details This function is called from the BLE Stack event interrupt handler after a BLE stack
@@ -819,6 +832,7 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
         ble_cmds_c_on_ble_evt(&m_cmds_c_s,p_ble_evt);
     }
     
+    app_cmd_evt(p_ble_evt);
     bsp_btn_ble_on_ble_evt(p_ble_evt);
 }
 
@@ -1054,7 +1068,7 @@ static void device_preset()
     uint8_t num_rand_bytes_available;
     uint8_t rand_number;
 
-    err_code=sd_ble_gap_address_get(&app_state.dev.p_addr);
+    err_code=sd_ble_gap_address_get(&app_state.dev.my_addr);
     APP_ERROR_CHECK(err_code);
     
     nrf_delay_ms(100); // wait for random pool to be filled.
@@ -1104,9 +1118,7 @@ int main(void)
     conn_params_init();
 
     NRF_LOG_DEBUG("Ram Size : %d kb \r\n",sizeof(app_state)/1024);    
-    NRF_LOG_DEBUG("%s  Addr : %s\r\n",
-        nrf_log_push(app_state.dev.name), 
-        nrf_log_push(uint8_t_to_str(app_state.dev.p_addr.addr,sizeof(app_state.dev.p_addr.addr),1)));
+    NRF_LOG_DEBUG("%s Addr : %s\r\n",LOG_PUSH(app_state.dev.name), STR_PUSH(app_state.dev.my_addr.addr,1));
 
     advertising_start();
 //    adv_scan_start();
