@@ -832,6 +832,8 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
         ble_cmds_c_on_ble_evt(&m_cmds_c_s,p_ble_evt);
     }
     
+    packet_interpret(&m_cmds_s);
+    
     app_cmd_evt(p_ble_evt);
     bsp_btn_ble_on_ble_evt(p_ble_evt);
 }

@@ -1,7 +1,7 @@
 #include "cmds.h"
 
 
-int8_t gap_disc_addr_check(uint8_t *p_data){
+static int8_t gap_disc_addr_check(uint8_t *p_data){
     for(int i=0;i<app_state.net.disc.count;i++){
         if(!memcmp(app_state.net.disc.data[i].peer_addr.addr,p_data, BLE_GAP_ADDR_LEN)){
             NRF_LOG_DEBUG("ADDR FOUND!\r\n");
@@ -13,7 +13,7 @@ int8_t gap_disc_addr_check(uint8_t *p_data){
 }
 
 
-void gap_disc_id_update(p_packet* ppacket)
+static void gap_disc_id_update(p_packet* ppacket)
 {
     int8_t result = gap_disc_addr_check(ppacket->data.p_data);
     if(result >0)
@@ -50,63 +50,66 @@ void packet_route(uint8_t *addr)
     
 }
  
-void packet_interpret(uint8_t packet_no)
+void packet_interpret(ble_cmds_t * p_cmds)
 {
-    NRF_LOG_DEBUG("PACKET INTERPRET!\r\n");
+    if(app_state.rx_p.interpret){
+        NRF_LOG_DEBUG("PACKET INTERPRET!\r\n");
 
-    p_packet *ppacket = &(app_state.rx_p.packet[packet_no]);
-   
-    switch(ppacket->header.type)
-    {
-        case BLE_CMDS_PACKET_TYPE_NETWORK_SCAN_REQUEST:
-            if(app_state.dev.my_id == 0)
-            {
-                NRF_LOG_DEBUG("Device ID not set!\r\n");
-
-                if(memcmp(app_state.dev.my_addr.addr,ppacket->data.p_data, BLE_GAP_ADDR_LEN))
+        p_packet *ppacket = &(app_state.rx_p.packet[app_state.rx_p.interpret_count]);
+       
+        switch(ppacket->header.type)
+        {
+            case BLE_CMDS_PACKET_TYPE_NETWORK_SCAN_REQUEST:
+                if(app_state.dev.my_id == 0)
                 {
-                    NRF_LOG_ERROR("SET Device ID FIRST!!\r\n");
+                    NRF_LOG_DEBUG("Device ID not set!\r\n");
+
+                    if(memcmp(app_state.dev.my_addr.addr,ppacket->data.p_data, BLE_GAP_ADDR_LEN))
+                    {
+                        NRF_LOG_ERROR("SET Device ID FIRST!!\r\n");
+                    }
+                    else
+                    {
+                        app_state.dev.my_id = ppacket->header.target.node; //ID SETTING
+                        NRF_LOG_INFO("Device ID SET : %d !!\r\n",app_state.dev.my_id);
+                        
+                        APP_CMD(APP_CMD_SET_PARENT_ID);
+                        
+                        NRF_LOG_INFO("[MOD] Network Not Discovered.\r\n");
+                        scan_start();
+                    }
                 }
-                else
+                else if(app_state.dev.my_id == ppacket->header.target.node)
                 {
-                    app_state.dev.my_id = ppacket->header.target.node; //ID SETTING
-                    NRF_LOG_INFO("Device ID SET : %d !!\r\n",app_state.dev.my_id);
+                    app_state.net.discovered = APP_NET_DISCOVERED_FALSE;
+                    NRF_LOG_INFO("Network Re-Scan Initialized.\r\n");
                     
                     APP_CMD(APP_CMD_SET_PARENT_ID);
-                    
-                    NRF_LOG_INFO("[MOD] Network Not Discovered.\r\n");
                     scan_start();
                 }
-            }
-            else if(app_state.dev.my_id == ppacket->header.target.node)
-            {
-                app_state.net.discovered = APP_NET_DISCOVERED_FALSE;
-                NRF_LOG_INFO("Network Re-Scan Initialized.\r\n");
-                
-                APP_CMD(APP_CMD_SET_PARENT_ID);
-                scan_start();
-            }
-            else if(app_state.dev.my_id != ppacket->header.target.node)
-            {
-                NRF_LOG_DEBUG("PACKET ROUTE!\r\n");
-                gap_disc_id_update(ppacket);
-                
-                if(app_state.net.discovered)
+                else if(app_state.dev.my_id != ppacket->header.target.node)
                 {
-                    packet_route(ppacket->data.p_data);
+                    NRF_LOG_DEBUG("PACKET ROUTE!\r\n");
+                    gap_disc_id_update(ppacket);
+                    
+                    if(app_state.net.discovered)
+                    {
+                        packet_route(ppacket->data.p_data);
+                    }
                 }
-            }
-            break;
+                break;
+            
+            case BLE_CMDS_PACKET_TYPE_NETWORK_SCAN_RESPONSE: 
+                break;
+            
+            default:
+                break;
+        }
         
-        case BLE_CMDS_PACKET_TYPE_NETWORK_SCAN_RESPONSE: 
-            break;
-        
-        default:
-            break;
+        app_state.rx_p.interpret = false;
     }
-
 }
-void packet_count(uint8_t *packet_type)
+static void packet_count(uint8_t *packet_type)
 {
     *packet_type = *packet_type+1;
     NRF_LOG_DEBUG("PACKET COUNT : %d HEADER : %d DATA : %d \r\n",
@@ -120,12 +123,13 @@ void packet_count(uint8_t *packet_type)
     }
     else if(app_state.rx_p.packet_count>=*packet_type)
     {
-        packet_interpret(*packet_type -1);
+        app_state.rx_p.interpret = true;
+        app_state.rx_p.interpret_count = *packet_type -1;
     }
 }
 
 
-void header_parser(ble_gatts_value_t * rx_data)
+static void header_parser(ble_gatts_value_t * rx_data)
 {
     p_header *pheader = &(app_state.rx_p.packet[app_state.rx_p.header_count].header);
     
@@ -144,10 +148,10 @@ void header_parser(ble_gatts_value_t * rx_data)
     NRF_LOG_DEBUG("Header TARGET : %02x - %02x\r\n",pheader->target.node , pheader->target.sensor);
     
     packet_count(&app_state.rx_p.header_count);
-
 }
 
-void data_parser(ble_gatts_value_t *rx_data){
+static void data_parser(ble_gatts_value_t *rx_data)
+{
     uint8_t *pdata = app_state.rx_p.packet[app_state.rx_p.data_count].data.p_data;
     memcpy(pdata, rx_data->p_value, rx_data->len);
     
@@ -156,19 +160,30 @@ void data_parser(ble_gatts_value_t *rx_data){
     packet_count(&app_state.rx_p.data_count);
 }
 
-static void notification_enable(ble_cmds_t * p_cmds, bool *notification_type){
+static void notification_enable(ble_cmds_t * p_cmds, bool *notification_type)
+{
     *notification_type = true;
     p_cmds->is_notification_enabled=
         p_cmds->header_notification_enabled && p_cmds->data_notification_enabled && p_cmds->result_notification_enabled;
     if(p_cmds->is_notification_enabled){
-        NRF_LOG_DEBUG("NOTIFICATION ALL ENABLED!!");
+        NRF_LOG_DEBUG("NOTIFICATION ALL ENABLED!!\r\n");
     }
 }
 
-void gatts_value_get(ble_cmds_t * p_cmds, uint16_t handle, ble_gatts_value_t* rx_data)
+static void gatts_value_get(ble_cmds_t * p_cmds, uint16_t handle, ble_gatts_value_t* rx_data)
 {
     sd_ble_gatts_value_get(p_cmds->conn_handle, handle, rx_data);
     NRF_LOG_INFO("[R] Handle %#06x Value : %s \r\n", handle, VSTR_PUSH(rx_data->p_value,rx_data->len,0));
+}
+
+static void cmds_result_update(ble_cmds_t * p_cmds, uint8_t result_type)
+{
+    uint32_t err_code;
+    uint8_t result[BLE_CMDS_PACKET_RESULT_SIZE] = {result_type};
+
+    err_code = cmds_value_update(p_cmds,&p_cmds->result_handles,result, sizeof(result));
+    APP_ERROR_CHECK(err_code);
+    NRF_LOG_INFO("Result : %s \r\n", STR_PUSH(result,0));
 }
 
 static void on_write(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
@@ -188,6 +203,8 @@ static void on_write(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
     {
         gatts_value_get(p_cmds,p_cmds->header_handles.value_handle,&rx_data);
         header_parser(&rx_data);
+        
+        cmds_result_update(p_cmds,BLE_CMDS_PACKET_RESULT_HEADER_OK);
     }
     else if(p_evt_write->handle == p_cmds->header_handles.cccd_handle)
     {
@@ -198,6 +215,8 @@ static void on_write(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
     {
         gatts_value_get(p_cmds,p_cmds->data_handles.value_handle,&rx_data);
         data_parser(&rx_data);
+
+        cmds_result_update(p_cmds,BLE_CMDS_PACKET_RESULT_DATA_OK);
     }
     else if(p_evt_write->handle == p_cmds->data_handles.cccd_handle)
     {
@@ -364,10 +383,10 @@ static uint32_t cmd_char_result_add(ble_cmds_t * p_cmds)
     attr_char_value.p_uuid      = &char_uuid;
     attr_char_value.p_attr_md   = &attr_md;
     attr_char_value.init_offs = 0;
-    attr_char_value.max_len     = 1;
-    attr_char_value.init_len    = 1;
-    uint8_t value[4]            = {0x00};
-    attr_char_value.p_value     = value;
+    attr_char_value.max_len     = BLE_CMDS_PACKET_RESULT_SIZE;
+    attr_char_value.init_len    = BLE_CMDS_PACKET_RESULT_SIZE;
+    uint8_t value            = BLE_CMDS_PACKET_RESULT_IDLE;
+    attr_char_value.p_value     = &value;
     
     return sd_ble_gatts_characteristic_add(p_cmds->service_handle,
                                    &char_md,

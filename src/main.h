@@ -41,10 +41,6 @@
 
 #define APP_CMD(CMD)                                     app_state.dev.app_cmd = CMD
 
-#define LOG_PUSH(str)                                             nrf_log_push(str)
-#define STR_PUSH(str,rev)                                        nrf_log_push(uint8_t_to_str(str,sizeof(str),rev))
-#define VSTR_PUSH(str,str_len,rev)                          nrf_log_push(uint8_t_to_str(str,str_len,rev))
-
 typedef struct {
   uint8_t node;
   uint8_t sensor;
@@ -113,7 +109,8 @@ typedef struct
     uint8_t packet_count;
     uint8_t header_count;
     uint8_t data_count;
-    
+    bool    interpret;
+    uint8_t interpret_count;
     p_packet packet[MAX_PACKET_COUNT];
 } app_packet_s;
 

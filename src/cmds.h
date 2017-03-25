@@ -16,7 +16,11 @@
 #define BLE_CMDS_PACKET_TYPE_NETWORK_SCAN_REQUEST 1
 #define BLE_CMDS_PACKET_TYPE_NETWORK_SCAN_RESPONSE 2
 
-
+#define BLE_CMDS_PACKET_RESULT_SIZE              1
+#define BLE_CMDS_PACKET_RESULT_IDLE              ((uint8_t) 0)
+#define BLE_CMDS_PACKET_RESULT_HEADER_OK ((uint8_t) 1)
+#define BLE_CMDS_PACKET_RESULT_DATA_OK      ((uint8_t) 2)
+#define BLE_CMDS_PACKET_RESULT_ERROR      ((uint8_t) 255)
 typedef struct
 {
     uint8_t                                 uuid_type;
@@ -32,6 +36,7 @@ typedef struct
 }ble_cmds_t;
 
 
+void packet_interpret(ble_cmds_t * p_cmds);
 
 uint32_t cmds_init(ble_cmds_t * p_cmd_service);
 void ble_cmds_on_ble_evt(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt);
