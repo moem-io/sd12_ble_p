@@ -1,5 +1,65 @@
 #include "cmds_c.h"
 
+uint32_t cmds_c_header_update(ble_cmds_c_t* p_cmds_c, p_header* header)
+{
+    uint8_t buff[20];
+    memcpy(buff, header,sizeof(p_header));
+    return cmds_c_value_update(p_cmds_c,&p_cmds_c->handles.header_handle,buff,sizeof(p_header));
+}
+
+uint32_t cmds_c_data_update(ble_cmds_c_t* p_cmds_c, p_data* data)
+{
+    uint8_t buff[20];
+    memcpy(buff, data,sizeof(p_data));
+    return cmds_c_value_update(p_cmds_c,&p_cmds_c->handles.data_handle,buff,sizeof(p_data));
+}
+
+uint32_t cmds_c_result_update(ble_cmds_c_t* p_cmds_c, p_result* result)
+{
+    uint8_t buff[20];
+    memcpy(buff, result,sizeof(p_result));
+    return cmds_c_value_update(p_cmds_c,&p_cmds_c->handles.result_handle,buff,sizeof(p_result));
+}
+
+void packet_send(ble_cmds_c_t* p_cmds_c)
+{
+    uint32_t err_code;
+    p_packet* txp = &app_state.tx_p.packet[app_state.tx_p.process_count];
+    if(app_state.tx_p.process){
+        
+        if (p_cmds_c->conn_handle == BLE_CONN_HANDLE_INVALID)
+        {
+            NRF_LOG_DEBUG("WAIT FOR PERIPHERAL CONNECTION\r\n");
+            ble_gap_addr_t* target_addr = gap_disc_id_check(&txp->header.target.node);
+            if(target_addr){
+                err_code = sd_ble_gap_connect(target_addr,&m_scan_params,&m_connection_param);
+                if (err_code != NRF_SUCCESS)
+                {
+                    NRF_LOG_INFO("Connection Request Failed, reason %d\r\n", err_code);
+                }
+            }
+            return;
+        }
+        if(!p_cmds_c->handles.assigned)
+        {
+            NRF_LOG_DEBUG("WAIT FOR HANDLE ASSIGNED\r\n");
+            return;
+        }
+        
+        err_code = cmds_c_header_update(p_cmds_c,&txp->header);
+        APP_ERROR_CHECK(err_code);
+
+        err_code = cmds_c_data_update(p_cmds_c,&txp->data);
+        APP_ERROR_CHECK(err_code);
+        
+        app_state.tx_p.tx_queue[app_state.tx_p.process_count] = CMDS_C_PACKET_TX_UNAVAILABLE;
+        app_state.tx_p.process_count++;
+        if(app_state.tx_p.tx_queue[app_state.tx_p.process_count] == CMDS_C_PACKET_TX_UNAVAILABLE){
+            app_state.tx_p.process = false;
+        }
+    }
+
+}
 
 void data_builder(uint8_t *p_data){
     uint8_t p_idx= 0 ;
@@ -40,7 +100,10 @@ void packet_build(uint8_t build_cmd)
         default:
             break;
     }
-    app_state.tx_p.packet_count ++;
+    app_state.tx_p.process = true;
+    app_state.tx_p.tx_queue[app_state.tx_p.queue_index] = app_state.tx_p.packet_count;
+    app_state.tx_p.packet_count++;
+    app_state.tx_p.queue_index++;
 }
 
 static uint32_t cccd_configure(uint16_t conn_handle, uint16_t cccd_handle, bool enable);
@@ -111,27 +174,27 @@ static void on_hvx(ble_cmds_c_t * p_cmds_c, const ble_evt_t * p_ble_evt)
     if(p_cmds_c->handles.assigned){
         if (p_evt_hvx->handle == p_cmds_c->handles.header_handle)
         {
-            NRF_LOG_INFO("HEADER HANDLER [R] OR [S]");
+            NRF_LOG_INFO("HEADER HANDLER [R]");
         }
         else if (p_evt_hvx->handle == p_cmds_c->handles.header_cccd_handle)
         {
-            NRF_LOG_INFO("HEADER CCCD HANDLER [R] OR [S]");
+            NRF_LOG_INFO("HEADER CCCD HANDLER [R]");
         }
         else if (p_evt_hvx->handle == p_cmds_c->handles.data_handle)
         {
-            NRF_LOG_INFO("DATA HANDLER [R] OR [S]");
+            NRF_LOG_INFO("DATA HANDLER [R]");
         }
          else if (p_evt_hvx->handle == p_cmds_c->handles.header_cccd_handle)
         {
-            NRF_LOG_INFO("DATA CCCD HANDLER [R] OR [S]");
+            NRF_LOG_INFO("DATA CCCD HANDLER [R]");
         }
          else if (p_evt_hvx->handle == p_cmds_c->handles.result_handle)
         {
-            NRF_LOG_INFO("RESULT HANDLER [R] OR [S]");
+            NRF_LOG_INFO("RESULT HANDLER [R]");
         }
          else if (p_evt_hvx->handle == p_cmds_c->handles.result_cccd_handle)
         {
-            NRF_LOG_INFO("RESULT CCCD HANDLER [R] OR [S]");
+            NRF_LOG_INFO("RESULT CCCD HANDLER [R]");
         }
     }
 }
@@ -177,7 +240,7 @@ uint32_t ble_cmds_c_init(ble_cmds_c_t * p_cmds_c)
     p_cmds_c->handles.data_cccd_handle      = BLE_GATT_HANDLE_INVALID;
     p_cmds_c->handles.result_handle = BLE_GATT_HANDLE_INVALID;
     p_cmds_c->handles.result_cccd_handle      = BLE_GATT_HANDLE_INVALID;
-    
+        
     return ble_db_discovery_evt_register(&cmds_c_uuid);
 }
 
@@ -201,3 +264,27 @@ static uint32_t cccd_configure(uint16_t conn_handle, uint16_t cccd_handle, bool 
 
     return sd_ble_gattc_write(conn_handle, &write_params);
 }
+
+uint32_t cmds_c_value_update(ble_cmds_c_t * p_cmds_c, uint16_t* handle, uint8_t * p_string, uint16_t length)
+{
+    if ( p_cmds_c->conn_handle == BLE_CONN_HANDLE_INVALID)
+    {
+        return NRF_ERROR_INVALID_STATE;
+    }
+    if (length > CMDS_DATA_MAX_DATA_LEN)
+    {
+        return NRF_ERROR_INVALID_PARAM;
+    }
+
+    const ble_gattc_write_params_t write_params = {
+        .write_op = BLE_GATT_OP_WRITE_CMD,
+        .flags    = BLE_GATT_EXEC_WRITE_FLAG_PREPARED_WRITE,
+        .handle   = *handle,
+        .offset   = 0,
+        .len      = length,
+        .p_value  = p_string
+    };
+
+    return sd_ble_gattc_write(p_cmds_c->conn_handle, &write_params);
+}
+

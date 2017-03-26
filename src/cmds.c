@@ -1,16 +1,5 @@
 #include "cmds.h"
-
-
-static int8_t gap_disc_addr_check(uint8_t *p_data){
-    for(int i=0;i<app_state.net.disc.count;i++){
-        if(!memcmp(app_state.net.disc.peer[i].p_addr.addr,p_data, BLE_GAP_ADDR_LEN)){
-            NRF_LOG_DEBUG("ADDR FOUND!\r\n");
-            return i;
-        }
-    }
-    NRF_LOG_DEBUG("ADDR NOT FOUND!\r\n");
-    return GAP_DISC_ADDR_NOT_FOUND;
-}
+#include "ble_hci.h"
 
 
 static void gap_disc_id_update(p_packet* rxp)
@@ -34,6 +23,8 @@ static void gap_disc_id_update(p_packet* rxp)
  
 void packet_interpret(ble_cmds_t * p_cmds)
 {
+    uint32_t err_code;
+
     if(app_state.rx_p.process){
         NRF_LOG_DEBUG("PACKET INTERPRET!\r\n");
 
@@ -87,6 +78,9 @@ void packet_interpret(ble_cmds_t * p_cmds)
             default:
                 break;
         }
+        
+        err_code = sd_ble_gap_disconnect(p_cmds->conn_handle,BLE_HCI_STATUS_CODE_SUCCESS);
+        APP_ERROR_CHECK(err_code);
         
         app_state.rx_p.process = false;
     }

@@ -834,8 +834,10 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
     }
     
     packet_interpret(&m_cmds_s);
-//    packet_send();
+    //    packet_send();
     app_cmd_evt(p_ble_evt);
+    packet_send(&m_cmds_c_s);
+
     bsp_btn_ble_on_ble_evt(p_ble_evt);
 }
 
@@ -1095,7 +1097,8 @@ int main(void)
     bool     erase_bonds;
 
     memset(&app_state, 0, sizeof(app_state));
-
+    memset(&app_state.tx_p.tx_queue,CMDS_C_PACKET_TX_UNAVAILABLE,sizeof(app_state.tx_p.tx_queue)); //for tx_queue index
+    
     // Initialize.
     err_code = NRF_LOG_INIT(NULL);
     APP_ERROR_CHECK(err_code);
@@ -1120,7 +1123,7 @@ int main(void)
     advertising_init();
     conn_params_init();
 
-    NRF_LOG_DEBUG("Ram Size : %d kb \r\n",sizeof(app_state)/1024);    
+    NRF_LOG_DEBUG("Ram Size : %d kb %d\r\n",sizeof(app_state)/1024,sizeof(app_state.tx_p.tx_queue));    
     NRF_LOG_DEBUG("%s Addr : %s\r\n",LOG_PUSH(app_state.dev.name), STR_PUSH(app_state.dev.my_addr.addr,1));
 
     advertising_start();

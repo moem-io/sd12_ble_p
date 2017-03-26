@@ -6,6 +6,8 @@
 #include <string.h>
 #include <stdbool.h>
 
+#include "main.h"
+
 #define STR(str,rev)                                                  uint8_t_to_str(str,sizeof(str),rev)
 #define VSTR(str,str_len,rev)                                     uint8_t_to_str(str,str_len,rev)
 
@@ -14,5 +16,7 @@
 #define VSTR_PUSH(str,str_len,rev)                          nrf_log_push(VSTR(str,str_len,rev))
 
 char* uint8_t_to_str(uint8_t *data_addr,uint8_t length, bool reverse);
+int8_t gap_disc_addr_check(uint8_t *p_data);
+ble_gap_addr_t* gap_disc_id_check(uint8_t *id);
 
 #endif

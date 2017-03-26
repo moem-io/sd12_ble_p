@@ -24,6 +24,7 @@
 #define CMDS_PACKET_RESULT_HEADER_OK ((uint8_t) 1)
 #define CMDS_PACKET_RESULT_DATA_OK      ((uint8_t) 2)
 #define CMDS_PACKET_RESULT_ERROR      ((uint8_t) 255)
+
 typedef struct
 {
     uint8_t                                 uuid_type;

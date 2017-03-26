@@ -38,33 +38,39 @@
 #define APP_CMD_SET_PARENT_ID                           1
 
 #define GAP_DISC_ADDR_NOT_FOUND                   -1
+#define GAP_DISC_ID_NOT_FOUND                           NULL
 
 #define APP_CMD(CMD)                                     app_state.dev.app_cmd = CMD
 
 typedef struct {
-  uint8_t node;
-  uint8_t sensor;
+    uint8_t node;
+    uint8_t sensor;
 }p_address;
 
 typedef struct {
-  uint8_t now;
-  uint8_t total;
+    uint8_t now;
+    uint8_t total;
 }p_index;
 
 typedef struct {
-  uint8_t type;
-  p_index index;
-  p_address source;
-  p_address target;
+    uint8_t type;
+    p_index index;
+    p_address source;
+    p_address target;
 }p_header;
 
 typedef struct {
-  uint8_t p_data[MAX_DATA_LENGTH];
+    uint8_t p_data[MAX_DATA_LENGTH];
 }p_data;
 
 typedef struct {
-  p_header header;
-  p_data data;
+    uint8_t result;
+}p_result;
+
+typedef struct {
+    p_header header;
+    p_data data;
+    p_result result;
 }p_packet;
 
 
@@ -119,8 +125,12 @@ typedef struct
 {
     uint8_t packet_count;
 
+    uint8_t queue_index;
+    int8_t tx_queue[MAX_PACKET_COUNT];
+
     bool    process;
     uint8_t process_count;
+
     p_packet packet[MAX_PACKET_COUNT];
 } app_packet_tx;
 
