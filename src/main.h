@@ -71,7 +71,7 @@ typedef struct {
 typedef struct
 {
     uint8_t                 id;
-    ble_gap_addr_t peer_addr;
+    ble_gap_addr_t p_addr;
     int8_t         rssi;
     uint8_t         rssi_count;
 } gap_data;
@@ -79,12 +79,13 @@ typedef struct
 typedef struct
 {
   uint8_t count;
-  gap_data data[MAX_DISC_QUEUE];
+  gap_data peer[MAX_DISC_QUEUE];
 } gap_disc;
 
 typedef struct
 {
     uint8_t         my_id;
+    uint8_t         root_id; //ALWAYS 0
     char name[MAX_DEV_NAME];
     ble_gap_addr_t my_addr;
     ble_gap_addr_t parent_addr;
@@ -109,18 +110,27 @@ typedef struct
     uint8_t packet_count;
     uint8_t header_count;
     uint8_t data_count;
-    bool    interpret;
-    uint8_t interpret_count;
+    bool    process;
+    uint8_t process_count;
     p_packet packet[MAX_PACKET_COUNT];
-} app_packet_s;
+} app_packet_rx;
+
+typedef struct
+{
+    uint8_t packet_count;
+
+    bool    process;
+    uint8_t process_count;
+    p_packet packet[MAX_PACKET_COUNT];
+} app_packet_tx;
 
 typedef struct
 {
     app_dev_condition dev;
     app_net_condition net;
     app_timer_condition timer;
-    app_packet_s rx_p;
-    app_packet_s tx_p;
+    app_packet_rx rx_p;
+    app_packet_tx tx_p;
 } app_condition;
 
 extern app_condition app_state;

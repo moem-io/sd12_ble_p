@@ -545,27 +545,27 @@ void net_disc(const ble_evt_t * const p_ble_evt){
       NRF_LOG_INFO("CMD SVC FOUND!!\r\n");
 
       for(int i=0;i<disc->count;i++){
-        if(!memcmp(disc->data[i].peer_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
-          if(disc->data[i].rssi_count < MAX_RSSI_COUNT){
+        if(!memcmp(disc->peer[i].p_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
+          if(disc->peer[i].rssi_count < MAX_RSSI_COUNT){
             base_rssi[i] +=  p_adv_report->rssi;
-            disc->data[i].rssi_count++;
-            disc->data[i].rssi = base_rssi[i]/disc->data[i].rssi_count;
+            disc->peer[i].rssi_count++;
+            disc->peer[i].rssi = base_rssi[i]/disc->peer[i].rssi_count;
             NRF_LOG_DEBUG("count %d : Addr : %s Rssi : %d \r\n",
-            disc->data[i].rssi_count, STR_PUSH(disc->data[i].peer_addr.addr,1),disc->data[i].rssi);
+            disc->peer[i].rssi_count, STR_PUSH(disc->peer[i].p_addr.addr,1),disc->peer[i].rssi);
           }
           return;
         }
       }
 
-      disc->data[disc->count].peer_addr=p_adv_report->peer_addr;
-      disc->data[disc->count].rssi= p_adv_report->rssi;
-      disc->data[disc->count].rssi_count=1;
+      disc->peer[disc->count].p_addr=p_adv_report->peer_addr;
+      disc->peer[disc->count].rssi= p_adv_report->rssi;
+      disc->peer[disc->count].rssi_count=1;
       base_rssi[disc->count] = p_adv_report->rssi;
-
-      for(int i=0;i<=disc->count;i++){
-          NRF_LOG_INFO("No %d : Addr : %s Rssi : %d \r\n",i, STR_PUSH(disc->data[i].peer_addr.addr,1),disc->data[i].rssi);
+      disc->count +=1;
+      
+      for(int i=0;i<disc->count;i++){
+          NRF_LOG_INFO("No %d : Addr : %s Rssi : %d \r\n",i, STR_PUSH(disc->peer[i].p_addr.addr,1),disc->peer[i].rssi);
       }
-        disc->count +=1;
     }
   }
   else{
@@ -624,6 +624,7 @@ static void on_ble_central_evt(const ble_evt_t * const p_ble_evt)
                 
                 if(app_state.net.disc.count >0){
                     app_state.net.discovered = APP_NET_DISCOVERED_TRUE; 
+                    packet_build(CMDS_C_BUILD_SCAN_RESULT);
                 }
             }
             else if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_CONN)
@@ -833,7 +834,7 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
     }
     
     packet_interpret(&m_cmds_s);
-    
+//    packet_send();
     app_cmd_evt(p_ble_evt);
     bsp_btn_ble_on_ble_evt(p_ble_evt);
 }

@@ -7,20 +7,23 @@
 #include "app_error.h"
 
 #include "cmds_base.h"
+#include "cmds_c.h"
 #include "util.h"
 #include "main.h"
 
-#define BLE_CMDS_MAX_DATA_LEN (GATT_MTU_SIZE_DEFAULT - 3)
-#define BLE_CMDS_RESULT_CHAR_MAX_DATA_LEN 2
+#define CMDS_MAX_DATA_LEN (GATT_MTU_SIZE_DEFAULT - 3)
 
-#define BLE_CMDS_PACKET_TYPE_NETWORK_SCAN_REQUEST 1
-#define BLE_CMDS_PACKET_TYPE_NETWORK_SCAN_RESPONSE 2
+#define CMDS_HEADER_MAX_DATA_LEN 7
+#define CMDS_DATA_MAX_DATA_LEN 20
+#define CMDS_RESULT_MAX_DATA_LEN 1
 
-#define BLE_CMDS_PACKET_RESULT_SIZE              1
-#define BLE_CMDS_PACKET_RESULT_IDLE              ((uint8_t) 0)
-#define BLE_CMDS_PACKET_RESULT_HEADER_OK ((uint8_t) 1)
-#define BLE_CMDS_PACKET_RESULT_DATA_OK      ((uint8_t) 2)
-#define BLE_CMDS_PACKET_RESULT_ERROR      ((uint8_t) 255)
+#define CMDS_PACKET_TYPE_NETWORK_SCAN_REQUEST 1
+#define CMDS_PACKET_TYPE_NETWORK_SCAN_RESPONSE 2
+
+#define CMDS_PACKET_RESULT_IDLE              ((uint8_t) 0)
+#define CMDS_PACKET_RESULT_HEADER_OK ((uint8_t) 1)
+#define CMDS_PACKET_RESULT_DATA_OK      ((uint8_t) 2)
+#define CMDS_PACKET_RESULT_ERROR      ((uint8_t) 255)
 typedef struct
 {
     uint8_t                                 uuid_type;

@@ -1,5 +1,48 @@
 #include "cmds_c.h"
 
+
+void data_builder(uint8_t *p_data){
+    uint8_t p_idx= 0 ;
+    for(int i=0;i<app_state.net.disc.count;i++){
+        memcpy(&p_data[p_idx],app_state.net.disc.peer[i].p_addr.addr,BLE_GAP_ADDR_LEN);
+        
+        uint8_t u_rssi = -app_state.net.disc.peer[i].rssi;
+        memcpy(&p_data[p_idx+BLE_GAP_ADDR_LEN],&u_rssi,sizeof(uint8_t));
+        
+        p_idx= p_idx+BLE_GAP_ADDR_LEN+sizeof(uint8_t);
+    }
+}
+
+void packet_build(uint8_t build_cmd)
+{
+    p_packet* txp = &app_state.tx_p.packet[app_state.tx_p.packet_count];
+    p_packet* rxp = &app_state.rx_p.packet[app_state.rx_p.process_count];
+    
+    switch(build_cmd)
+    {
+        case CMDS_C_BUILD_SCAN_RESULT:
+            txp->header.type = CMDS_PACKET_TYPE_NETWORK_SCAN_RESPONSE;
+            txp->header.source.node = app_state.dev.my_id;
+            txp->header.source.sensor = 0;
+            txp->header.target.node = app_state.dev.root_id;
+            txp->header.target.sensor = 0;
+            txp->header.index.now = 1;
+            txp->header.index.total = 1;
+        
+            data_builder(txp->data.p_data);
+            break;
+
+        case CMDS_C_BUILD_PACKET_ROUTE:
+            memcpy(&txp->header,&rxp->header,sizeof(CMDS_HEADER_MAX_DATA_LEN));
+            memcpy(&txp->data,&rxp->data,sizeof(CMDS_DATA_MAX_DATA_LEN));
+            break;
+        
+        default:
+            break;
+    }
+    app_state.tx_p.packet_count ++;
+}
+
 static uint32_t cccd_configure(uint16_t conn_handle, uint16_t cccd_handle, bool enable);
 
 void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t * p_evt)

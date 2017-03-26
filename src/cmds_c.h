@@ -8,6 +8,11 @@
 #include "app_error.h"
 #include "main.h"
 
+#define CMDS_C_BUILD_SCAN_RESULT 1
+#define CMDS_C_BUILD_DATA_RESULT 2
+#define CMDS_C_BUILD_PACKET_ROUTE 3
+
+#define CMDS_C_PACKET_LENGTH_SCAN_RESPONSE 7
 
 typedef struct {
     uint16_t                header_handle;      /**< Handle of the NUS RX characteristic as provided by a discovery. */
@@ -29,6 +34,7 @@ typedef struct
 void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t * p_evt);
 void ble_cmds_c_on_ble_evt(ble_cmds_c_t * p_cmds_c, const ble_evt_t * p_ble_evt);
 
+void packet_build(uint8_t build_cmd);
 
 uint32_t ble_cmds_c_init(ble_cmds_c_t * p_cmds_c);
 
