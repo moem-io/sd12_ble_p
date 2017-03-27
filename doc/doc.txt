@@ -1,0 +1,64 @@
+﻿
+1. CMDS GAP Conn Sequence
+
+저희 FW 시퀀스의 BLE 통신 중에 가장 우선이 되는 순서입니다. BLE의 경우 GAP(Generic Access Profile)를 기반으로 연결이 수립됩니다. GAP가 관여하는 부분은, 한 장치가 다른 장치에게 어떤식으로 검색될 것인지 정의하는 부분과, 한 장치가 다른 장치와 어떤 식으로 연결될지를 정의하는 부분입니다. 
+이 GAP에서 사용되는 핵심 개념은 Central 과 Peripheral 입니다. Peripheral은 주로 센서 장비와 같이 구성되어 있어 데이터를 전달할때 사용하는 장비를 지칭합니다. Central의 경우는 센서 장비의 값과 같은 데이터를 수집하길 원하는 장비를 지칭합니다. (물론 Central과 Peripheral의 역활이 서로 바뀌어도 됩니다)
+
+이런 점에 있어 저희 제품에서의 노드 역활은 데이터를 수집하기도 하면서 데이터를 전달하기도 해야되기 때문에 Central 과 Peripheral의 역활을 동시에 가질 수 있습니다.
+(이 연결 시퀀스에서는 연결할 때 에서만의 역활을 표시하기 위해서 Central과 Peripheral 장비 각각 한가지만을 표시하였습니다.)
+
+위에서 언급한 바와 같이 Peripheral은 자신의 데이터를 전달하기 위해서 Central에 의해서 연결되어야 하는 장비입니다. 따라서 Peripheral은 자신의 정보를 상대방에게 알려주는 역활이 수행되어야 합니다. 이를 Advertising 이라고 부릅니다. 근데 위 시퀀스를 보면 ADVERTISING START 에 앞서 SET GAP PARAMS 가 먼저 위치하게 됩니다.
+
+이는 상대방에게 내가 어떻게 보여질 것인지 및 Advertising에 관련된 전반적인 설정을 하는 부분입니다. Advertising에 관련된 전반적인, 장비 주소, 장비 이름, 내가 가지고 있는 데이터에 대한 정보, Advertising을 얼마큼의 간격으로 내보낼 것인지, Advertising을 할 최대 시간 등에 대해 정의합니다.
+
+이러한 설정을 마치게 되면, 이제 Advertising start을 통해 내 장치를 Advertising 하게 됩니다. 상대 장비인 Central은 GAP Scan Request를 통해 Advertising 정보를 받아오게 됩니다. 이 받아온 정보를 GAP ADV Report 이라고 부릅니다. 이 Advertising 정보에는 아까 Peripheral이 설정한 정보들이 담겨오게 됩니다.
+
+Central은 받아온 Advertising Report에서 자신이 연결해야할 데이터를 가진 장치를 선택해야 합니다. 저희 제품에서는 저희 장치를 식별하기 위해 만든 고유 식별자를 이용해서 장치를 찾아내게 됩니다. 이 식별하기 위한 값을 Service Complete List 128bit UUID라고 부릅니다. 
+
+만약 이 고유 식별자가 저희가 원한 UUID와 일치한다면, Central은 이 Peripheral에 Connection Request를 날려 연결을 요청하게 됩니다. Peripheral에서는 이 요청을 받아들이고 Central과의 연결이 수립되게 됩니다.
+
+Central과 Peripheral 간의 연결이 수립되었지만, 이 둘 간에 서로 데이터를 주고받기 위한 규약이 서로 없기 때문에, 이를 위해서 Connection Param Update라는 것을 하게 됩니다. 이 Connection Param에 들어가는 정보는 몇 ms 주기로 packet을 주고받을 것인지, 요청이 오지 않는다면 얼만큼 후에 연결을 끊을 것인지, 지연 시간 등에 관련한 것들입니다.
+
+이런 식으로 서로간의 Connection Param 정보를 교환을 통해 데이터를 주고받을 규약이 완료되고 난다면 실질적인 데이터를 주고 받기 위한 연결이 완료되었다고 볼 수 있습니다. 
+
+
+2. Packet Structure
+
+연결이 완료되고 난 뒤에는 서로의 장치간에 데이터를 교환이 시작됩니다. 저희 제품에서는 노드 간의 데이터 교환을 위해서 저희만의 packet 구조를 구성하였습니다. 아래와 같이 저희 packet에는 3가지 부분으로 구성되어집니다. 
+제일 먼저 packet의 구성 정보에 대해 담고 있는 Packet Header 부분, 실질적인 데이터를 담고 있는 Packet Data 부분, Packet을 받고 나서 성공적으로 패킷을 받았는지 혹은 패킷을 처리하고 나서 처리 결과를 전달하는 Packet Result 부분 이렇게 세 부분으로 구성됩니다.
+
+Packet을 구성할 수 있는 방법에는 여러가지가 있겠지만, 저희가 이렇게 세 부분으로 나누어서 구성한 이유는, 저희 서비스에서 구현해야 할 Packet의 종류가 상당히 많고, 또 Packet의 종류에 따라 Packet Data 부분을 해석해야 하는 방법도 달라지기 때문에 Header과 Data 부분을 분리해 두었습니다. Result의 경우 전달 받은 Packet에 오류가 있을수도 있기 때문에, 전달한 Packet에 대해 확인하기 위한 용도로 따로 분리해 두었습니다.
+
+먼저 Packet Header 부분입니다. 가장 첫번째 Byte에 위치하는 내용은 Packet이 어떤 종류인지를 나타냅니다. 다음 두 Byte에 오는 패킷은 Data Packet의 길이가 길 수 있기 때문에 Data Packet을 20 Byte씩 잘라서 보내야 하기 때문에 이런 Packet Index Byte를 사용하였습니다.
+(한 번에 보낼수 있는 Packet의 길이를 MTU (Maximum Transmission Unit) 이라고 부릅니다. BLE 4.0에서 규정하고 있는 Packet MTU의 크기가 20 Byte로 지정되어 있기 때문에, Packet Index를 이용하여 긴 Packet를 구성하였습니다.) 뒤에 4 Byte 중에 앞 2 Byte는 Source Byte (Packet을 보낸 곳)이고, 뒤의 2 Byte는 Targetr Byte (Packet을 보낼 목적지)로 구성되어 있습니다.
+Source, Target 각각 2 Byte 씩에 대한 구성은, 먼저 앞 Byte에는 전달할 Node에 대한 ID 값이고, 뒤의 Byte는 요청할 데이터에 대한 센서 ID 값이 들어갑니다. 
+(각 노드와 센서에 부여할 수 있는 최대 ID 값은 1~255까지 가능합니다. 노드의 경우 ID값이 0번에 대해서는 IoT Hub를 의미합니다. 센서 ID값이 0에 대해서는 노드 혹은 IoT Hub 자체를 의미합니다.)
+
+다음은 Packet Data 부분입니다. 보시는것과 같이 Packet Target에 따라 데이터를 해석하는 방법이 달라지게 됩니다. 가령 네트워크 검색을 요청하고 검색된 데이터를 반환 할때 이용되는 데이터 패킷의 구성은 다음과 같습니다. 검색된 데이터 한개당 데이터 구성은 7 Byte로 구성됩니다. (6 Byte Addr + 1 Byte RSSI) 로 구성됩니다. 따라서 만약 검색된 데이터가 6개가 된다면 7 * 6 = 42 Byte라서 데이터 Byte 3개를 사용하게 되고, Header 자리에 위치할 Packet Index는 3개가 됩니다. 
+
+마지막으로는 Packet Result 부분입니다. Packet을 전달받았을때 정확히 데이터를 전달받았는지, 혹은 패킷을 해석하였을시 Packet이 올바르게 전달되었는지 혹은 잘못된 Packet이 전달되었는지 등에 대한 정보를 반환합니다.
+
+
+3. Packet Transfer
+
+위에서 정의한 Packet을 실질적으로 주고받는 부분입니다. 위의 Connection Sequence 부분에서는 GAP를 기반으로 통신하였지만, Central과 Peripheral 간의 Connection이 수립되고 난 뒤에는 Central과 Peripheral이라는 역활이 더이상 중요해지지 않습니다. 연결된 이후부터는 GATT (General Attribute Profile) 이라는 프로토콜을 사용하게 됩니다. GATT를 이용해서 통신을 하는 순간부터는 Central 과 Peripheral 대신 GATT Server와 GATT Client라는 개념이 이용되게 됩니다.
+일반적으로 Peripheral의 경우 데이터를 전달하는 역활을 맡고 있기 때문에 GATT Server이고 Central의 경우는 데이터를 수집해와야 하기 때문에 GATT Client 으로 인식되지만, 이는 일반적인 통념이 그럴 뿐 실질적으로 Central, Peripheral 과 GATT Server, GATT Client와는 전혀 다른 개념입니다.
+
+위의 시퀀스에 표시한 것과 같이 저희 제품 역시 일반적인 경우처럼 Central은 GATT Client이고, Peripheral의 경우 GATT Server로 동작하게 됩니다. 
+GATT는 실제로는 ATT (Attribute Protocol)의 구현체이며, ATT는 사실상 Service와 Characteristic 으로 구성되어 있습니다.
+
+위에 보시는것과 같이 ATT에는 실질적으로 값을 담을 수 있는 Attributes로 구성되어 있고, 여러 Attributes를 묶은 구성을 Characteristic 이라고 부릅니다. 또 여러개의 Characteristic의 구성은 Service라 부릅니다. 이러한 Service, Characteristic, Attributes를 이용해 데이터를 주고받을 수 있게 되고, 이렇게 데이터를 제공해 주어야 되는 GATT Server 가 이러한 Attributes를 제공하게 됩니다.
+
+이러한 Attributes, Characteristic, Service 각각에는 개별을 식별하기 위한 UUID와 데이터를 처리를 위한 Handler가 각각 부여되어 있습니다. UUID 값은 사용자가 Service를 구성하면서 각각의 Attribute를 식별하기 위해 고유로 부여한 값이고, Handler 값은 GATT Client 혹은 GATT Server가 각 Attribute의 값을 제어하기 위한 값입니다.
+
+
+시퀀스에서 1, 2번 경우는 앞에서 보았던 GAP Connection Sequence와 동일합니다. Connection이 수립된 이후, GATT Client는 GATT Server가 어떠한 Service를 가지고 있는지, 이 Service에 어떠한 Attribute 가 있는지 알지 못하기 때문에 이를 확인하기 위한 Discover Service 라는 과정을 거치게 됩니다. GATT Server의 모든 Service 검사를 하고 나서 GATT Client는 개별의 Attribute를 관리할때 사용하기 위한 Handler 값을 Assign 해야 됩니다.
+
+Handler 값을 모두 Assign 해준 뒤에는 GATT Server Attribute 개별의 Notification 을 가능하게 해주어야 합니다. GATT Client가 GATT Server에게 값을 Read / Write를 할 때는 다른 특별한 조치가 필요 없지만, GATT Server 가 자신의 현 상황 혹은 자신의 Attribute의 변화를 알리기 위해서는 Notification을 통해서만 전달할 수 있습니다. 그리고 이 Notification은 연결을 한다고 해서 활성화 되는게 아니기 때문에 GATT Client가 개별 Attribute 에 대해서 Notification을 활성화 해주어야 합니다.
+
+여기까지의 모든 과정을 거친 뒤에는 GATT Central은 데이터를 보낼 수 있게 됩니다. GATT Client가 Header Attribute 에 Header Packet을 보내게 되면, GATT Server은 Header가 확실히 들어옴을 확인하고 Header 확인 Byte를 Result Attribute를 통해 Notify 하게 됩니다. GATT Client는 이 Notify 된 Header 확인 패킷읋 확인하고 나서 Data 패킷을 실어 보냅니다. 똑같은 과정을 거침을 통해서 GATT Client는 패킷이 성공적으로 전달됨을 알게 됩니다.
+0GATT Server은 받은 Header와 Data Packet을 분석해서 관련된 처리를 시작하게 됩니다. Packet이 정상적으로 해석되면 GATT Server는 GATT Client 에게 연결을 끊을 요청을 하고 이 과정을 통해 두 장비의 연결은 끊어지게 됩니다. 만약 Packet이 제대로 전달되지 않았다던가 Packet에 문제가 있다면, GATT Server은 GATT Client에게 Packet 재요청을 위한 Result Packet을 보내게 됩니다.
+
+4. Packet Interpret
+
+5. Packet Route
