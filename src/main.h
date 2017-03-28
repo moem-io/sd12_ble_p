@@ -11,7 +11,7 @@
 
 #define MAX_DISC_QUEUE 10  /** Max Discovery Queue **/
 #define MAX_RSSI_COUNT 255  /** Max RSSI NORMALIZE COUNT **/
-#define MAX_PACKET_COUNT 40
+#define MAX_PACKET_COUNT 20
 #define MAX_DATA_LENGTH 80
 #define MAX_DEV_NAME 10
 
@@ -34,13 +34,8 @@
 #define APP_NET_DISCOVERED_FALSE                   false
 #define APP_NET_DISCOVERED_TRUE                   true
 
-#define APP_CMD_INVALID                                         0
-#define APP_CMD_SET_PARENT_ID                           1
-
 #define GAP_DISC_ADDR_NOT_FOUND                   -1
 #define GAP_DISC_ID_NOT_FOUND                           NULL
-
-#define APP_CMD(CMD)                                     app_state.dev.app_cmd = CMD
 
 typedef struct {
     uint8_t node;
@@ -95,7 +90,7 @@ typedef struct
     char name[MAX_DEV_NAME];
     ble_gap_addr_t my_addr;
     ble_gap_addr_t parent_addr;
-    uint8_t         app_cmd;
+    bool parent_addr_set;
 }app_dev_condition;
 
 typedef struct

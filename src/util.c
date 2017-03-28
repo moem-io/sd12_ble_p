@@ -14,7 +14,7 @@ char* uint8_t_to_str(uint8_t *data_addr,uint8_t length, bool rev){
 }
 
 
-int8_t gap_disc_addr_check(uint8_t *p_data){
+int8_t app_disc_addr_check(uint8_t *p_data){
     for(int i=0;i<app_state.net.disc.count;i++){
         if(!memcmp(app_state.net.disc.peer[i].p_addr.addr,p_data, BLE_GAP_ADDR_LEN)){
             NRF_LOG_DEBUG("ADDR FOUND!\r\n");
@@ -26,7 +26,7 @@ int8_t gap_disc_addr_check(uint8_t *p_data){
 }
 
 
-ble_gap_addr_t* gap_disc_id_check(uint8_t *id){
+ble_gap_addr_t* app_disc_id_check(uint8_t *id){
     if(*id == 0){
         return &app_state.dev.parent_addr;
     }

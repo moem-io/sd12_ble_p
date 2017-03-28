@@ -6,6 +6,7 @@
 #include "ble_db_discovery.h"
 
 #include "app_error.h"
+#include "nrf_delay.h"
 #include "main.h"
 
 #define CMDS_C_BUILD_SCAN_RESULT 1

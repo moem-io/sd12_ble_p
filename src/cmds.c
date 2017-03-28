@@ -1,10 +1,20 @@
 #include "cmds.h"
 #include "ble_hci.h"
 
-
-static void gap_disc_id_update(p_packet* rxp)
+static void app_dev_parent_addr_set(ble_gap_addr_t* addr)
 {
-    int8_t result = gap_disc_addr_check(rxp->data.p_data);
+    if(!app_state.dev.parent_addr_set){
+        memcpy(&app_state.dev.parent_addr, addr, sizeof(ble_gap_addr_t));
+
+        NRF_LOG_DEBUG("Parent Addr set : %s\r\n",STR_PUSH(app_state.dev.parent_addr.addr,1));
+        app_state.dev.parent_addr_set = true;
+    }
+}
+
+
+static void app_disc_id_update(p_packet* rxp)
+{
+    int8_t result = app_disc_addr_check(rxp->data.p_data);
     if(result >0)
     {
         if(app_state.net.disc.peer[result].id == 0){
@@ -21,13 +31,13 @@ static void gap_disc_id_update(p_packet* rxp)
 }
 
  
-void packet_interpret(ble_cmds_t * p_cmds)
+void packet_interpret(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
 {
     uint32_t err_code;
 
     if(app_state.rx_p.process){
-        NRF_LOG_DEBUG("PACKET INTERPRET!\r\n");
-
+        //NRF_LOG_DEBUG("[P3] - PACKET INTERPRET\r\n");
+        
         p_packet *rxp = &(app_state.rx_p.packet[app_state.rx_p.process_count]);
        
         switch(rxp->header.type)
@@ -46,8 +56,6 @@ void packet_interpret(ble_cmds_t * p_cmds)
                         app_state.dev.my_id = rxp->header.target.node; //ID SETTING
                         NRF_LOG_INFO("Device ID SET : %d !!\r\n",app_state.dev.my_id);
                         
-                        APP_CMD(APP_CMD_SET_PARENT_ID);
-                        
                         NRF_LOG_INFO("[MOD] Network Not Discovered.\r\n");
                         scan_start();
                     }
@@ -57,13 +65,12 @@ void packet_interpret(ble_cmds_t * p_cmds)
                     app_state.net.discovered = APP_NET_DISCOVERED_FALSE;
                     NRF_LOG_INFO("Network Re-Scan Initialized.\r\n");
                     
-                    APP_CMD(APP_CMD_SET_PARENT_ID);
                     scan_start();
                 }
                 else if(app_state.dev.my_id != rxp->header.target.node)
                 {
                     NRF_LOG_DEBUG("PACKET ROUTE!\r\n");
-                    gap_disc_id_update(rxp);
+                    app_disc_id_update(rxp);
                     
                     if(app_state.net.discovered)
                     {
@@ -79,7 +86,7 @@ void packet_interpret(ble_cmds_t * p_cmds)
                 break;
         }
         
-        err_code = sd_ble_gap_disconnect(p_cmds->conn_handle,BLE_HCI_STATUS_CODE_SUCCESS);
+        err_code = sd_ble_gap_disconnect(p_cmds->conn_handle,BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
         APP_ERROR_CHECK(err_code);
         
         app_state.rx_p.process = false;
@@ -216,6 +223,9 @@ void ble_cmds_on_ble_evt(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
     {
         case BLE_GAP_EVT_CONNECTED:
             p_cmds->conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
+            if(p_ble_evt->evt.gap_evt.params.connected.peer_addr.addr[0] != 0){
+                app_dev_parent_addr_set(&p_ble_evt->evt.gap_evt.params.connected.peer_addr);
+            }
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:

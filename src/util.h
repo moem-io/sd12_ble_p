@@ -16,7 +16,7 @@
 #define VSTR_PUSH(str,str_len,rev)                          nrf_log_push(VSTR(str,str_len,rev))
 
 char* uint8_t_to_str(uint8_t *data_addr,uint8_t length, bool reverse);
-int8_t gap_disc_addr_check(uint8_t *p_data);
-ble_gap_addr_t* gap_disc_id_check(uint8_t *id);
+int8_t app_disc_addr_check(uint8_t *p_data);
+ble_gap_addr_t* app_disc_id_check(uint8_t *id);
 
 #endif

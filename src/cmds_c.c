@@ -1,4 +1,8 @@
 #include "cmds_c.h"
+#include "util.h"
+
+static uint32_t cccd_configure(uint16_t conn_handle, uint16_t cccd_handle, bool enable);
+
 
 uint32_t cmds_c_header_update(ble_cmds_c_t* p_cmds_c, p_header* header)
 {
@@ -23,34 +27,81 @@ uint32_t cmds_c_result_update(ble_cmds_c_t* p_cmds_c, p_result* result)
 
 void packet_send(ble_cmds_c_t* p_cmds_c)
 {
+    NRF_LOG_DEBUG("[P3] - PACKET SEND - %d\r\n",app_state.tx_p.process);
     uint32_t err_code;
     p_packet* txp = &app_state.tx_p.packet[app_state.tx_p.process_count];
     if(app_state.tx_p.process){
-        
+        NRF_LOG_DEBUG("PACKET SEND IN PROGRESS\r\n");
+
         if (p_cmds_c->conn_handle == BLE_CONN_HANDLE_INVALID)
         {
-            NRF_LOG_DEBUG("WAIT FOR PERIPHERAL CONNECTION\r\n");
-            ble_gap_addr_t* target_addr = gap_disc_id_check(&txp->header.target.node);
+            ble_gap_addr_t* target_addr = app_disc_id_check(&txp->header.target.node);
             if(target_addr){
+                NRF_LOG_INFO("WAIT FOR PERIPHERAL - TARGET %s\r\n",STR_PUSH(target_addr->addr,1));
                 err_code = sd_ble_gap_connect(target_addr,&m_scan_params,&m_connection_param);
                 if (err_code != NRF_SUCCESS)
                 {
                     NRF_LOG_INFO("Connection Request Failed, reason %d\r\n", err_code);
-                }
+                }   
+                app_state.tx_p.process = false;
+                return;
             }
+            NRF_LOG_ERROR("TARGET NOT FOUND\r\n");
             return;
         }
         if(!p_cmds_c->handles.assigned)
         {
-            NRF_LOG_DEBUG("WAIT FOR HANDLE ASSIGNED\r\n");
+            NRF_LOG_INFO("WAIT FOR HANDLE ASSIGNED\r\n");
+            app_state.tx_p.process =false;
+            nrf_delay_ms(100); // wait for process
             return;
         }
+
+        NRF_LOG_INFO("NOTIFICATION ENABLING!!\r\n");
+        
+            err_code = cccd_configure(p_cmds_c->conn_handle,p_cmds_c->handles.header_cccd_handle, true);
+            if (err_code != NRF_SUCCESS)
+            {
+                NRF_LOG_INFO("1 Failed, reason %d\r\n", err_code);
+            }
+            NRF_LOG_INFO("NOTIFICATION 1 ENABLED!!\r\n");
+            nrf_delay_ms(8);
+
+            err_code = cccd_configure(p_cmds_c->conn_handle,p_cmds_c->handles.data_cccd_handle, true);
+            if (err_code != NRF_SUCCESS)
+            {
+                NRF_LOG_INFO("2 Failed, reason %d\r\n", err_code);
+            }   
+            NRF_LOG_INFO("NOTIFICATION 2 ENABLED!!\r\n");
+            nrf_delay_ms(8);
+
+
+            err_code = cccd_configure(p_cmds_c->conn_handle,p_cmds_c->handles.result_cccd_handle, true);
+            if (err_code != NRF_SUCCESS)
+            {
+                NRF_LOG_INFO("3 Failed, reason %d\r\n", err_code);
+            }           
+            NRF_LOG_INFO("NOTIFICATION 3 ENABLED!!\r\n");
+            nrf_delay_ms(8);
+
+
+            NRF_LOG_DEBUG("NOTIFICATION ENABLED\r\n");
+
         
         err_code = cmds_c_header_update(p_cmds_c,&txp->header);
-        APP_ERROR_CHECK(err_code);
-
+        if (err_code != NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Header update error, reason %d\r\n", err_code);
+        }
+        NRF_LOG_INFO("Header UPDATE SUCCESS\r\n");
+        
         err_code = cmds_c_data_update(p_cmds_c,&txp->data);
-        APP_ERROR_CHECK(err_code);
+        if (err_code != NRF_SUCCESS)
+        {
+            NRF_LOG_INFO("Data update error, reason %d\r\n", err_code);
+        }
+        NRF_LOG_INFO("Data UPDATE SUCCESS\r\n");
+
         
         app_state.tx_p.tx_queue[app_state.tx_p.process_count] = CMDS_C_PACKET_TX_UNAVAILABLE;
         app_state.tx_p.process_count++;
@@ -106,11 +157,8 @@ void packet_build(uint8_t build_cmd)
     app_state.tx_p.queue_index++;
 }
 
-static uint32_t cccd_configure(uint16_t conn_handle, uint16_t cccd_handle, bool enable);
-
 void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t * p_evt)
 {
-    uint32_t err_code;
     ble_gatt_db_char_t * p_chars = p_evt->params.discovered_db.charateristics;
 
     // Check if the CMDS was discovered.
@@ -118,7 +166,6 @@ void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t *
         p_evt->params.discovered_db.srv_uuid.uuid == BLE_UUID_CMDS &&
         p_evt->params.discovered_db.srv_uuid.type == p_cmds_c->uuid_type)
     {
-
         uint32_t i;
 
         for (i = 0; i < p_evt->params.discovered_db.char_count; i++)
@@ -148,20 +195,15 @@ void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t *
         p_cmds_c->handles.assigned=true;
         NRF_LOG_DEBUG("HANDLER ASSIGNED\r\n");
         
-        NRF_LOG_DEBUG("HEADER :%02x , CCCD : %02x",p_cmds_c->handles.header_handle, p_cmds_c->handles.header_cccd_handle);
-        NRF_LOG_DEBUG("DATA :%02x , CCCD : %02x",p_cmds_c->handles.data_handle, p_cmds_c->handles.data_cccd_handle);
-        NRF_LOG_DEBUG("RESULT :%02x , CCCD : %02x",p_cmds_c->handles.result_handle, p_cmds_c->handles.result_cccd_handle);
-        
-        err_code = cccd_configure(p_cmds_c->conn_handle,p_cmds_c->handles.header_cccd_handle, true);
-        APP_ERROR_CHECK(err_code);
-        
-        err_code = cccd_configure(p_cmds_c->conn_handle,p_cmds_c->handles.data_cccd_handle, true);
-        APP_ERROR_CHECK(err_code);
-        
-        err_code = cccd_configure(p_cmds_c->conn_handle,p_cmds_c->handles.result_cccd_handle, true);
-        APP_ERROR_CHECK(err_code);
-        
-        NRF_LOG_DEBUG("NOTIFICATION ENABLED\r\n");
+        NRF_LOG_DEBUG("HEADER :%02x , CCCD : %02x\r\n",p_cmds_c->handles.header_handle, p_cmds_c->handles.header_cccd_handle);
+        NRF_LOG_DEBUG("DATA :%02x , CCCD : %02x\r\n",p_cmds_c->handles.data_handle, p_cmds_c->handles.data_cccd_handle);
+        NRF_LOG_DEBUG("RESULT :%02x , CCCD : %02x\r\n",p_cmds_c->handles.result_handle, p_cmds_c->handles.result_cccd_handle);
+       
+        if(p_cmds_c->handles.header_handle&& p_cmds_c->handles.header_cccd_handle&&p_cmds_c->handles.data_handle&& p_cmds_c->handles.data_cccd_handle&&p_cmds_c->handles.result_handle&&p_cmds_c->handles.result_cccd_handle){
+            NRF_LOG_DEBUG("HANDLER ASSIGNED\r\n");
+
+            app_state.tx_p.process = true;
+        }
     }
 }
 

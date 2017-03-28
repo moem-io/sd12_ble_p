@@ -40,7 +40,7 @@ typedef struct
 }ble_cmds_t;
 
 
-void packet_interpret(ble_cmds_t * p_cmds);
+void packet_interpret(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt);
 
 uint32_t cmds_init(ble_cmds_t * p_cmd_service);
 void ble_cmds_on_ble_evt(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt);

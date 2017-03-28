@@ -782,21 +782,6 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt)
     }
 }
 
-
-static void app_cmd_evt(ble_evt_t* p_ble_evt)
-{
-    switch(app_state.dev.app_cmd){
-        case APP_CMD_INVALID:
-            break;
-        
-        case APP_CMD_SET_PARENT_ID:
-            memcpy(&app_state.dev.parent_addr, &p_ble_evt->evt.gap_evt.params.connected.peer_addr, sizeof(ble_gap_addr_t));
-            
-            NRF_LOG_DEBUG("Parent Addr set : %s\r\n",STR_PUSH(app_state.dev.parent_addr.addr,1));
-            app_state.dev.app_cmd = APP_CMD_INVALID;
-            break;
-    }
-}
 /**@brief Function for dispatching a BLE stack event to all modules with a BLE stack event handler.
  *
  * @details This function is called from the BLE Stack event interrupt handler after a BLE stack
@@ -833,12 +818,10 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
         ble_cmds_c_on_ble_evt(&m_cmds_c_s,p_ble_evt);
     }
     
-    packet_interpret(&m_cmds_s);
-    //    packet_send();
-    app_cmd_evt(p_ble_evt);
+    packet_interpret(&m_cmds_s,p_ble_evt);
     packet_send(&m_cmds_c_s);
 
-    bsp_btn_ble_on_ble_evt(p_ble_evt);
+//    bsp_btn_ble_on_ble_evt(p_ble_evt);
 }
 
 
@@ -1085,7 +1068,7 @@ static void device_preset()
         APP_ERROR_CHECK(err_code);
     }
     
-    sprintf(app_state.dev.name, "%s%d", DEVICE_NAME_PREFIX,rand_number);
+    sprintf(app_state.dev.name, "%s%03d", DEVICE_NAME_PREFIX,rand_number);
 }
 
 
@@ -1123,7 +1106,7 @@ int main(void)
     advertising_init();
     conn_params_init();
 
-    NRF_LOG_DEBUG("Ram Size : %d kb %d\r\n",sizeof(app_state)/1024,sizeof(app_state.tx_p.tx_queue));    
+    NRF_LOG_DEBUG("Ram Size : %d kb \r\n",sizeof(app_state)/1024);    
     NRF_LOG_DEBUG("%s Addr : %s\r\n",LOG_PUSH(app_state.dev.name), STR_PUSH(app_state.dev.my_addr.addr,1));
 
     advertising_start();
