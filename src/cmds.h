@@ -25,6 +25,13 @@
 #define CMDS_PACKET_RESULT_DATA_OK      ((uint8_t) 2)
 #define CMDS_PACKET_RESULT_ERROR      ((uint8_t) 255)
 
+typedef struct { 
+    bool                    header;
+    bool                    data;
+    bool                    result;
+    bool                     all;
+} ble_cmds_notification_t;
+
 typedef struct
 {
     uint8_t                                 uuid_type;
@@ -33,10 +40,7 @@ typedef struct
     ble_gatts_char_handles_t     header_handles;                                          /**< Handles related to the Heart Rate Measurement characteristic. */
     ble_gatts_char_handles_t     data_handles;                                          /**< Handles related to the Body Sensor Location characteristic. */
     ble_gatts_char_handles_t     result_handles;                                         /**< Handles related to the Heart Rate Control Point characteristic. */  
-    bool                    header_notification_enabled;
-    bool                    data_notification_enabled;
-    bool                    result_notification_enabled;
-    bool                     is_notification_enabled;
+    ble_cmds_notification_t notification;
 }ble_cmds_t;
 
 

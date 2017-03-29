@@ -27,11 +27,27 @@ typedef struct {
     bool                     assigned;
 } ble_cmds_c_handles_t;
 
+typedef struct { 
+    bool                    header;
+    bool                    data;
+    bool                    result;
+    bool                     all;
+} ble_cmds_c_notification_t;
+
+typedef struct { 
+    bool                    header;
+    bool                    data;
+    bool                    result;
+    bool                     all;
+} ble_cmds_c_state_t;
+
 typedef struct
 {
     uint8_t                 uuid_type;          /**< UUID type. */
     uint16_t                conn_handle;        /**< Handle of the current connection. Set with @ref ble_nus_c_handles_assign when connected. */
     ble_cmds_c_handles_t     handles;            /**< Handles on the connected peer device needed to interact with it. */
+    ble_cmds_c_notification_t notification;
+    ble_cmds_c_state_t state;
 }ble_cmds_c_t;
 
 void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t * p_evt);
@@ -41,6 +57,5 @@ void packet_build(uint8_t build_cmd);
 void packet_send(ble_cmds_c_t* p_cmds_c);
 
 uint32_t ble_cmds_c_init(ble_cmds_c_t * p_cmds_c);
-uint32_t cmds_c_value_update(ble_cmds_c_t * p_cmds_c, uint16_t* handle, uint8_t * p_string, uint16_t length);
 
 #endif

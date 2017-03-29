@@ -1,17 +1,6 @@
 #include "cmds.h"
 #include "ble_hci.h"
 
-static void app_dev_parent_addr_set(ble_gap_addr_t* addr)
-{
-    if(!app_state.dev.parent_addr_set){
-        memcpy(&app_state.dev.parent_addr, addr, sizeof(ble_gap_addr_t));
-
-        NRF_LOG_DEBUG("Parent Addr set : %s\r\n",STR_PUSH(app_state.dev.parent_addr.addr,1));
-        app_state.dev.parent_addr_set = true;
-    }
-}
-
-
 static void app_disc_id_update(p_packet* rxp)
 {
     int8_t result = app_disc_addr_check(rxp->data.p_data);
@@ -30,7 +19,6 @@ static void app_disc_id_update(p_packet* rxp)
     }
 }
 
- 
 void packet_interpret(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
 {
     uint32_t err_code;
@@ -143,13 +131,12 @@ static void data_parser(ble_gatts_value_t *rx_data)
     packet_count(&app_state.rx_p.data_count);
 }
 
-static void notification_enable(ble_cmds_t * p_cmds, bool *notification_type)
+static void cmds_notification_enable(ble_cmds_t * p_cmds, bool *notification_type)
 {
     *notification_type = true;
-    p_cmds->is_notification_enabled=
-        p_cmds->header_notification_enabled && p_cmds->data_notification_enabled && p_cmds->result_notification_enabled;
-    if(p_cmds->is_notification_enabled){
-        NRF_LOG_DEBUG("NOTIFICATION ALL ENABLED!!\r\n");
+    p_cmds->notification.all=p_cmds->notification.header && p_cmds->notification.data && p_cmds->notification.result;
+    if(p_cmds->notification.all){
+        NRF_LOG_DEBUG("PERIPHERAL NOTIFICATION ALL ENABLED!!\r\n");
     }
 }
 
@@ -192,7 +179,7 @@ static void on_write(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
     else if(p_evt_write->handle == p_cmds->header_handles.cccd_handle)
     {
         gatts_value_get(p_cmds,p_cmds->header_handles.cccd_handle,&rx_data);
-        notification_enable(p_cmds,&p_cmds->header_notification_enabled);
+        cmds_notification_enable(p_cmds,&p_cmds->notification.header);
     }
     else if(p_evt_write->handle == p_cmds->data_handles.value_handle)
     {
@@ -204,7 +191,7 @@ static void on_write(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
     else if(p_evt_write->handle == p_cmds->data_handles.cccd_handle)
     {
         gatts_value_get(p_cmds,p_cmds->data_handles.cccd_handle,&rx_data);
-        notification_enable(p_cmds,&p_cmds->data_notification_enabled);
+        cmds_notification_enable(p_cmds,&p_cmds->notification.data);
     }
     else if(p_evt_write->handle == p_cmds->result_handles.value_handle)
     {
@@ -213,7 +200,7 @@ static void on_write(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
     else if(p_evt_write->handle == p_cmds->result_handles.cccd_handle)
     {
         gatts_value_get(p_cmds,p_cmds->result_handles.cccd_handle,&rx_data);
-        notification_enable(p_cmds,&p_cmds->result_notification_enabled);
+        cmds_notification_enable(p_cmds,&p_cmds->notification.result);
     }
 }
 
@@ -277,10 +264,10 @@ static uint32_t cmd_char_header_add(ble_cmds_t * p_cmds)
     attr_char_value.p_attr_md   = &attr_md;
     attr_char_value.init_offs = 0;
     attr_char_value.max_len     = CMDS_HEADER_MAX_DATA_LEN;
-    attr_char_value.init_len = 0;
+    attr_char_value.init_len = CMDS_HEADER_MAX_DATA_LEN;
     
-    uint8_t value[attr_char_value.max_len];
-    memset(&value, 0, sizeof(value));
+    uint8_t value[CMDS_HEADER_MAX_DATA_LEN];
+    memset(value, 0, sizeof(value));
     
     attr_char_value.p_value     = value;
     
@@ -324,9 +311,9 @@ static uint32_t cmd_char_data_add(ble_cmds_t * p_cmds)
     attr_char_value.p_attr_md   = &attr_md;
     attr_char_value.init_offs = 0;
     attr_char_value.max_len     = CMDS_DATA_MAX_DATA_LEN;
-    attr_char_value.init_len     = 0;
+    attr_char_value.init_len     = CMDS_DATA_MAX_DATA_LEN;
 
-    uint8_t value[attr_char_value.max_len];
+    uint8_t value[CMDS_DATA_MAX_DATA_LEN];
     memset(&value, 0, sizeof(value));
     
     attr_char_value.p_value     = value;
@@ -392,7 +379,7 @@ uint32_t cmds_init(ble_cmds_t * p_cmds)
     APP_ERROR_CHECK(err_code);
     
     p_cmds->conn_handle             = BLE_CONN_HANDLE_INVALID;
-    p_cmds->is_notification_enabled = false;
+    p_cmds->notification.all = false;
     p_cmds->uuid_type = cmds_uuid.type;
     
     cmds_uuid.uuid = BLE_UUID_CMDS;
@@ -417,7 +404,7 @@ uint32_t cmds_init(ble_cmds_t * p_cmds)
 
 uint32_t cmds_value_update(ble_cmds_t *p_cmds,ble_gatts_char_handles_t* data_handle, uint8_t * p_string, uint16_t length)
 {
-    if ((p_cmds->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_cmds->is_notification_enabled))
+    if ((p_cmds->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_cmds->notification.all))
     {
         return NRF_ERROR_INVALID_STATE;
     }

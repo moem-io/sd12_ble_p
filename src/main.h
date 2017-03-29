@@ -19,10 +19,6 @@
 #define APP_STATUS_UNKNOWN              0x0001
 #define APP_STATUS_ERR_MAX_DISC_QUEUE_FULL              0x0010
 
-#define UUID16_SIZE             2                               /**< Size of 16 bit UUID */
-#define UUID32_SIZE             4                               /**< Size of 32 bit UUID */
-#define UUID128_SIZE            16                              /**< Size of 128 bit UUID */
-
 #define APP_TIMER_STATUS_DISABLED                 false
 #define APP_TIMER_STATUS_ENABLED                  true
 #define APP_TIMER_TIMEOUT_FALSE                  false
@@ -33,9 +29,6 @@
 
 #define APP_NET_DISCOVERED_FALSE                   false
 #define APP_NET_DISCOVERED_TRUE                   true
-
-#define GAP_DISC_ADDR_NOT_FOUND                   -1
-#define GAP_DISC_ID_NOT_FOUND                           NULL
 
 typedef struct {
     uint8_t node;

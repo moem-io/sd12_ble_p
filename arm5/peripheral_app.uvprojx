@@ -395,14 +395,19 @@
               <FilePath>..\src\cmds.c</FilePath>
             </File>
             <File>
-              <FileName>util.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\src\util.c</FilePath>
-            </File>
-            <File>
               <FileName>cmds_c.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\src\cmds_c.c</FilePath>
+            </File>
+            <File>
+              <FileName>util_misc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\util_misc.c</FilePath>
+            </File>
+            <File>
+              <FileName>util_app.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\util_app.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -3277,14 +3282,19 @@
               <FilePath>..\src\cmds.c</FilePath>
             </File>
             <File>
-              <FileName>util.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\src\util.c</FilePath>
-            </File>
-            <File>
               <FileName>cmds_c.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\src\cmds_c.c</FilePath>
+            </File>
+            <File>
+              <FileName>util_misc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\util_misc.c</FilePath>
+            </File>
+            <File>
+              <FileName>util_app.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\util_app.c</FilePath>
             </File>
           </Files>
         </Group>
