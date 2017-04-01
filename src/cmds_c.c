@@ -3,7 +3,6 @@
 
 static uint32_t cccd_configure(uint16_t conn_handle, uint16_t cccd_handle, bool enable);
 static uint32_t ble_cmds_c_notif_enable(ble_cmds_c_t * p_cmds_c, uint16_t * handle);
-
 static uint32_t cmds_c_value_update(ble_cmds_c_t * p_cmds_c, uint16_t* handle, uint8_t * p_string, uint16_t length);
 
 uint32_t cmds_c_header_update(ble_cmds_c_t* p_cmds_c, p_header* header)
@@ -27,6 +26,24 @@ uint32_t cmds_c_result_update(ble_cmds_c_t* p_cmds_c, p_result* result)
     return cmds_c_value_update(p_cmds_c,&p_cmds_c->handles.result_handle,buff,sizeof(p_result));
 }
 
+static uint32_t cmds_c_notification_enable(ble_cmds_c_t* p_cmds_c)
+{
+    if(!p_cmds_c->notification.header)
+    {
+        return ble_cmds_c_notif_enable(p_cmds_c,&p_cmds_c->handles.header_cccd_handle);
+    }
+    else if(!p_cmds_c->notification.data)
+    {
+        return ble_cmds_c_notif_enable(p_cmds_c,&p_cmds_c->handles.data_cccd_handle);
+    }
+    else if(!p_cmds_c->notification.result)
+    {
+        return ble_cmds_c_notif_enable(p_cmds_c,&p_cmds_c->handles.result_cccd_handle);
+    }
+    NRF_LOG_ERROR("SEQUENCE BROKEN!! WILL STOP!!\r\n");
+    return NRF_ERROR_INVALID_STATE;
+}
+
 void packet_send(ble_cmds_c_t* p_cmds_c)
 {
     uint32_t err_code;
@@ -34,14 +51,15 @@ void packet_send(ble_cmds_c_t* p_cmds_c)
     if(app_state.tx_p.process){
         p_packet* txp = &app_state.tx_p.packet[app_state.tx_p.process_count];
    
-//        uint8_t buff1[7];
-//        memcpy(buff1, &txp->header,sizeof(buff1));
-//        
-//        uint8_t buff2[20];
-//        memcpy(buff2, &txp->data,sizeof(buff2));
+        uint8_t buff1[7];
+        memcpy(buff1, &txp->header,sizeof(buff1));
+        
+        uint8_t buff2[20];
+        memcpy(buff2, &txp->data,sizeof(buff2));
 
-//        NRF_LOG_DEBUG("[P3] %d th PACKET SEND IN PROGRESS\r\n",app_state.tx_p.process_count);
-//        NRF_LOG_DEBUG(" Header : %07s, DATA : %s\r\n", STR_PUSH(buff1,0), STR_PUSH(buff2,0));
+        NRF_LOG_DEBUG("[%d]th PACKET, Target ID %d\r\n",app_state.tx_p.process_count, txp->header.target.node);
+        NRF_LOG_DEBUG(" Header : %.14s\r\n", STR_PUSH(buff1,0));
+        NRF_LOG_DEBUG(" DATA : %.14s\r\n", STR_PUSH(buff2,0));
         
         if (p_cmds_c->conn_handle == BLE_CONN_HANDLE_INVALID)
         {
@@ -62,30 +80,10 @@ void packet_send(ble_cmds_c_t* p_cmds_c)
             return;
         }
         
-        if(!p_cmds_c->notification.all){            
-            if(!p_cmds_c->notification.header){
-                err_code = ble_cmds_c_notif_enable(p_cmds_c,&p_cmds_c->handles.header_cccd_handle);
-                ERR_CHK("Header Noti Enable Failed");
-                NRF_LOG_INFO("NOTIFICATION 1 ENABLED!!\r\n");
-                p_cmds_c->notification.header = true;
-                return;
-            }
-
-            if(!p_cmds_c->notification.data){
-                err_code = ble_cmds_c_notif_enable(p_cmds_c,&p_cmds_c->handles.data_cccd_handle);
-                ERR_CHK("Data Noti Enable Failed");
-                NRF_LOG_INFO("NOTIFICATION 2 ENABLED!!\r\n");
-                p_cmds_c->notification.data = true;
-                return;
-            }
-
-            if(!p_cmds_c->notification.result){
-                err_code = ble_cmds_c_notif_enable(p_cmds_c,&p_cmds_c->handles.result_cccd_handle);
-                ERR_CHK("Result Noti Enable Failed");
-                NRF_LOG_INFO("NOTIFICATION 3 ENABLED!!\r\n");
-                p_cmds_c->notification.result = true;
-                return;
-            }
+        if(!p_cmds_c->notification.all){
+            err_code = cmds_c_notification_enable(p_cmds_c);
+            ERR_CHK("Noti Enable Failed");
+            return;
         }
         
 
@@ -116,7 +114,8 @@ void packet_send(ble_cmds_c_t* p_cmds_c)
 }
 
 //Function name Rename
-void data_builder(uint8_t *p_data){
+void data_builder(uint8_t *p_data)
+{
     uint8_t p_idx= 0 ;
     for(int i=0;i<app_state.net.disc.count;i++){
         memcpy(&p_data[p_idx],app_state.net.disc.peer[i].p_addr.addr,BLE_GAP_ADDR_LEN);
@@ -130,6 +129,7 @@ void data_builder(uint8_t *p_data){
 
 void packet_build(uint8_t build_cmd)
 {
+    NRF_LOG_INFO("PACKET BUILD TXP : %d, RXP : %d, \r\n",app_state.tx_p.packet_count,app_state.rx_p.process_count);
     p_packet* txp = &app_state.tx_p.packet[app_state.tx_p.packet_count];
     p_packet* rxp = &app_state.rx_p.packet[app_state.rx_p.process_count];
     
@@ -210,12 +210,33 @@ void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t *
         }
     }
 }
-
+//FOR NOTIFICATION ENABLE
+static void on_write_rsp(ble_cmds_c_t * p_cmds_c, const ble_evt_t * p_ble_evt)
+{
+    if(p_ble_evt->evt.gattc_evt.gatt_status == BLE_GATT_STATUS_SUCCESS)
+    {
+        if (p_ble_evt->evt.gattc_evt.params.write_rsp.handle == p_cmds_c->handles.header_cccd_handle)
+        {
+            p_cmds_c->notification.header = true;
+        }
+        else if (p_ble_evt->evt.gattc_evt.params.write_rsp.handle == p_cmds_c->handles.data_cccd_handle)
+        {
+            p_cmds_c->notification.data = true;
+        }
+        else if (p_ble_evt->evt.gattc_evt.params.write_rsp.handle == p_cmds_c->handles.result_cccd_handle)
+        {
+            p_cmds_c->notification.result = true;
+        }
+        
+        p_cmds_c->notification.all=p_cmds_c->notification.header && p_cmds_c->notification.data && p_cmds_c->notification.result;
+        if(p_cmds_c->notification.all){
+            NRF_LOG_DEBUG("PERIPHERAL NOTIFICATION ALL ENABLED!!\r\n");
+        }
+    }
+}
 
 static void on_hvx(ble_cmds_c_t * p_cmds_c, const ble_evt_t * p_ble_evt)
 {
-    NRF_LOG_INFO("HVX HELLO!! [R]");
-
     const ble_gattc_evt_hvx_t * p_evt_hvx = &p_ble_evt->evt.gattc_evt.params.hvx;
     // HVX can only occur from client sending.
 
@@ -255,12 +276,17 @@ void ble_cmds_c_on_ble_evt(ble_cmds_c_t * p_cmds_c, const ble_evt_t * p_ble_evt)
             p_cmds_c->conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
             break;
         
+        case BLE_GATTC_EVT_WRITE_RSP:
+            on_write_rsp(p_cmds_c, p_ble_evt);
+            break;
+        
         case BLE_GATTC_EVT_HVX:
             on_hvx(p_cmds_c, p_ble_evt);
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
             p_cmds_c->conn_handle = BLE_CONN_HANDLE_INVALID;
+            memset(&p_cmds_c->notification, 0, sizeof(ble_cmds_c_notification_t)); 
             break;
         
         default:

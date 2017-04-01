@@ -707,7 +707,8 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
 {
     uint16_t conn_handle;
     uint16_t role;
-
+    
+//    NRF_LOG_DEBUG("EVT ID : %d \r\n",p_ble_evt->header.evt_id);
     ble_conn_state_on_ble_evt(p_ble_evt);
     pm_on_ble_evt(p_ble_evt);
     
@@ -731,11 +732,10 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
         ble_db_discovery_on_ble_evt(&m_ble_db_discovery, p_ble_evt);
         ble_cmds_c_on_ble_evt(&m_cmds_c_s,p_ble_evt);
     }
-    
     packet_interpret(&m_cmds_s,p_ble_evt);
     packet_send(&m_cmds_c_s);
 
-//    bsp_btn_ble_on_ble_evt(p_ble_evt);
+    bsp_btn_ble_on_ble_evt(p_ble_evt);
 }
 
 

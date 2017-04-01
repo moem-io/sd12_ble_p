@@ -4,14 +4,9 @@
 static void app_disc_id_update(p_packet* rxp)
 {
     int8_t result = app_disc_addr_check(rxp->data.p_data);
-    if(result >0)
+    if(result >= 0)
     {
-        if(app_state.net.disc.peer[result].id == 0){
-            NRF_LOG_INFO("Peer ID SET : %d !!\r\n",app_state.net.disc.peer[result].id);
-        }
-        else{
-            NRF_LOG_INFO("[Mod] Peer ID RE-SET : %d !!\r\n",app_state.net.disc.peer[result].id);
-        }
+        NRF_LOG_INFO("ADDR %s ID %d -> %d !!\r\n",STR_PUSH(app_state.net.disc.peer[result].p_addr.addr,1),app_state.net.disc.peer[result].id,rxp->header.target.node);
         app_state.net.disc.peer[result].id = rxp->header.target.node;
     }
     else{
@@ -76,7 +71,7 @@ void packet_interpret(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
         
         err_code = sd_ble_gap_disconnect(p_cmds->conn_handle,BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
         APP_ERROR_CHECK(err_code);
-        
+        memset(&p_cmds->notification, 0, sizeof(ble_cmds_notification_t));
         app_state.rx_p.process = false;
     }
 }
@@ -94,6 +89,7 @@ static void packet_count(uint8_t *packet_type)
     }
     else if(app_state.rx_p.packet_count>=*packet_type)
     {
+        NRF_LOG_DEBUG("PACKET INTERPRET START \r\n");
         app_state.rx_p.process = true;
         app_state.rx_p.process_count = *packet_type -1;
     }
@@ -406,6 +402,7 @@ uint32_t cmds_value_update(ble_cmds_t *p_cmds,ble_gatts_char_handles_t* data_han
 {
     if ((p_cmds->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_cmds->notification.all))
     {
+        NRF_LOG_ERROR("Check Noti or Conn State!!\r\n");
         return NRF_ERROR_INVALID_STATE;
     }
     
