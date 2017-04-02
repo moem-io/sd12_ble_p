@@ -5,6 +5,7 @@
 #include "ble.h"
 #include "ble_srv_common.h"
 #include "app_error.h"
+#include "ble_hci.h"
 
 #include "cmds_base.h"
 #include "cmds_c.h"
@@ -13,9 +14,9 @@
 
 #define CMDS_MAX_DATA_LEN (GATT_MTU_SIZE_DEFAULT - 3)
 
-#define CMDS_HEADER_MAX_DATA_LEN 7
-#define CMDS_DATA_MAX_DATA_LEN 20
-#define CMDS_RESULT_MAX_DATA_LEN 1
+#define CMDS_HEADER_MAX_LEN 7
+#define CMDS_DATA_MAX_LEN 20
+#define CMDS_RESULT_MAX_LEN 1
 
 #define CMDS_PACKET_TYPE_NETWORK_SCAN_REQUEST 1
 #define CMDS_PACKET_TYPE_NETWORK_SCAN_RESPONSE 2

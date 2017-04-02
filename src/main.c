@@ -518,8 +518,7 @@ static void on_ble_central_evt(const ble_evt_t * const p_ble_evt)
 
         case BLE_GAP_EVT_DISCONNECTED:
         {
-            NRF_LOG_INFO("Central disconnected (reason: %d)\r\n",
-                   p_gap_evt->params.disconnected.reason);
+            NRF_LOG_INFO("Central disconnected (reason: %d)\r\n",p_gap_evt->params.disconnected.reason);
             
             bsp_board_led_off(CENTRAL_CONNECTED_LED);
         } break; // BLE_GAP_EVT_DISCONNECTED
@@ -533,8 +532,7 @@ static void on_ble_central_evt(const ble_evt_t * const p_ble_evt)
         {
             if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_SCAN)
             {
-                NRF_LOG_INFO("NET SCANNING TIMEOUT.\r\n");
-                NRF_LOG_DEBUG("%d FOUND!!\r\n",app_state.net.disc.count);
+                NRF_LOG_INFO("NET SCANNING TIMEOUT -- %d FOUND!!\r\n",app_state.net.disc.count);
                 
                 if(app_state.net.disc.count >0){
                     app_state.net.discovered = APP_NET_DISCOVERED_TRUE; 
@@ -708,7 +706,7 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
     uint16_t conn_handle;
     uint16_t role;
     
-//    NRF_LOG_DEBUG("EVT ID : %d \r\n",p_ble_evt->header.evt_id);
+    NRF_LOG_DEBUG("EVT ID : %d \r\n",p_ble_evt->header.evt_id);
     ble_conn_state_on_ble_evt(p_ble_evt);
     pm_on_ble_evt(p_ble_evt);
     

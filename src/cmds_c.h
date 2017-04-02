@@ -37,8 +37,6 @@ typedef struct {
 typedef struct { 
     bool                    header;
     bool                    data;
-    bool                    result;
-    bool                     all;
 } ble_cmds_c_state_t;
 
 typedef struct

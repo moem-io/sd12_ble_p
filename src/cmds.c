@@ -1,5 +1,4 @@
 #include "cmds.h"
-#include "ble_hci.h"
 
 static void app_disc_id_update(p_packet* rxp)
 {
@@ -23,6 +22,17 @@ void packet_interpret(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
         
         p_packet *rxp = &(app_state.rx_p.packet[app_state.rx_p.process_count]);
        
+           
+        uint8_t buff1[7];
+        memcpy(buff1, &rxp->header,sizeof(buff1));
+        
+        uint8_t buff2[20];
+        memcpy(buff2, &rxp->data,sizeof(buff2));
+
+        NRF_LOG_DEBUG("[%d]th PACKET INTERPRET\r\n",app_state.rx_p.process_count);
+        NRF_LOG_DEBUG(" Header : %.14s\r\n", STR_PUSH(buff1,0));
+        NRF_LOG_DEBUG(" DATA : %.28s\r\n", STR_PUSH(buff2,0));
+        
         switch(rxp->header.type)
         {
             case CMDS_PACKET_TYPE_NETWORK_SCAN_REQUEST:
@@ -145,7 +155,7 @@ static void gatts_value_get(ble_cmds_t * p_cmds, uint16_t handle, ble_gatts_valu
 static void cmds_result_update(ble_cmds_t * p_cmds, uint8_t result_type)
 {
     uint32_t err_code;
-    uint8_t result[CMDS_RESULT_MAX_DATA_LEN] = {result_type};
+    uint8_t result[CMDS_RESULT_MAX_LEN] = {result_type};
 
     err_code = cmds_value_update(p_cmds,&p_cmds->result_handles,result, sizeof(result));
     APP_ERROR_CHECK(err_code);
@@ -259,10 +269,10 @@ static uint32_t cmd_char_header_add(ble_cmds_t * p_cmds)
     attr_char_value.p_uuid      = &char_uuid;
     attr_char_value.p_attr_md   = &attr_md;
     attr_char_value.init_offs = 0;
-    attr_char_value.max_len     = CMDS_HEADER_MAX_DATA_LEN;
-    attr_char_value.init_len = CMDS_HEADER_MAX_DATA_LEN;
+    attr_char_value.max_len     = CMDS_HEADER_MAX_LEN;
+    attr_char_value.init_len = CMDS_HEADER_MAX_LEN;
     
-    uint8_t value[CMDS_HEADER_MAX_DATA_LEN];
+    uint8_t value[CMDS_HEADER_MAX_LEN];
     memset(value, 0, sizeof(value));
     
     attr_char_value.p_value     = value;
@@ -306,10 +316,10 @@ static uint32_t cmd_char_data_add(ble_cmds_t * p_cmds)
     attr_char_value.p_uuid      = &char_uuid;
     attr_char_value.p_attr_md   = &attr_md;
     attr_char_value.init_offs = 0;
-    attr_char_value.max_len     = CMDS_DATA_MAX_DATA_LEN;
-    attr_char_value.init_len     = CMDS_DATA_MAX_DATA_LEN;
+    attr_char_value.max_len     = CMDS_DATA_MAX_LEN;
+    attr_char_value.init_len     = CMDS_DATA_MAX_LEN;
 
-    uint8_t value[CMDS_DATA_MAX_DATA_LEN];
+    uint8_t value[CMDS_DATA_MAX_LEN];
     memset(&value, 0, sizeof(value));
     
     attr_char_value.p_value     = value;
@@ -354,9 +364,9 @@ static uint32_t cmd_char_result_add(ble_cmds_t * p_cmds)
     attr_char_value.p_uuid      = &char_uuid;
     attr_char_value.p_attr_md   = &attr_md;
     attr_char_value.init_offs = 0;
-    attr_char_value.max_len     = CMDS_RESULT_MAX_DATA_LEN;
-    attr_char_value.init_len    = CMDS_RESULT_MAX_DATA_LEN;
-    uint8_t value[CMDS_RESULT_MAX_DATA_LEN] = {CMDS_PACKET_RESULT_IDLE};
+    attr_char_value.max_len     = CMDS_RESULT_MAX_LEN;
+    attr_char_value.init_len    = CMDS_RESULT_MAX_LEN;
+    uint8_t value[CMDS_RESULT_MAX_LEN] = {CMDS_PACKET_RESULT_IDLE};
     attr_char_value.p_value     = value;
     
     return sd_ble_gatts_characteristic_add(p_cmds->service_handle,

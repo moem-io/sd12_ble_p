@@ -19,13 +19,6 @@ uint32_t cmds_c_data_update(ble_cmds_c_t* p_cmds_c, p_data* data)
     return cmds_c_value_update(p_cmds_c,&p_cmds_c->handles.data_handle,buff,sizeof(buff));
 }
 
-uint32_t cmds_c_result_update(ble_cmds_c_t* p_cmds_c, p_result* result)
-{
-    uint8_t buff[20];
-    memcpy(buff, result,sizeof(p_result));
-    return cmds_c_value_update(p_cmds_c,&p_cmds_c->handles.result_handle,buff,sizeof(p_result));
-}
-
 static uint32_t cmds_c_notification_enable(ble_cmds_c_t* p_cmds_c)
 {
     if(!p_cmds_c->notification.header)
@@ -51,15 +44,15 @@ void packet_send(ble_cmds_c_t* p_cmds_c)
     if(app_state.tx_p.process){
         p_packet* txp = &app_state.tx_p.packet[app_state.tx_p.process_count];
    
-        uint8_t buff1[7];
-        memcpy(buff1, &txp->header,sizeof(buff1));
-        
-        uint8_t buff2[20];
-        memcpy(buff2, &txp->data,sizeof(buff2));
+//        uint8_t buff1[7];
+//        memcpy(buff1, &txp->header,sizeof(buff1));
+//        
+//        uint8_t buff2[20];
+//        memcpy(buff2, &txp->data,sizeof(buff2));
 
-        NRF_LOG_DEBUG("[%d]th PACKET, Target ID %d\r\n",app_state.tx_p.process_count, txp->header.target.node);
-        NRF_LOG_DEBUG(" Header : %.14s\r\n", STR_PUSH(buff1,0));
-        NRF_LOG_DEBUG(" DATA : %.14s\r\n", STR_PUSH(buff2,0));
+//        NRF_LOG_DEBUG("[%d]th PACKET, Target ID %d\r\n",app_state.tx_p.process_count, txp->header.target.node);
+//        NRF_LOG_DEBUG(" Header : %.14s\r\n", STR_PUSH(buff1,0));
+//        NRF_LOG_DEBUG(" DATA : %.14s\r\n", STR_PUSH(buff2,0));
         
         if (p_cmds_c->conn_handle == BLE_CONN_HANDLE_INVALID)
         {
@@ -133,6 +126,15 @@ void packet_build(uint8_t build_cmd)
     p_packet* txp = &app_state.tx_p.packet[app_state.tx_p.packet_count];
     p_packet* rxp = &app_state.rx_p.packet[app_state.rx_p.process_count];
     
+//    uint8_t buff1[7];
+//    memcpy(buff1, &rxp->header,sizeof(buff1));
+//        
+//    uint8_t buff2[20];
+//    memcpy(buff2, &rxp->data,sizeof(buff2));
+//    NRF_LOG_DEBUG("[%d]th PACKET INTERPRET\r\n",app_state.rx_p.process_count);
+//    NRF_LOG_DEBUG(" Header : %.14s\r\n", STR_PUSH(buff1,0));
+//    NRF_LOG_DEBUG(" DATA : %.28s\r\n", STR_PUSH(buff2,0));
+
     switch(build_cmd)
     {
         case CMDS_C_BUILD_SCAN_RESULT:
@@ -148,8 +150,20 @@ void packet_build(uint8_t build_cmd)
             break;
 
         case CMDS_C_BUILD_PACKET_ROUTE:
-            memcpy(&txp->header,&rxp->header,sizeof(CMDS_HEADER_MAX_DATA_LEN));
-            memcpy(&txp->data,&rxp->data,sizeof(CMDS_DATA_MAX_DATA_LEN));
+            
+            memcpy(&txp->header,&rxp->header,CMDS_HEADER_MAX_LEN);
+            memcpy(&txp->data,&rxp->data,CMDS_DATA_MAX_LEN);
+
+//            uint8_t buff3[7];
+//            memcpy(buff3, &txp->header,sizeof(buff3));
+//                
+//            uint8_t buff4[20];
+//            memcpy(buff4, &txp->data,sizeof(buff4));
+//        
+//            NRF_LOG_DEBUG("[%d]th PACKET ROUTE\r\n",app_state.tx_p.packet_count);
+//            NRF_LOG_DEBUG(" Header : %.14s\r\n", STR_PUSH(buff3,0));
+//            NRF_LOG_DEBUG(" DATA : %.28s\r\n", STR_PUSH(buff4,0));
+
             break;
         
         default:
@@ -186,7 +200,7 @@ void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t *
                     p_cmds_c->handles.data_cccd_handle      = p_chars[i].cccd_handle;
                     break;
 
-                case BLE_UUID_CMDS_CHAR_RESULT_UUID:
+                case BLE_UUID_CMDS_CHAR_RESULT_UUID:    
                     p_cmds_c->handles.result_handle         = p_chars[i].characteristic.handle_value;
                     p_cmds_c->handles.result_cccd_handle    = p_chars[i].cccd_handle;
                     break;
@@ -286,6 +300,8 @@ void ble_cmds_c_on_ble_evt(ble_cmds_c_t * p_cmds_c, const ble_evt_t * p_ble_evt)
 
         case BLE_GAP_EVT_DISCONNECTED:
             p_cmds_c->conn_handle = BLE_CONN_HANDLE_INVALID;
+            memset(&p_cmds_c->state, 0, sizeof(ble_cmds_c_state_t));
+            memset(&p_cmds_c->handles, 0, sizeof(ble_cmds_c_handles_t));
             memset(&p_cmds_c->notification, 0, sizeof(ble_cmds_c_notification_t)); 
             break;
         
@@ -345,7 +361,7 @@ static uint32_t cmds_c_value_update(ble_cmds_c_t * p_cmds_c, uint16_t* handle, u
     {
         return NRF_ERROR_INVALID_STATE;
     }
-    if (length > CMDS_DATA_MAX_DATA_LEN)
+    if (length > CMDS_DATA_MAX_LEN)
     {
         return NRF_ERROR_INVALID_PARAM;
     }
