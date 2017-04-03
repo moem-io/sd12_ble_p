@@ -706,7 +706,7 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
     uint16_t conn_handle;
     uint16_t role;
     
-    NRF_LOG_DEBUG("EVT ID : %d \r\n",p_ble_evt->header.evt_id);
+//    NRF_LOG_DEBUG("EVT ID : %d \r\n",p_ble_evt->header.evt_id);
     ble_conn_state_on_ble_evt(p_ble_evt);
     pm_on_ble_evt(p_ble_evt);
     

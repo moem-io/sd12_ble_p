@@ -65,14 +65,23 @@ void packet_interpret(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
                     NRF_LOG_DEBUG("PACKET ROUTE!\r\n");
                     app_disc_id_update(rxp);
                     
-                    if(app_state.net.discovered)
-                    {
-                        packet_build(CMDS_C_BUILD_PACKET_ROUTE);
+                    if(!app_state.net.discovered){
+                        NRF_LOG_ERROR("Network not discovered\r\n");
+                        break;
                     }
+                    
+                    packet_build(CMDS_C_BUILD_PACKET_ROUTE);
                 }
                 break;
             
-            case CMDS_PACKET_TYPE_NETWORK_SCAN_RESPONSE: 
+            case CMDS_PACKET_TYPE_NETWORK_SCAN_RESPONSE:
+                if(!app_state.net.discovered){
+                    NRF_LOG_ERROR("Network not discovered\r\n");
+                    break;
+                }
+                
+                NRF_LOG_DEBUG("PACKET ROUTE!\r\n");
+                packet_build(CMDS_C_BUILD_PACKET_ROUTE);
                 break;
             
             default:

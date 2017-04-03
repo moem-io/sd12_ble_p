@@ -44,16 +44,6 @@ void packet_send(ble_cmds_c_t* p_cmds_c)
     if(app_state.tx_p.process){
         p_packet* txp = &app_state.tx_p.packet[app_state.tx_p.process_count];
    
-//        uint8_t buff1[7];
-//        memcpy(buff1, &txp->header,sizeof(buff1));
-//        
-//        uint8_t buff2[20];
-//        memcpy(buff2, &txp->data,sizeof(buff2));
-
-//        NRF_LOG_DEBUG("[%d]th PACKET, Target ID %d\r\n",app_state.tx_p.process_count, txp->header.target.node);
-//        NRF_LOG_DEBUG(" Header : %.14s\r\n", STR_PUSH(buff1,0));
-//        NRF_LOG_DEBUG(" DATA : %.14s\r\n", STR_PUSH(buff2,0));
-        
         if (p_cmds_c->conn_handle == BLE_CONN_HANDLE_INVALID)
         {
             ble_gap_addr_t* target_addr = app_disc_id_check(&txp->header.target.node);
@@ -79,24 +69,29 @@ void packet_send(ble_cmds_c_t* p_cmds_c)
             return;
         }
         
-
-        if(!p_cmds_c->state.header){
-            err_code = cmds_c_header_update(p_cmds_c,&txp->header);
-            ERR_CHK("Header Update Failed");
-            NRF_LOG_INFO("Header UPDATE SUCCESS\r\n");
-            p_cmds_c->state.header = true;
-            nrf_delay_ms(8);
+        if(p_cmds_c->state.send){
+            NRF_LOG_DEBUG("Wait For Response\r\n");
+            nrf_delay_ms(100);
             return;
         }
         
-        if(!p_cmds_c->state.data){
-            err_code = cmds_c_data_update(p_cmds_c,&txp->data);
-            ERR_CHK("Data Update Failed");
-            NRF_LOG_INFO("Data UPDATE SUCCESS\r\n");
-            p_cmds_c->state.data = true;
-            return;
+        else if(!p_cmds_c->state.send){
+            p_cmds_c->state.send = true;
+            
+            if(!p_cmds_c->state.header){
+                err_code = cmds_c_header_update(p_cmds_c,&txp->header);
+                ERR_CHK("Header Update Failed");
+                NRF_LOG_INFO("Header UPDATE SUCCESS\r\n");
+                return;
+            }
+            
+            if(!p_cmds_c->state.data){
+                err_code = cmds_c_data_update(p_cmds_c,&txp->data);
+                ERR_CHK("Data Update Failed");
+                NRF_LOG_INFO("Data UPDATE SUCCESS\r\n");
+                return;
+            }
         }
-
         app_state.tx_p.tx_queue[app_state.tx_p.process_count] = CMDS_C_PACKET_TX_UNAVAILABLE;
         app_state.tx_p.process_count++;
         if(app_state.tx_p.tx_queue[app_state.tx_p.process_count] == CMDS_C_PACKET_TX_UNAVAILABLE){
@@ -125,15 +120,6 @@ void packet_build(uint8_t build_cmd)
     NRF_LOG_INFO("PACKET BUILD TXP : %d, RXP : %d, \r\n",app_state.tx_p.packet_count,app_state.rx_p.process_count);
     p_packet* txp = &app_state.tx_p.packet[app_state.tx_p.packet_count];
     p_packet* rxp = &app_state.rx_p.packet[app_state.rx_p.process_count];
-    
-//    uint8_t buff1[7];
-//    memcpy(buff1, &rxp->header,sizeof(buff1));
-//        
-//    uint8_t buff2[20];
-//    memcpy(buff2, &rxp->data,sizeof(buff2));
-//    NRF_LOG_DEBUG("[%d]th PACKET INTERPRET\r\n",app_state.rx_p.process_count);
-//    NRF_LOG_DEBUG(" Header : %.14s\r\n", STR_PUSH(buff1,0));
-//    NRF_LOG_DEBUG(" DATA : %.28s\r\n", STR_PUSH(buff2,0));
 
     switch(build_cmd)
     {
@@ -150,20 +136,8 @@ void packet_build(uint8_t build_cmd)
             break;
 
         case CMDS_C_BUILD_PACKET_ROUTE:
-            
             memcpy(&txp->header,&rxp->header,CMDS_HEADER_MAX_LEN);
             memcpy(&txp->data,&rxp->data,CMDS_DATA_MAX_LEN);
-
-//            uint8_t buff3[7];
-//            memcpy(buff3, &txp->header,sizeof(buff3));
-//                
-//            uint8_t buff4[20];
-//            memcpy(buff4, &txp->data,sizeof(buff4));
-//        
-//            NRF_LOG_DEBUG("[%d]th PACKET ROUTE\r\n",app_state.tx_p.packet_count);
-//            NRF_LOG_DEBUG(" Header : %.14s\r\n", STR_PUSH(buff3,0));
-//            NRF_LOG_DEBUG(" DATA : %.28s\r\n", STR_PUSH(buff4,0));
-
             break;
         
         default:
@@ -255,29 +229,19 @@ static void on_hvx(ble_cmds_c_t * p_cmds_c, const ble_evt_t * p_ble_evt)
     // HVX can only occur from client sending.
 
     if(p_cmds_c->handles.assigned){
-        if (p_evt_hvx->handle == p_cmds_c->handles.header_handle)
+        if (p_evt_hvx->handle == p_cmds_c->handles.result_handle)
         {
-            NRF_LOG_INFO("HEADER HANDLER [R]");
-        }
-        else if (p_evt_hvx->handle == p_cmds_c->handles.header_cccd_handle)
-        {
-            NRF_LOG_INFO("HEADER CCCD HANDLER [R]");
-        }
-        else if (p_evt_hvx->handle == p_cmds_c->handles.data_handle)
-        {
-            NRF_LOG_INFO("DATA HANDLER [R]");
-        }
-         else if (p_evt_hvx->handle == p_cmds_c->handles.header_cccd_handle)
-        {
-            NRF_LOG_INFO("DATA CCCD HANDLER [R]");
-        }
-         else if (p_evt_hvx->handle == p_cmds_c->handles.result_handle)
-        {
-            NRF_LOG_INFO("RESULT HANDLER [R]");
-        }
-         else if (p_evt_hvx->handle == p_cmds_c->handles.result_cccd_handle)
-        {
-            NRF_LOG_INFO("RESULT CCCD HANDLER [R]");
+            p_cmds_c->state.send = false;
+            
+            uint8_t  * p_data = (uint8_t *) p_evt_hvx->data;
+            if(p_data[0] == CMDS_PACKET_RESULT_HEADER_OK){
+                p_cmds_c->state.header = true;
+                NRF_LOG_DEBUG("HEADER OK\r\n");
+            }
+            else if(p_data[0] == CMDS_PACKET_RESULT_DATA_OK){
+                p_cmds_c->state.data = true;
+                NRF_LOG_DEBUG("DATA OK\r\n");
+            }
         }
     }
 }
@@ -299,10 +263,10 @@ void ble_cmds_c_on_ble_evt(ble_cmds_c_t * p_cmds_c, const ble_evt_t * p_ble_evt)
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
-            p_cmds_c->conn_handle = BLE_CONN_HANDLE_INVALID;
             memset(&p_cmds_c->state, 0, sizeof(ble_cmds_c_state_t));
             memset(&p_cmds_c->handles, 0, sizeof(ble_cmds_c_handles_t));
-            memset(&p_cmds_c->notification, 0, sizeof(ble_cmds_c_notification_t)); 
+            memset(&p_cmds_c->notification, 0, sizeof(ble_cmds_c_notification_t));
+            p_cmds_c->conn_handle = BLE_CONN_HANDLE_INVALID;
             break;
         
         default:
