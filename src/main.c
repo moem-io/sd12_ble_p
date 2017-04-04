@@ -943,24 +943,6 @@ static void power_manage(void)
 }
 
 
-static void adv_scan_start(void)
-{
-    ret_code_t err_code;
-    uint32_t count;
-
-    //check if there are no flash operations in progress
-    err_code = fs_queued_op_count_get(&count);
-    APP_ERROR_CHECK(err_code);
-
-    if (count == 0)
-    {
-        // Start scanning for peripherals and initiate connection to devices which
-        scan_start();
-
-        advertising_start();
-    }
-}
-
 static void device_preset()
 {
     uint32_t err_code;
@@ -992,7 +974,7 @@ int main(void)
     bool     erase_bonds;
 
     memset(&app_state, 0, sizeof(app_state));
-    memset(&app_state.tx_p.tx_queue,CMDS_C_PACKET_TX_UNAVAILABLE,sizeof(app_state.tx_p.tx_queue)); //for tx_queue index
+    memset(&app_state.tx_p.tx_queue,CMDS_C_TXP_QUEUE_UNAVAILABLE,sizeof(app_state.tx_p.tx_queue)); //for tx_queue index
     
     // Initialize.
     err_code = NRF_LOG_INIT(NULL);
@@ -1022,7 +1004,6 @@ int main(void)
     NRF_LOG_DEBUG("%s Addr : %s\r\n",LOG_PUSH(app_state.dev.name), STR_PUSH(app_state.dev.my_addr.addr,1));
 
     advertising_start();
-//    adv_scan_start();
     APP_ERROR_CHECK(err_code);
 
     for (;;)

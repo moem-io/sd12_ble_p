@@ -1,5 +1,7 @@
 #include "cmds.h"
 
+static void cmds_result_update(ble_cmds_t * p_cmds, uint8_t result_type);
+
 static void app_disc_id_update(p_packet* rxp)
 {
     int8_t result = app_disc_addr_check(rxp->data.p_data);
@@ -17,11 +19,8 @@ void packet_interpret(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
 {
     uint32_t err_code;
 
-    if(app_state.rx_p.process){
-        //NRF_LOG_DEBUG("[P3] - PACKET INTERPRET\r\n");
-        
+    if(app_state.rx_p.process){        
         p_packet *rxp = &(app_state.rx_p.packet[app_state.rx_p.process_count]);
-       
            
         uint8_t buff1[7];
         memcpy(buff1, &rxp->header,sizeof(buff1));
@@ -88,10 +87,9 @@ void packet_interpret(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
                 break;
         }
         
-        err_code = sd_ble_gap_disconnect(p_cmds->conn_handle,BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-        APP_ERROR_CHECK(err_code);
-        memset(&p_cmds->notification, 0, sizeof(ble_cmds_notification_t));
+        cmds_result_update(p_cmds,CMDS_PACKET_RESULT_INTERPRET_OK);
         app_state.rx_p.process = false;
+        NRF_LOG_DEBUG("P DISCONNECT CHECK 1 \r\n");
     }
 }
 static void packet_count(uint8_t *packet_type)
@@ -108,7 +106,6 @@ static void packet_count(uint8_t *packet_type)
     }
     else if(app_state.rx_p.packet_count>=*packet_type)
     {
-        NRF_LOG_DEBUG("PACKET INTERPRET START \r\n");
         app_state.rx_p.process = true;
         app_state.rx_p.process_count = *packet_type -1;
     }
@@ -146,14 +143,6 @@ static void data_parser(ble_gatts_value_t *rx_data)
     packet_count(&app_state.rx_p.data_count);
 }
 
-static void cmds_notification_enable(ble_cmds_t * p_cmds, bool *notification_type)
-{
-    *notification_type = true;
-    p_cmds->notification.all=p_cmds->notification.header && p_cmds->notification.data && p_cmds->notification.result;
-    if(p_cmds->notification.all){
-        NRF_LOG_DEBUG("PERIPHERAL NOTIFICATION ALL ENABLED!!\r\n");
-    }
-}
 
 static void gatts_value_get(ble_cmds_t * p_cmds, uint16_t handle, ble_gatts_value_t* rx_data)
 {
@@ -191,22 +180,12 @@ static void on_write(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
         
         cmds_result_update(p_cmds,CMDS_PACKET_RESULT_HEADER_OK);
     }
-    else if(p_evt_write->handle == p_cmds->header_handles.cccd_handle)
-    {
-        gatts_value_get(p_cmds,p_cmds->header_handles.cccd_handle,&rx_data);
-        cmds_notification_enable(p_cmds,&p_cmds->notification.header);
-    }
     else if(p_evt_write->handle == p_cmds->data_handles.value_handle)
     {
         gatts_value_get(p_cmds,p_cmds->data_handles.value_handle,&rx_data);
         data_parser(&rx_data);
 
         cmds_result_update(p_cmds,CMDS_PACKET_RESULT_DATA_OK);
-    }
-    else if(p_evt_write->handle == p_cmds->data_handles.cccd_handle)
-    {
-        gatts_value_get(p_cmds,p_cmds->data_handles.cccd_handle,&rx_data);
-        cmds_notification_enable(p_cmds,&p_cmds->notification.data);
     }
     else if(p_evt_write->handle == p_cmds->result_handles.value_handle)
     {
@@ -215,7 +194,8 @@ static void on_write(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
     else if(p_evt_write->handle == p_cmds->result_handles.cccd_handle)
     {
         gatts_value_get(p_cmds,p_cmds->result_handles.cccd_handle,&rx_data);
-        cmds_notification_enable(p_cmds,&p_cmds->notification.result);
+        p_cmds->notification = true;
+        NRF_LOG_DEBUG("NOTIFICATION ENABLED BY CENTRAL!!\r\n");
     }
 }
 
@@ -231,6 +211,8 @@ void ble_cmds_on_ble_evt(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
+            NRF_LOG_DEBUG("P DISCONNECT CHECK 2 \r\n");
+            p_cmds->notification = false;
             p_cmds->conn_handle = BLE_CONN_HANDLE_INVALID;
             break;
 
@@ -248,7 +230,6 @@ void ble_cmds_on_ble_evt(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
 static uint32_t cmd_char_header_add(ble_cmds_t * p_cmds)
 {
     ble_gatts_char_md_t char_md;
-    ble_gatts_attr_md_t cccd_md;
     ble_gatts_attr_t    attr_char_value;
     ble_uuid_t          char_uuid;
     ble_gatts_attr_md_t attr_md; 
@@ -259,15 +240,6 @@ static uint32_t cmd_char_header_add(ble_cmds_t * p_cmds)
     memset(&char_md, 0, sizeof(char_md));
     char_md.char_props.read = 1;
     char_md.char_props.write = 1;
-    char_md.char_props.notify = 1;
-    
-    memset(&cccd_md, 0, sizeof(cccd_md));
-
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.read_perm);
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.write_perm);
-    cccd_md.vloc       = BLE_GATTS_VLOC_STACK;
-    char_md.p_cccd_md           = &cccd_md;
-    char_md.char_props.notify   = 1;
     
     memset(&attr_md, 0, sizeof(attr_md));
     attr_md.vloc        = BLE_GATTS_VLOC_STACK;
@@ -295,7 +267,6 @@ static uint32_t cmd_char_header_add(ble_cmds_t * p_cmds)
 static uint32_t cmd_char_data_add(ble_cmds_t * p_cmds)
 {
     ble_gatts_char_md_t char_md;
-    ble_gatts_attr_md_t cccd_md;
     ble_gatts_attr_t    attr_char_value;
     ble_gatts_attr_md_t attr_md;
     ble_uuid_t          char_uuid;
@@ -306,15 +277,6 @@ static uint32_t cmd_char_data_add(ble_cmds_t * p_cmds)
     memset(&char_md, 0, sizeof(char_md));
     char_md.char_props.read = 1;
     char_md.char_props.write = 1;
-    char_md.char_props.notify = 1;
-
-    memset(&cccd_md, 0, sizeof(cccd_md));
-
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.read_perm);
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.write_perm);
-    cccd_md.vloc       = BLE_GATTS_VLOC_STACK;
-    char_md.p_cccd_md           = &cccd_md;
-    char_md.char_props.notify   = 1;
     
     memset(&attr_md, 0, sizeof(attr_md));
     attr_md.vloc        = BLE_GATTS_VLOC_STACK;
@@ -354,7 +316,6 @@ static uint32_t cmd_char_result_add(ble_cmds_t * p_cmds)
     memset(&char_md, 0, sizeof(char_md));
     char_md.char_props.read = 1;
     char_md.char_props.write = 1;
-    char_md.char_props.notify = 1;
     
     memset(&cccd_md, 0, sizeof(cccd_md));
 
@@ -394,7 +355,6 @@ uint32_t cmds_init(ble_cmds_t * p_cmds)
     APP_ERROR_CHECK(err_code);
     
     p_cmds->conn_handle             = BLE_CONN_HANDLE_INVALID;
-    p_cmds->notification.all = false;
     p_cmds->uuid_type = cmds_uuid.type;
     
     cmds_uuid.uuid = BLE_UUID_CMDS;
@@ -419,7 +379,7 @@ uint32_t cmds_init(ble_cmds_t * p_cmds)
 
 uint32_t cmds_value_update(ble_cmds_t *p_cmds,ble_gatts_char_handles_t* data_handle, uint8_t * p_string, uint16_t length)
 {
-    if ((p_cmds->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_cmds->notification.all))
+    if ((p_cmds->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_cmds->notification))
     {
         NRF_LOG_ERROR("Check Noti or Conn State!!\r\n");
         return NRF_ERROR_INVALID_STATE;

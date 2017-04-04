@@ -8,7 +8,6 @@
 #include "ble_hci.h"
 
 #include "cmds_base.h"
-#include "cmds_c.h"
 #include "util.h"
 #include "main.h"
 
@@ -18,30 +17,15 @@
 #define CMDS_DATA_MAX_LEN 20
 #define CMDS_RESULT_MAX_LEN 1
 
-#define CMDS_PACKET_TYPE_NETWORK_SCAN_REQUEST 1
-#define CMDS_PACKET_TYPE_NETWORK_SCAN_RESPONSE 2
-
-#define CMDS_PACKET_RESULT_IDLE              ((uint8_t) 0)
-#define CMDS_PACKET_RESULT_HEADER_OK ((uint8_t) 1)
-#define CMDS_PACKET_RESULT_DATA_OK      ((uint8_t) 2)
-#define CMDS_PACKET_RESULT_ERROR      ((uint8_t) 255)
-
-typedef struct { 
-    bool                    header;
-    bool                    data;
-    bool                    result;
-    bool                     all;
-} ble_cmds_notification_t;
-
 typedef struct
 {
+    bool                                    notification;
     uint8_t                                 uuid_type;
     uint16_t                                conn_handle; 
     uint16_t                                service_handle;
     ble_gatts_char_handles_t     header_handles;                                          /**< Handles related to the Heart Rate Measurement characteristic. */
     ble_gatts_char_handles_t     data_handles;                                          /**< Handles related to the Body Sensor Location characteristic. */
     ble_gatts_char_handles_t     result_handles;                                         /**< Handles related to the Heart Rate Control Point characteristic. */  
-    ble_cmds_notification_t notification;
 }ble_cmds_t;
 
 

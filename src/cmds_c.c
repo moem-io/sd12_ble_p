@@ -1,4 +1,3 @@
-#include "cmds_c.h"
 #include "util.h"
 
 static uint32_t cccd_configure(uint16_t conn_handle, uint16_t cccd_handle, bool enable);
@@ -19,23 +18,6 @@ uint32_t cmds_c_data_update(ble_cmds_c_t* p_cmds_c, p_data* data)
     return cmds_c_value_update(p_cmds_c,&p_cmds_c->handles.data_handle,buff,sizeof(buff));
 }
 
-static uint32_t cmds_c_notification_enable(ble_cmds_c_t* p_cmds_c)
-{
-    if(!p_cmds_c->notification.header)
-    {
-        return ble_cmds_c_notif_enable(p_cmds_c,&p_cmds_c->handles.header_cccd_handle);
-    }
-    else if(!p_cmds_c->notification.data)
-    {
-        return ble_cmds_c_notif_enable(p_cmds_c,&p_cmds_c->handles.data_cccd_handle);
-    }
-    else if(!p_cmds_c->notification.result)
-    {
-        return ble_cmds_c_notif_enable(p_cmds_c,&p_cmds_c->handles.result_cccd_handle);
-    }
-    NRF_LOG_ERROR("SEQUENCE BROKEN!! WILL STOP!!\r\n");
-    return NRF_ERROR_INVALID_STATE;
-}
 
 void packet_send(ble_cmds_c_t* p_cmds_c)
 {
@@ -63,8 +45,8 @@ void packet_send(ble_cmds_c_t* p_cmds_c)
             return;
         }
         
-        if(!p_cmds_c->notification.all){
-            err_code = cmds_c_notification_enable(p_cmds_c);
+        if(!p_cmds_c->notification){
+            err_code = ble_cmds_c_notif_enable(p_cmds_c,&p_cmds_c->handles.result_cccd_handle);
             ERR_CHK("Noti Enable Failed");
             return;
         }
@@ -92,10 +74,22 @@ void packet_send(ble_cmds_c_t* p_cmds_c)
                 return;
             }
         }
-        app_state.tx_p.tx_queue[app_state.tx_p.process_count] = CMDS_C_PACKET_TX_UNAVAILABLE;
-        app_state.tx_p.process_count++;
-        if(app_state.tx_p.tx_queue[app_state.tx_p.process_count] == CMDS_C_PACKET_TX_UNAVAILABLE){
-            app_state.tx_p.process = false;
+        
+        if(!p_cmds_c->state.interpret){
+            NRF_LOG_INFO("WAIT FOR PACKET INTERPRETING\r\n");
+            nrf_delay_ms(100);
+        }
+        
+        else if(p_cmds_c->state.interpret){
+            app_state.tx_p.tx_queue[app_state.tx_p.process_count] = CMDS_C_TXP_QUEUE_UNAVAILABLE;
+            app_state.tx_p.process_count++;
+            if(app_state.tx_p.tx_queue[app_state.tx_p.process_count] == CMDS_C_TXP_QUEUE_UNAVAILABLE){
+                app_state.tx_p.process = false;
+            }
+            NRF_LOG_DEBUG("DISCONNECT CHECK 1 \r\n");
+            err_code = sd_ble_gap_disconnect(p_cmds_c->conn_handle,BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+            APP_ERROR_CHECK(err_code);
+            
         }
     }
 
@@ -166,12 +160,10 @@ void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t *
             {
                 case BLE_UUID_CMDS_CHAR_HEADER_UUID:
                     p_cmds_c->handles.header_handle         = p_chars[i].characteristic.handle_value;
-                    p_cmds_c->handles.header_cccd_handle    = p_chars[i].cccd_handle;
                     break;
 
                 case BLE_UUID_CMDS_CHAR_DATA_UUID:
                     p_cmds_c->handles.data_handle           = p_chars[i].characteristic.handle_value;
-                    p_cmds_c->handles.data_cccd_handle      = p_chars[i].cccd_handle;
                     break;
 
                 case BLE_UUID_CMDS_CHAR_RESULT_UUID:    
@@ -183,17 +175,12 @@ void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t *
                     break;
             }
         }
-
-        p_cmds_c->handles.assigned=true;
-        NRF_LOG_DEBUG("HANDLER ASSIGNED\r\n");
         
-        NRF_LOG_DEBUG("HEADER :%02x , CCCD : %02x\r\n",p_cmds_c->handles.header_handle, p_cmds_c->handles.header_cccd_handle);
-        NRF_LOG_DEBUG("DATA :%02x , CCCD : %02x\r\n",p_cmds_c->handles.data_handle, p_cmds_c->handles.data_cccd_handle);
+        NRF_LOG_DEBUG("HEADER :%02x, DATA :%02x\r\n",p_cmds_c->handles.header_handle, p_cmds_c->handles.data_handle);
         NRF_LOG_DEBUG("RESULT :%02x , CCCD : %02x\r\n",p_cmds_c->handles.result_handle, p_cmds_c->handles.result_cccd_handle);
-       
-        if(p_cmds_c->handles.header_handle&& p_cmds_c->handles.header_cccd_handle&&p_cmds_c->handles.data_handle&& p_cmds_c->handles.data_cccd_handle&&p_cmds_c->handles.result_handle&&p_cmds_c->handles.result_cccd_handle){
+        if(p_cmds_c->handles.header_handle&&p_cmds_c->handles.data_handle&&p_cmds_c->handles.result_handle&&p_cmds_c->handles.result_cccd_handle){
             NRF_LOG_DEBUG("ALL HANDLER ASSIGNED\r\n");
-
+            p_cmds_c->handles.assigned=true;
             app_state.tx_p.process = true;
         }
     }
@@ -201,25 +188,11 @@ void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t *
 //FOR NOTIFICATION ENABLE
 static void on_write_rsp(ble_cmds_c_t * p_cmds_c, const ble_evt_t * p_ble_evt)
 {
-    if(p_ble_evt->evt.gattc_evt.gatt_status == BLE_GATT_STATUS_SUCCESS)
+    if(p_ble_evt->evt.gattc_evt.gatt_status == BLE_GATT_STATUS_SUCCESS &&
+       p_ble_evt->evt.gattc_evt.params.write_rsp.handle == p_cmds_c->handles.result_cccd_handle)
     {
-        if (p_ble_evt->evt.gattc_evt.params.write_rsp.handle == p_cmds_c->handles.header_cccd_handle)
-        {
-            p_cmds_c->notification.header = true;
-        }
-        else if (p_ble_evt->evt.gattc_evt.params.write_rsp.handle == p_cmds_c->handles.data_cccd_handle)
-        {
-            p_cmds_c->notification.data = true;
-        }
-        else if (p_ble_evt->evt.gattc_evt.params.write_rsp.handle == p_cmds_c->handles.result_cccd_handle)
-        {
-            p_cmds_c->notification.result = true;
-        }
-        
-        p_cmds_c->notification.all=p_cmds_c->notification.header && p_cmds_c->notification.data && p_cmds_c->notification.result;
-        if(p_cmds_c->notification.all){
-            NRF_LOG_DEBUG("PERIPHERAL NOTIFICATION ALL ENABLED!!\r\n");
-        }
+        p_cmds_c->notification = true;
+        NRF_LOG_DEBUG("PERIPHERAL's NOTIFICATION ENABLED!!\r\n");
     }
 }
 
@@ -242,6 +215,10 @@ static void on_hvx(ble_cmds_c_t * p_cmds_c, const ble_evt_t * p_ble_evt)
                 p_cmds_c->state.data = true;
                 NRF_LOG_DEBUG("DATA OK\r\n");
             }
+            else if(p_data[0] == CMDS_PACKET_RESULT_INTERPRET_OK){
+                p_cmds_c->state.interpret = true;
+                NRF_LOG_DEBUG("INTERPRET OK\r\n");
+            }
         }
     }
 }
@@ -263,9 +240,10 @@ void ble_cmds_c_on_ble_evt(ble_cmds_c_t * p_cmds_c, const ble_evt_t * p_ble_evt)
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
+            NRF_LOG_DEBUG("DISCONNECT CHECK 2 \r\n");
             memset(&p_cmds_c->state, 0, sizeof(ble_cmds_c_state_t));
             memset(&p_cmds_c->handles, 0, sizeof(ble_cmds_c_handles_t));
-            memset(&p_cmds_c->notification, 0, sizeof(ble_cmds_c_notification_t));
+            p_cmds_c->notification = false;
             p_cmds_c->conn_handle = BLE_CONN_HANDLE_INVALID;
             break;
         
@@ -289,9 +267,7 @@ uint32_t ble_cmds_c_init(ble_cmds_c_t * p_cmds_c)
     p_cmds_c->uuid_type = cmds_c_uuid.type;
     p_cmds_c->conn_handle                 = BLE_CONN_HANDLE_INVALID;
     p_cmds_c->handles.header_handle = BLE_GATT_HANDLE_INVALID;
-    p_cmds_c->handles.header_cccd_handle      = BLE_GATT_HANDLE_INVALID;
     p_cmds_c->handles.data_handle = BLE_GATT_HANDLE_INVALID;
-    p_cmds_c->handles.data_cccd_handle      = BLE_GATT_HANDLE_INVALID;
     p_cmds_c->handles.result_handle = BLE_GATT_HANDLE_INVALID;
     p_cmds_c->handles.result_cccd_handle      = BLE_GATT_HANDLE_INVALID;
         

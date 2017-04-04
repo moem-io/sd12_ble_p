@@ -5,6 +5,8 @@
 #include "ble.h"
 #include "ble_db_discovery.h"
 
+#include "cmds_base.h"
+
 #include "app_error.h"
 #include "nrf_delay.h"
 #include "main.h"
@@ -13,15 +15,11 @@
 #define CMDS_C_BUILD_DATA_RESULT 2
 #define CMDS_C_BUILD_PACKET_ROUTE 3
 
-#define CMDS_C_PACKET_LENGTH_SCAN_RESPONSE 7
-
-#define CMDS_C_PACKET_TX_UNAVAILABLE -1
+#define CMDS_C_TXP_QUEUE_UNAVAILABLE -1
 
 typedef struct {
     uint16_t                header_handle;      /**< Handle of the NUS RX characteristic as provided by a discovery. */
-    uint16_t                header_cccd_handle; /**< Handle of the CCCD of the NUS RX characteristic as provided by a discovery. */
     uint16_t                data_handle;      /**< Handle of the NUS TX characteristic as provided by a discovery. */
-    uint16_t                data_cccd_handle; /**< Handle of the CCCD of the NUS RX characteristic as provided by a discovery. */
     uint16_t                result_handle;      /**< Handle of the NUS TX characteristic as provided by a discovery. */
     uint16_t                result_cccd_handle; /**< Handle of the CCCD of the NUS RX characteristic as provided by a discovery. */
     bool                     assigned;
@@ -30,22 +28,16 @@ typedef struct {
 typedef struct { 
     bool                    header;
     bool                    data;
-    bool                    result;
-    bool                     all;
-} ble_cmds_c_notification_t;
-
-typedef struct { 
-    bool                    header;
-    bool                    data;
     bool                    send;
+    bool                    interpret;
 } ble_cmds_c_state_t;
 
 typedef struct
 {
+    bool                    notification;
     uint8_t                 uuid_type;          /**< UUID type. */
     uint16_t                conn_handle;        /**< Handle of the current connection. Set with @ref ble_nus_c_handles_assign when connected. */
     ble_cmds_c_handles_t     handles;            /**< Handles on the connected peer device needed to interact with it. */
-    ble_cmds_c_notification_t notification;
     ble_cmds_c_state_t state;
 }ble_cmds_c_t;
 
