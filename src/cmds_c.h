@@ -8,8 +8,8 @@
 #include "cmds_base.h"
 
 #include "app_error.h"
-#include "nrf_delay.h"
 #include "main.h"
+#include "util.h"
 
 #define CMDS_C_BUILD_SCAN_RESULT 1
 #define CMDS_C_BUILD_DATA_RESULT 2

@@ -14,7 +14,7 @@ int8_t app_disc_addr_check(uint8_t *p_data){
 
 ble_gap_addr_t* app_disc_id_check(uint8_t *id){
     if(*id == 0){
-        return &app_state.dev.parent_addr;
+        return &app_state.dev.parent;
     }
     for(int i=0;i<app_state.net.disc.count;i++){
         if(!memcmp(&app_state.net.disc.peer[i].id,id, sizeof(uint8_t))){
@@ -28,13 +28,13 @@ ble_gap_addr_t* app_disc_id_check(uint8_t *id){
 
 
 
-void app_dev_parent_addr_set(ble_gap_addr_t* addr)
+void app_dev_parent_set(ble_gap_addr_t* addr)
 {
-    if(!app_state.dev.parent_addr_set){
-        memcpy(&app_state.dev.parent_addr, addr, sizeof(ble_gap_addr_t));
+    if(!app_state.dev.parent_set){ //TODO: if parent must be changed?
+        memcpy(&app_state.dev.parent, addr, sizeof(ble_gap_addr_t));
 
-        NRF_LOG_DEBUG("Parent Addr set : %s\r\n",STR_PUSH(app_state.dev.parent_addr.addr,1));
-        app_state.dev.parent_addr_set = true;
+        NRF_LOG_DEBUG("Parent Addr set : %s\r\n",STR_PUSH(app_state.dev.parent.addr,1));
+        app_state.dev.parent_set = true;
     }
 }
 

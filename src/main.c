@@ -46,7 +46,6 @@
 #include "bsp_btn_ble.h"
 #include "sensorsim.h"
 #include "nrf_gpio.h"
-#include "nrf_delay.h"
 
 #include "ble_hci.h"
 #include "ble_advdata.h"
@@ -72,7 +71,7 @@
 
 #define DEVICE_NAME_PREFIX                     "Mx" 
 #define APP_ADV_INTERVAL                300                                         /**< The advertising interval (in units of 0.625 ms. This value corresponds to 187.5 ms). */
-#define APP_ADV_TIMEOUT_IN_SECONDS      180                                         /**< The advertising timeout in units of seconds. */
+#define APP_ADV_TIMEOUT_IN_SECONDS      0                                         /**< The advertising timeout in units of seconds. */
 
 #define APP_TIMER_PRESCALER             0                                           /**< Value of the RTC1 PRESCALER register. */
 #define APP_TIMER_OP_QUEUE_SIZE         4                                           /**< Size of timer operation queues. */

@@ -1,4 +1,4 @@
-#include "util.h"
+#include "cmds_c.h"
 
 static uint32_t cccd_configure(uint16_t conn_handle, uint16_t cccd_handle, bool enable);
 static uint32_t ble_cmds_c_notif_enable(ble_cmds_c_t * p_cmds_c, uint16_t * handle);
@@ -86,10 +86,6 @@ void packet_send(ble_cmds_c_t* p_cmds_c)
             if(app_state.tx_p.tx_queue[app_state.tx_p.process_count] == CMDS_C_TXP_QUEUE_UNAVAILABLE){
                 app_state.tx_p.process = false;
             }
-            NRF_LOG_DEBUG("DISCONNECT CHECK 1 \r\n");
-            err_code = sd_ble_gap_disconnect(p_cmds_c->conn_handle,BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-            APP_ERROR_CHECK(err_code);
-            
         }
     }
 
@@ -240,7 +236,6 @@ void ble_cmds_c_on_ble_evt(ble_cmds_c_t * p_cmds_c, const ble_evt_t * p_ble_evt)
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
-            NRF_LOG_DEBUG("DISCONNECT CHECK 2 \r\n");
             memset(&p_cmds_c->state, 0, sizeof(ble_cmds_c_state_t));
             memset(&p_cmds_c->handles, 0, sizeof(ble_cmds_c_handles_t));
             p_cmds_c->notification = false;

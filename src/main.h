@@ -82,8 +82,9 @@ typedef struct
     uint8_t         root_id; //ALWAYS 0
     char name[MAX_DEV_NAME];
     ble_gap_addr_t my_addr;
-    ble_gap_addr_t parent_addr;
-    bool parent_addr_set;
+    ble_gap_addr_t connected_central;
+    ble_gap_addr_t parent;
+    bool parent_set;
 }app_dev_condition;
 
 typedef struct

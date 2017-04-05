@@ -38,7 +38,8 @@ void packet_interpret(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
                 if(app_state.dev.my_id == 0)
                 {
                     NRF_LOG_DEBUG("Device ID not set!\r\n");
-
+                     app_dev_parent_set(&app_state.dev.connected_central); 
+                    
                     if(memcmp(app_state.dev.my_addr.addr,rxp->data.p_data, BLE_GAP_ADDR_LEN))
                     {
                         NRF_LOG_ERROR("SET Device ID FIRST!!\r\n");
@@ -89,7 +90,10 @@ void packet_interpret(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
         
         cmds_result_update(p_cmds,CMDS_PACKET_RESULT_INTERPRET_OK);
         app_state.rx_p.process = false;
-        NRF_LOG_DEBUG("P DISCONNECT CHECK 1 \r\n");
+        nrf_delay_ms(100);
+        err_code = sd_ble_gap_disconnect(p_cmds->conn_handle,BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+        APP_ERROR_CHECK(err_code);
+
     }
 }
 static void packet_count(uint8_t *packet_type)
@@ -205,13 +209,11 @@ void ble_cmds_on_ble_evt(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
     {
         case BLE_GAP_EVT_CONNECTED:
             p_cmds->conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
-            if(p_ble_evt->evt.gap_evt.params.connected.peer_addr.addr[0] != 0){
-                app_dev_parent_addr_set(&p_ble_evt->evt.gap_evt.params.connected.peer_addr);
-            }
+            memcpy(&app_state.dev.connected_central, &p_ble_evt->evt.gap_evt.params.connected.peer_addr, sizeof(ble_gap_addr_t));
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
-            NRF_LOG_DEBUG("P DISCONNECT CHECK 2 \r\n");
+            memset(&app_state.dev.connected_central,0,sizeof(ble_gap_addr_t));
             p_cmds->notification = false;
             p_cmds->conn_handle = BLE_CONN_HANDLE_INVALID;
             break;

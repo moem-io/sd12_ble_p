@@ -18,7 +18,7 @@
 int8_t app_disc_addr_check(uint8_t *p_data);
 ble_gap_addr_t* app_disc_id_check(uint8_t *id);
 
-void app_dev_parent_addr_set(ble_gap_addr_t* addr);
+void app_dev_parent_set(ble_gap_addr_t* addr);
 bool is_uuid_present(const ble_uuid_t *p_target_uuid, const ble_gap_evt_adv_report_t *p_adv_report);
 
 #endif
