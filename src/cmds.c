@@ -200,6 +200,8 @@ static void on_write(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
         gatts_value_get(p_cmds,p_cmds->result_handles.cccd_handle,&rx_data);
         p_cmds->notification = true;
         NRF_LOG_DEBUG("NOTIFICATION ENABLED BY CENTRAL!!\r\n");
+			
+ 		    cmds_result_update(p_cmds,CMDS_PACKET_RESULT_IDLE);
     }
 }
 
