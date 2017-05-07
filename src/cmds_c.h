@@ -26,6 +26,7 @@ typedef struct {
 } ble_cmds_c_handles_t;
 
 typedef struct { 
+		bool										 idle;
     bool                    header;
     bool                    data;
     bool                    send;

@@ -44,16 +44,20 @@ void packet_send(ble_cmds_c_t* p_cmds_c)
             app_state.tx_p.process = false;
             return;
         }
-        
+				
         if(!p_cmds_c->notification){
             err_code = ble_cmds_c_notif_enable(p_cmds_c,&p_cmds_c->handles.result_cccd_handle);
             ERR_CHK("Noti Enable Failed");
             return;
         }
-        
+  
+		if(!p_cmds_c->state.idle){
+			NRF_LOG_DEBUG("Wait For IDLE\r\n");
+            return;		
+		}
+		
         if(p_cmds_c->state.send){
             NRF_LOG_DEBUG("Wait For Response\r\n");
-            nrf_delay_ms(100);
             return;
         }
         
@@ -73,6 +77,8 @@ void packet_send(ble_cmds_c_t* p_cmds_c)
                 NRF_LOG_INFO("Data UPDATE SUCCESS\r\n");
                 return;
             }
+			
+			return;
         }
         
         if(!p_cmds_c->state.interpret){
@@ -203,7 +209,11 @@ static void on_hvx(ble_cmds_c_t * p_cmds_c, const ble_evt_t * p_ble_evt)
             p_cmds_c->state.send = false;
             
             uint8_t  * p_data = (uint8_t *) p_evt_hvx->data;
-            if(p_data[0] == CMDS_PACKET_RESULT_HEADER_OK){
+            if(p_data[0] == CMDS_PACKET_RESULT_IDLE){
+                p_cmds_c->state.idle = true;
+                NRF_LOG_DEBUG("IDLE OK\r\n");
+            }
+			else if(p_data[0] == CMDS_PACKET_RESULT_HEADER_OK){
                 p_cmds_c->state.header = true;
                 NRF_LOG_DEBUG("HEADER OK\r\n");
             }
