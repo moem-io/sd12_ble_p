@@ -3,11 +3,11 @@
 
 #include "ble.h"
 
-#define BLE_UUID_CMDS_BASE_UUID              {0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0x00, 0x00, 0x80, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00} // 128-bit base UUID
-#define BLE_UUID_CMDS                                           0xA000
-#define BLE_UUID_CMDS_CHAR_HEADER_UUID         0xA001
-#define BLE_UUID_CMDS_CHAR_DATA_UUID              0xA002
-#define BLE_UUID_CMDS_CHAR_RESULT_UUID          0xA003
+#define BLE_UUID_CMDS_BASE_UUID              {0x55, 0x44, 0x33, 0x22, 0x11, 0x00, 0x00, 0x80, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00} // 128-bit base UUID
+#define BLE_UUID_CMDS                                           0x9000
+#define BLE_UUID_CMDS_CHAR_HEADER_UUID         0x9001
+#define BLE_UUID_CMDS_CHAR_DATA_UUID              0x9002
+#define BLE_UUID_CMDS_CHAR_RESULT_UUID          0x9003
 
 static const ble_uuid_t m_cmds_uuid =
   {
