@@ -19,16 +19,18 @@
 
 typedef struct {
     uint16_t                header_handle;      /**< Handle of the NUS RX characteristic as provided by a discovery. */
-    uint16_t                data_handle;      /**< Handle of the NUS TX characteristic as provided by a discovery. */
+    uint16_t                data_1_handle;      /**< Handle of the NUS TX characteristic as provided by a discovery. */
+    uint16_t                data_2_handle;      /**< Handle of the NUS TX characteristic as provided by a discovery. */
     uint16_t                result_handle;      /**< Handle of the NUS TX characteristic as provided by a discovery. */
     uint16_t                result_cccd_handle; /**< Handle of the CCCD of the NUS RX characteristic as provided by a discovery. */
     bool                     assigned;
 } ble_cmds_c_handles_t;
 
 typedef struct { 
-		bool										 idle;
+    bool                    idle;
     bool                    header;
-    bool                    data;
+    bool                    data_1;
+    bool                    data_2;
     bool                    send;
     bool                    interpret;
 } ble_cmds_c_state_t;

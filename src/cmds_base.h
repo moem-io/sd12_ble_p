@@ -6,8 +6,9 @@
 #define BLE_UUID_CMDS_BASE_UUID              {0x55, 0x44, 0x33, 0x22, 0x11, 0x00, 0x00, 0x80, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00} // 128-bit base UUID
 #define BLE_UUID_CMDS                                           0x9000
 #define BLE_UUID_CMDS_CHAR_HEADER_UUID         0x9001
-#define BLE_UUID_CMDS_CHAR_DATA_UUID              0x9002
-#define BLE_UUID_CMDS_CHAR_RESULT_UUID          0x9003
+#define BLE_UUID_CMDS_CHAR_DATA_1_UUID              0x9002
+#define BLE_UUID_CMDS_CHAR_DATA_2_UUID              0x9003
+#define BLE_UUID_CMDS_CHAR_RESULT_UUID          0x9004
 
 static const ble_uuid_t m_cmds_uuid =
   {
@@ -21,9 +22,10 @@ static const ble_uuid_t m_cmds_uuid =
   
 #define CMDS_PACKET_RESULT_IDLE              ((uint8_t) 0)
 #define CMDS_PACKET_RESULT_HEADER_OK ((uint8_t) 1)
-#define CMDS_PACKET_RESULT_DATA_OK      ((uint8_t) 2)
-#define CMDS_PACKET_RESULT_INTERPRET_OK      ((uint8_t) 3)
-#define CMDS_PACKET_RESULT_INTERPRET_ERROR      ((uint8_t) 4)
+#define CMDS_PACKET_RESULT_DATA_1_OK      ((uint8_t) 2)
+#define CMDS_PACKET_RESULT_DATA_2_OK      ((uint8_t) 3)
+#define CMDS_PACKET_RESULT_INTERPRET_OK      ((uint8_t) 4)
+#define CMDS_PACKET_RESULT_INTERPRET_ERROR      ((uint8_t) 5)
 
 #define CMDS_PACKET_RESULT_ERROR      ((uint8_t) 255)
 

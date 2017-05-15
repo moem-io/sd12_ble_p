@@ -24,7 +24,8 @@ typedef struct
     uint16_t                                conn_handle; 
     uint16_t                                service_handle;
     ble_gatts_char_handles_t     header_handles;                                          /**< Handles related to the Heart Rate Measurement characteristic. */
-    ble_gatts_char_handles_t     data_handles;                                          /**< Handles related to the Body Sensor Location characteristic. */
+    ble_gatts_char_handles_t     data_1_handles;                                          /**< Handles related to the Body Sensor Location characteristic. */
+    ble_gatts_char_handles_t     data_2_handles;                                          /**< Handles related to the Body Sensor Location characteristic. */
     ble_gatts_char_handles_t     result_handles;                                         /**< Handles related to the Heart Rate Control Point characteristic. */  
 }ble_cmds_t;
 

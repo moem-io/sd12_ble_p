@@ -11,11 +11,18 @@ uint32_t cmds_c_header_update(ble_cmds_c_t* p_cmds_c, p_header* header)
     return cmds_c_value_update(p_cmds_c,&p_cmds_c->handles.header_handle,buff,sizeof(p_header));
 }
 
-uint32_t cmds_c_data_update(ble_cmds_c_t* p_cmds_c, p_data* data)
+uint32_t cmds_c_data_1_update(ble_cmds_c_t* p_cmds_c, p_data* data)
 {
     uint8_t buff[20];
     memcpy(buff, data,sizeof(buff));
-    return cmds_c_value_update(p_cmds_c,&p_cmds_c->handles.data_handle,buff,sizeof(buff));
+    return cmds_c_value_update(p_cmds_c,&p_cmds_c->handles.data_1_handle,buff,sizeof(buff));
+}
+
+uint32_t cmds_c_data_2_update(ble_cmds_c_t* p_cmds_c, p_data* data)
+{
+    uint8_t buff[20];
+    memcpy(buff, data,sizeof(buff));
+    return cmds_c_value_update(p_cmds_c,&p_cmds_c->handles.data_2_handle,buff,sizeof(buff));
 }
 
 
@@ -38,24 +45,24 @@ void packet_send(ble_cmds_c_t* p_cmds_c)
             NRF_LOG_ERROR("TARGET NOT FOUND\r\n");
             return;
         }
-        if(!p_cmds_c->handles.assigned)
-        {
+        
+        if(!p_cmds_c->handles.assigned){
             NRF_LOG_INFO("WAIT FOR HANDLE ASSIGNED\r\n");
             app_state.tx_p.process = false;
             return;
         }
-				
+
         if(!p_cmds_c->notification){
             err_code = ble_cmds_c_notif_enable(p_cmds_c,&p_cmds_c->handles.result_cccd_handle);
             ERR_CHK("Noti Enable Failed");
             return;
         }
   
-		if(!p_cmds_c->state.idle){
-			NRF_LOG_DEBUG("Wait For IDLE\r\n");
-            return;		
-		}
-		
+        if(!p_cmds_c->state.idle){
+            NRF_LOG_DEBUG("Wait For IDLE\r\n");
+            return;
+        }
+
         if(p_cmds_c->state.send){
             NRF_LOG_DEBUG("Wait For Response\r\n");
             return;
@@ -71,19 +78,27 @@ void packet_send(ble_cmds_c_t* p_cmds_c)
                 return;
             }
             
-            if(!p_cmds_c->state.data){
-                err_code = cmds_c_data_update(p_cmds_c,&txp->data);
+            if(!p_cmds_c->state.data_1){
+                err_code = cmds_c_data_1_update(p_cmds_c,&txp->data);
                 ERR_CHK("Data Update Failed");
                 NRF_LOG_INFO("Data UPDATE SUCCESS\r\n");
                 return;
             }
-			
-			return;
+            
+            // [TODO] :IF DATA 2 Exists.
+            
+            if(!p_cmds_c->state.data_2){
+                err_code = cmds_c_data_2_update(p_cmds_c,&txp->data);
+                ERR_CHK("Data Update Failed");
+                NRF_LOG_INFO("Data UPDATE SUCCESS\r\n");
+                return;
+            }
         }
         
         if(!p_cmds_c->state.interpret){
             NRF_LOG_INFO("WAIT FOR PACKET INTERPRETING\r\n");
             nrf_delay_ms(100);
+            return;
         }
         
         else if(p_cmds_c->state.interpret){
@@ -155,22 +170,28 @@ void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t *
         p_evt->params.discovered_db.srv_uuid.type == p_cmds_c->uuid_type)
     {
         uint32_t i;
+      
+          ble_cmds_c_handles_t* hdlr = &p_cmds_c->handles;
 
         for (i = 0; i < p_evt->params.discovered_db.char_count; i++)
         {
             switch (p_chars[i].characteristic.uuid.uuid)
             {
                 case BLE_UUID_CMDS_CHAR_HEADER_UUID:
-                    p_cmds_c->handles.header_handle         = p_chars[i].characteristic.handle_value;
+                    hdlr->header_handle         = p_chars[i].characteristic.handle_value;
                     break;
 
-                case BLE_UUID_CMDS_CHAR_DATA_UUID:
-                    p_cmds_c->handles.data_handle           = p_chars[i].characteristic.handle_value;
+                case BLE_UUID_CMDS_CHAR_DATA_1_UUID:
+                    hdlr->data_1_handle           = p_chars[i].characteristic.handle_value;
+                    break;
+
+                case BLE_UUID_CMDS_CHAR_DATA_2_UUID:
+                    hdlr->data_2_handle           = p_chars[i].characteristic.handle_value;
                     break;
 
                 case BLE_UUID_CMDS_CHAR_RESULT_UUID:    
-                    p_cmds_c->handles.result_handle         = p_chars[i].characteristic.handle_value;
-                    p_cmds_c->handles.result_cccd_handle    = p_chars[i].cccd_handle;
+                    hdlr->result_handle         = p_chars[i].characteristic.handle_value;
+                    hdlr->result_cccd_handle    = p_chars[i].cccd_handle;
                     break;
                 
                 default:
@@ -178,11 +199,11 @@ void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t *
             }
         }
         
-        NRF_LOG_DEBUG("HEADER :%02x, DATA :%02x\r\n",p_cmds_c->handles.header_handle, p_cmds_c->handles.data_handle);
-        NRF_LOG_DEBUG("RESULT :%02x , CCCD : %02x\r\n",p_cmds_c->handles.result_handle, p_cmds_c->handles.result_cccd_handle);
-        if(p_cmds_c->handles.header_handle&&p_cmds_c->handles.data_handle&&p_cmds_c->handles.result_handle&&p_cmds_c->handles.result_cccd_handle){
+        NRF_LOG_DEBUG("HEADER :%02x, DATA_1 :%02x, DATA_2 :%02x\r\n",hdlr->header_handle, hdlr->data_1_handle, hdlr->data_2_handle);
+        NRF_LOG_DEBUG("RESULT :%02x , CCCD : %02x\r\n",hdlr->result_handle, hdlr->result_cccd_handle);
+        if(hdlr->header_handle&&hdlr->data_1_handle&&hdlr->data_2_handle&&hdlr->result_handle&&hdlr->result_cccd_handle){
             NRF_LOG_DEBUG("ALL HANDLER ASSIGNED\r\n");
-            p_cmds_c->handles.assigned=true;
+            hdlr->assigned=true;
             app_state.tx_p.process = true;
         }
     }
@@ -213,13 +234,17 @@ static void on_hvx(ble_cmds_c_t * p_cmds_c, const ble_evt_t * p_ble_evt)
                 p_cmds_c->state.idle = true;
                 NRF_LOG_DEBUG("IDLE OK\r\n");
             }
-			else if(p_data[0] == CMDS_PACKET_RESULT_HEADER_OK){
+            else if(p_data[0] == CMDS_PACKET_RESULT_HEADER_OK){
                 p_cmds_c->state.header = true;
                 NRF_LOG_DEBUG("HEADER OK\r\n");
             }
-            else if(p_data[0] == CMDS_PACKET_RESULT_DATA_OK){
-                p_cmds_c->state.data = true;
-                NRF_LOG_DEBUG("DATA OK\r\n");
+            else if(p_data[0] == CMDS_PACKET_RESULT_DATA_1_OK){
+                p_cmds_c->state.data_1 = true;
+                NRF_LOG_DEBUG("DATA_1 OK\r\n");
+            }
+            else if(p_data[0] == CMDS_PACKET_RESULT_DATA_2_OK){
+                p_cmds_c->state.data_2 = true;
+                NRF_LOG_DEBUG("DATA_2 OK\r\n");
             }
             else if(p_data[0] == CMDS_PACKET_RESULT_INTERPRET_OK){
                 p_cmds_c->state.interpret = true;
@@ -272,7 +297,8 @@ uint32_t ble_cmds_c_init(ble_cmds_c_t * p_cmds_c)
     p_cmds_c->uuid_type = cmds_c_uuid.type;
     p_cmds_c->conn_handle                 = BLE_CONN_HANDLE_INVALID;
     p_cmds_c->handles.header_handle = BLE_GATT_HANDLE_INVALID;
-    p_cmds_c->handles.data_handle = BLE_GATT_HANDLE_INVALID;
+    p_cmds_c->handles.data_1_handle = BLE_GATT_HANDLE_INVALID;
+    p_cmds_c->handles.data_2_handle = BLE_GATT_HANDLE_INVALID;
     p_cmds_c->handles.result_handle = BLE_GATT_HANDLE_INVALID;
     p_cmds_c->handles.result_cccd_handle      = BLE_GATT_HANDLE_INVALID;
         

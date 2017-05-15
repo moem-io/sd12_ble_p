@@ -184,12 +184,19 @@ static void on_write(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
         
         cmds_result_update(p_cmds,CMDS_PACKET_RESULT_HEADER_OK);
     }
-    else if(p_evt_write->handle == p_cmds->data_handles.value_handle)
+    else if(p_evt_write->handle == p_cmds->data_1_handles.value_handle)
     {
-        gatts_value_get(p_cmds,p_cmds->data_handles.value_handle,&rx_data);
+        gatts_value_get(p_cmds,p_cmds->data_1_handles.value_handle,&rx_data);
         data_parser(&rx_data);
 
-        cmds_result_update(p_cmds,CMDS_PACKET_RESULT_DATA_OK);
+        cmds_result_update(p_cmds,CMDS_PACKET_RESULT_DATA_1_OK);
+    }
+    else if(p_evt_write->handle == p_cmds->data_2_handles.value_handle)
+    {
+        gatts_value_get(p_cmds,p_cmds->data_2_handles.value_handle,&rx_data);
+        data_parser(&rx_data);
+
+        cmds_result_update(p_cmds,CMDS_PACKET_RESULT_DATA_2_OK);
     }
     else if(p_evt_write->handle == p_cmds->result_handles.value_handle)
     {
@@ -268,7 +275,7 @@ static uint32_t cmd_char_header_add(ble_cmds_t * p_cmds)
                                    &p_cmds->header_handles);
 }
 
-static uint32_t cmd_char_data_add(ble_cmds_t * p_cmds)
+static uint32_t cmd_char_data_1_add(ble_cmds_t * p_cmds)
 {
     ble_gatts_char_md_t char_md;
     ble_gatts_attr_t    attr_char_value;
@@ -276,7 +283,7 @@ static uint32_t cmd_char_data_add(ble_cmds_t * p_cmds)
     ble_uuid_t          char_uuid;
     
     char_uuid.type      = p_cmds->uuid_type;
-    char_uuid.uuid      = BLE_UUID_CMDS_CHAR_DATA_UUID;
+    char_uuid.uuid      = BLE_UUID_CMDS_CHAR_DATA_1_UUID;
     
     memset(&char_md, 0, sizeof(char_md));
     char_md.char_props.read = 1;
@@ -303,7 +310,44 @@ static uint32_t cmd_char_data_add(ble_cmds_t * p_cmds)
     return sd_ble_gatts_characteristic_add(p_cmds->service_handle,
                                    &char_md,
                                    &attr_char_value,
-                                   &p_cmds->data_handles);
+                                   &p_cmds->data_1_handles);
+}
+static uint32_t cmd_char_data_2_add(ble_cmds_t * p_cmds)
+{
+    ble_gatts_char_md_t char_md;
+    ble_gatts_attr_t    attr_char_value;
+    ble_gatts_attr_md_t attr_md;
+    ble_uuid_t          char_uuid;
+    
+    char_uuid.type      = p_cmds->uuid_type;
+    char_uuid.uuid      = BLE_UUID_CMDS_CHAR_DATA_2_UUID;
+    
+    memset(&char_md, 0, sizeof(char_md));
+    char_md.char_props.read = 1;
+    char_md.char_props.write = 1;
+    
+    memset(&attr_md, 0, sizeof(attr_md));
+    attr_md.vloc        = BLE_GATTS_VLOC_STACK;
+    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.read_perm);
+    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.write_perm);
+    
+    memset(&attr_char_value, 0, sizeof(attr_char_value));    
+    attr_char_value.p_uuid      = &char_uuid;
+    attr_char_value.p_attr_md   = &attr_md;
+    attr_char_value.init_offs = 0;
+    attr_char_value.max_len     = CMDS_DATA_MAX_LEN;
+    attr_char_value.init_len     = CMDS_DATA_MAX_LEN;
+
+    uint8_t value[CMDS_DATA_MAX_LEN];
+    memset(&value, 0, sizeof(value));
+    
+    attr_char_value.p_value     = value;
+    
+    
+    return sd_ble_gatts_characteristic_add(p_cmds->service_handle,
+                                   &char_md,
+                                   &attr_char_value,
+                                   &p_cmds->data_2_handles);
 }
 
 static uint32_t cmd_char_result_add(ble_cmds_t * p_cmds)
@@ -371,7 +415,10 @@ uint32_t cmds_init(ble_cmds_t * p_cmds)
     err_code = cmd_char_header_add(p_cmds);
     APP_ERROR_CHECK(err_code);
 
-    err_code = cmd_char_data_add(p_cmds);
+    err_code = cmd_char_data_1_add(p_cmds);
+    APP_ERROR_CHECK(err_code);
+
+    err_code = cmd_char_data_2_add(p_cmds);
     APP_ERROR_CHECK(err_code);
 
     err_code = cmd_char_result_add(p_cmds);

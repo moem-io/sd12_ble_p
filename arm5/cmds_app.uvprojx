@@ -15,7 +15,7 @@
         <TargetCommonOption>
           <Device>nRF51422_xxAC</Device>
           <Vendor>Nordic Semiconductor</Vendor>
-          <PackID>NordicSemiconductor.nRF_DeviceFamilyPack.8.13.0</PackID>
+          <PackID>NordicSemiconductor.nRF_DeviceFamilyPack.8.11.1</PackID>
           <PackURL>http://developer.nordicsemi.com/nRF5_SDK/pieces/nRF_DeviceFamilyPack/</PackURL>
           <Cpu>IROM(0x00000000,0x40000) IRAM(0x20000000,0x8000) CPUTYPE("Cortex-M0") CLOCK(16000000) ELITTLE</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
@@ -2903,7 +2903,7 @@
         <TargetCommonOption>
           <Device>nRF51422_xxAC</Device>
           <Vendor>Nordic Semiconductor</Vendor>
-          <PackID>NordicSemiconductor.nRF_DeviceFamilyPack.8.13.0</PackID>
+          <PackID>NordicSemiconductor.nRF_DeviceFamilyPack.8.11.1</PackID>
           <PackURL>http://developer.nordicsemi.com/nRF5_SDK/pieces/nRF_DeviceFamilyPack/</PackURL>
           <Cpu>IROM(0x00000000,0x40000) IRAM(0x20000000,0x8000) CPUTYPE("Cortex-M0") CLOCK(16000000) ELITTLE</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
@@ -5954,7 +5954,7 @@
       </component>
     </components>
     <files>
-      <file attr="config" category="source" condition="ARM Compiler" name="Device\Source\arm\arm_startup_nrf51.s" version="8.13.0">
+      <file attr="config" category="source" condition="ARM Compiler" name="Device\Source\arm\arm_startup_nrf51.s" version="8.11.1">
         <instance index="0">RTE\Device\nRF51422_xxAC\arm_startup_nrf51.s</instance>
         <component Cclass="Device" Cgroup="Startup" Cvendor="NordicSemiconductor" Cversion="8.11.1" condition="nRF51 Series and CMSIS"/>
         <package license="License\license.txt" name="nRF_DeviceFamilyPack" schemaVersion="1.3" url="http://developer.nordicsemi.com/nRF5_SDK/pieces/nRF_DeviceFamilyPack/" vendor="NordicSemiconductor" version="8.11.1"/>
@@ -5963,7 +5963,7 @@
           <targetInfo name="nrf51422_xxac"/>
         </targetInfos>
       </file>
-      <file attr="config" category="source" name="Device\Source\system_nrf51.c" version="8.13.0">
+      <file attr="config" category="source" name="Device\Source\system_nrf51.c" version="8.11.1">
         <instance index="0">RTE\Device\nRF51422_xxAC\system_nrf51.c</instance>
         <component Cclass="Device" Cgroup="Startup" Cvendor="NordicSemiconductor" Cversion="8.11.1" condition="nRF51 Series and CMSIS"/>
         <package license="License\license.txt" name="nRF_DeviceFamilyPack" schemaVersion="1.3" url="http://developer.nordicsemi.com/nRF5_SDK/pieces/nRF_DeviceFamilyPack/" vendor="NordicSemiconductor" version="8.11.1"/>
