@@ -14,14 +14,14 @@ uint32_t cmds_c_header_update(ble_cmds_c_t* p_cmds_c, p_header* header)
 uint32_t cmds_c_data_1_update(ble_cmds_c_t* p_cmds_c, p_data* data)
 {
     uint8_t buff[20];
-    memcpy(buff, data,sizeof(buff));
+    memcpy(buff, &data->p_data[0],sizeof(buff));
     return cmds_c_value_update(p_cmds_c,&p_cmds_c->handles.data_1_handle,buff,sizeof(buff));
 }
 
 uint32_t cmds_c_data_2_update(ble_cmds_c_t* p_cmds_c, p_data* data)
 {
     uint8_t buff[20];
-    memcpy(buff, &data[20],sizeof(buff));
+    memcpy(buff, &data->p_data[20],sizeof(buff));
     return cmds_c_value_update(p_cmds_c,&p_cmds_c->handles.data_2_handle,buff,sizeof(buff));
 }
 
@@ -80,19 +80,19 @@ void pkt_send(ble_cmds_c_t* p_cmds_c)
             
             if(!p_cmds_c->state.data_1){
                 err_code = cmds_c_data_1_update(p_cmds_c,&txp->data);
-                ERR_CHK("Data Update Failed");
-                LOG_I("Data UPDATE SUCCESS\r\n");
+                ERR_CHK("Data 1 Update Failed");
+                LOG_I("Data 1 UPDATE SUCCESS\r\n");
                 return;
             }
             
-            // [TODO] :IF DATA 2 Exists.
-            
-            if(!p_cmds_c->state.data_2){
-                err_code = cmds_c_data_2_update(p_cmds_c,&txp->data);
-                ERR_CHK("Data Update Failed");
-                LOG_I("Data UPDATE SUCCESS\r\n");
-                return;
-            }
+            if(txp->header.index.total >= 2) {
+							if(!p_cmds_c->state.data_2){
+									err_code = cmds_c_data_2_update(p_cmds_c,&txp->data);
+									ERR_CHK("Data 2 Update Failed");
+									LOG_I("Data 2 UPDATE SUCCESS\r\n");
+									return;
+							}
+					}
         }
         
         if(!p_cmds_c->state.interpret){
@@ -115,15 +115,18 @@ void pkt_send(ble_cmds_c_t* p_cmds_c)
 //Function name Rename
 void data_builder(uint8_t *p_data)
 {
-    uint8_t p_idx= 0 ;
+    uint8_t p_idx= 0;
+		uint8_t unit = BLE_GAP_ADDR_LEN+sizeof(uint8_t);
+	
     for(int i=0;i<APP.net.disc.count;i++){
         memcpy(&p_data[p_idx],APP.net.disc.peer[i].p_addr.addr,BLE_GAP_ADDR_LEN);
         
         uint8_t u_rssi = -APP.net.disc.peer[i].rssi;
         memcpy(&p_data[p_idx+BLE_GAP_ADDR_LEN],&u_rssi,sizeof(uint8_t));
         
-        p_idx= p_idx+BLE_GAP_ADDR_LEN+sizeof(uint8_t);
+        p_idx= p_idx+unit;
     }
+		LOG_I("PACKET BUILD %s, \r\n",VSTR_PUSH(p_data,APP.net.disc.count*unit,0));
 }
 
 void pkt_build(uint8_t build_cmd)
@@ -141,14 +144,14 @@ void pkt_build(uint8_t build_cmd)
             txp->header.target.node = APP.dev.root_id;
             txp->header.target.sensor = 0;
             txp->header.index.now = 1;
-            txp->header.index.total = 1;
-        
+            txp->header.index.total = (int) ceil((float)APP.net.disc.count*8/CMDS_DATA_MAX_LEN);
+            
             data_builder(txp->data.p_data);
             break;
 
         case CMDS_C_BUILD_PACKET_ROUTE:
             memcpy(&txp->header,&rxp->header,CMDS_HEADER_MAX_LEN);
-            memcpy(&txp->data,&rxp->data,CMDS_DATA_MAX_LEN);
+            memcpy(&txp->data,&rxp->data,MAX_DATA_LEN);
             break;
         
         default:

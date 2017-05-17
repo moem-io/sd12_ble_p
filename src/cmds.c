@@ -96,19 +96,16 @@ void pkt_interpret(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
 
     }
 }
-static void pkt_cnt(uint8_t *pkt_type)
+static void data_cnt_chk(uint8_t *pkt_type, uint8_t cnt)
 {
-    *pkt_type = *pkt_type+1;
-    LOG_D("PACKET COUNT : %d HEADER : %d DATA : %d \r\n",APP.rx_p.pkt_cnt, APP.rx_p.header_cnt, APP.rx_p.data_cnt);
+    p_header *pheader = &(APP.rx_p.pkt[APP.rx_p.header_cnt-1].header);
+    LOG_D("PACKET HEADER INDEX TOTAL : %d NOW : %d \r\n",pheader->index.total, cnt);
 
-    if(APP.rx_p.pkt_cnt<*pkt_type)
+    if(pheader->index.total == cnt)
     {
-        APP.rx_p.pkt_cnt++;
-    }
-    else if(APP.rx_p.pkt_cnt>=*pkt_type)
-    {
-        APP.rx_p.process = true;
-        APP.rx_p.process_cnt = *pkt_type -1;
+        APP.rx_p.data_cnt++;
+			  APP.rx_p.pkt_cnt++;
+			  APP.rx_p.process = true;
     }
 }
 
@@ -131,17 +128,28 @@ static void header_parser(ble_gatts_value_t * rx_data)
     LOG_D("Header SOURCE : %02x - %02x\r\n",pheader->source.node , pheader->source.sensor);
     LOG_D("Header TARGET : %02x - %02x\r\n",pheader->target.node , pheader->target.sensor);
     
-    pkt_cnt(&APP.rx_p.header_cnt);
+    APP.rx_p.header_cnt++;
 }
 
-static void data_parser(ble_gatts_value_t *rx_data)
+static void data_1_parser(ble_gatts_value_t *rx_data)
 {
     uint8_t *pdata = APP.rx_p.pkt[APP.rx_p.data_cnt].data.p_data;
-    memcpy(pdata, rx_data->p_value, rx_data->len);
+    memcpy(&pdata[0], rx_data->p_value, rx_data->len);
     
-    LOG_D("Data : %s\r\n",VSTR_PUSH(rx_data->p_value,rx_data->len,0));
+    LOG_D("Data 1: %s\r\n",VSTR_PUSH(pdata,20,0));
     
-    pkt_cnt(&APP.rx_p.data_cnt);
+    data_cnt_chk(&APP.rx_p.data_cnt,1);
+}
+
+
+static void data_2_parser(ble_gatts_value_t *rx_data)
+{
+    uint8_t *pdata = APP.rx_p.pkt[APP.rx_p.data_cnt].data.p_data;
+    memcpy(&pdata[20], rx_data->p_value, rx_data->len);
+    
+    LOG_D("Data 2: %s\r\n",VSTR_PUSH(pdata,40,0));
+    
+    data_cnt_chk(&APP.rx_p.data_cnt,2);
 }
 
 
@@ -184,14 +192,14 @@ static void on_write(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
     else if(p_evt_write->handle == p_cmds->data_1_handles.value_handle)
     {
         gatts_value_get(p_cmds,p_cmds->data_1_handles.value_handle,&rx_data);
-        data_parser(&rx_data);
+        data_1_parser(&rx_data);
 
         cmds_result_update(p_cmds,CMDS_PKT_RSLT_DATA_1_OK);
     }
     else if(p_evt_write->handle == p_cmds->data_2_handles.value_handle)
     {
         gatts_value_get(p_cmds,p_cmds->data_2_handles.value_handle,&rx_data);
-        data_parser(&rx_data);
+        data_2_parser(&rx_data);
 
         cmds_result_update(p_cmds,CMDS_PKT_RSLT_DATA_2_OK);
     }

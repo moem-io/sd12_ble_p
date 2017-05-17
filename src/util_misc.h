@@ -6,6 +6,7 @@
 #include <stdbool.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 #include "nrf_delay.h"
 
 char* uint8_t_to_str(uint8_t *data_addr,uint8_t length, bool reverse);
