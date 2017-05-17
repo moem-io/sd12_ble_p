@@ -1,28 +1,28 @@
 #include "util_app.h"
 
 int8_t app_disc_addr_check(uint8_t *p_data){
-    for(int i=0;i<app_state.net.disc.count;i++){
-        if(!memcmp(app_state.net.disc.peer[i].p_addr.addr,p_data, BLE_GAP_ADDR_LEN)){
-            NRF_LOG_DEBUG("ADDR FOUND!\r\n");
+    for(int i=0;i<APP.net.disc.count;i++){
+        if(!memcmp(APP.net.disc.peer[i].p_addr.addr,p_data, BLE_GAP_ADDR_LEN)){
+            LOG_D("ADDR FOUND!\r\n");
             return i;
         }
     }
-    NRF_LOG_DEBUG("ADDR NOT FOUND!\r\n");
+    LOG_D("ADDR NOT FOUND!\r\n");
     return GAP_DISC_ADDR_NOT_FOUND;
 }
 
 
 ble_gap_addr_t* app_disc_id_check(uint8_t *id){
     if(*id == 0){
-        return &app_state.dev.parent;
+        return &APP.dev.parent;
     }
-    for(int i=0;i<app_state.net.disc.count;i++){
-        if(!memcmp(&app_state.net.disc.peer[i].id,id, sizeof(uint8_t))){
-            NRF_LOG_DEBUG("ID FOUND!\r\n");
-            return &app_state.net.disc.peer[i].p_addr;
+    for(int i=0;i<APP.net.disc.count;i++){
+        if(!memcmp(&APP.net.disc.peer[i].id,id, sizeof(uint8_t))){
+            LOG_D("ID FOUND!\r\n");
+            return &APP.net.disc.peer[i].p_addr;
         }
     }
-    NRF_LOG_DEBUG("ID NOT FOUND!\r\n");
+    LOG_D("ID NOT FOUND!\r\n");
     return GAP_DISC_ID_NOT_FOUND;
 }
 
@@ -30,18 +30,18 @@ ble_gap_addr_t* app_disc_id_check(uint8_t *id){
 
 void app_dev_parent_set(ble_gap_addr_t* addr)
 {
-    if(!app_state.dev.parent_set){ //TODO: if parent must be changed?
-        memcpy(&app_state.dev.parent, addr, sizeof(ble_gap_addr_t));
+    if(!APP.dev.parent_set){ //TODO: if parent must be changed?
+        memcpy(&APP.dev.parent, addr, sizeof(ble_gap_addr_t));
 
-        NRF_LOG_DEBUG("Parent Addr set : %s\r\n",STR_PUSH(app_state.dev.parent.addr,1));
-        app_state.dev.parent_set = true;
+        LOG_D("Parent Addr set : %s\r\n",STR_PUSH(APP.dev.parent.addr,1));
+        APP.dev.parent_set = true;
     }
 }
 
 /**@brief Reads an advertising report and checks if a uuid is present in the service list.
 *
 * @details The function is able to search for 16-bit, 32-bit and 128-bit service uuids.
-*          To see the format of a advertisement packet, see
+*          To see the format of a advertisement pkt, see
 *          https://www.bluetooth.org/Technical/AssignedNumbers/generic_access_profile.htm
 *
 * @param[in]   p_target_uuid The uuid to search fir

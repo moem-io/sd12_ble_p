@@ -16,18 +16,18 @@ static const ble_uuid_t m_cmds_uuid =
     .type = BLE_UUID_TYPE_VENDOR_BEGIN
   };
   
-#define CMDS_PACKET_TYPE_NETWORK_SCAN_REQUEST 1
-#define CMDS_PACKET_TYPE_NETWORK_SCAN_RESPONSE 2
+#define CMDS_PKT_TYPE_NET_SCAN_REQUEST 1
+#define CMDS_PKT_TYPE_NET_SCAN_RESPONSE 2
 
   
-#define CMDS_PACKET_RESULT_IDLE              ((uint8_t) 0)
-#define CMDS_PACKET_RESULT_HEADER_OK ((uint8_t) 1)
-#define CMDS_PACKET_RESULT_DATA_1_OK      ((uint8_t) 2)
-#define CMDS_PACKET_RESULT_DATA_2_OK      ((uint8_t) 3)
-#define CMDS_PACKET_RESULT_INTERPRET_OK      ((uint8_t) 4)
-#define CMDS_PACKET_RESULT_INTERPRET_ERROR      ((uint8_t) 5)
+#define CMDS_PKT_RSLT_IDLE              ((uint8_t) 0)
+#define CMDS_PKT_RSLT_HEADER_OK ((uint8_t) 1)
+#define CMDS_PKT_RSLT_DATA_1_OK      ((uint8_t) 2)
+#define CMDS_PKT_RSLT_DATA_2_OK      ((uint8_t) 3)
+#define CMDS_PKT_RSLT_INTERPRET_OK      ((uint8_t) 4)
+#define CMDS_PKT_RSLT_INTERPRET_ERROR      ((uint8_t) 5)
 
-#define CMDS_PACKET_RESULT_ERROR      ((uint8_t) 255)
+#define CMDS_PKT_RSLT_ERROR      ((uint8_t) 255)
 
 
 #endif

@@ -21,34 +21,34 @@ uint32_t cmds_c_data_1_update(ble_cmds_c_t* p_cmds_c, p_data* data)
 uint32_t cmds_c_data_2_update(ble_cmds_c_t* p_cmds_c, p_data* data)
 {
     uint8_t buff[20];
-    memcpy(buff, data,sizeof(buff));
+    memcpy(buff, &data[20],sizeof(buff));
     return cmds_c_value_update(p_cmds_c,&p_cmds_c->handles.data_2_handle,buff,sizeof(buff));
 }
 
 
-void packet_send(ble_cmds_c_t* p_cmds_c)
+void pkt_send(ble_cmds_c_t* p_cmds_c)
 {
     uint32_t err_code;
     
-    if(app_state.tx_p.process){
-        p_packet* txp = &app_state.tx_p.packet[app_state.tx_p.process_count];
+    if(APP.tx_p.process){
+        p_pkt* txp = &APP.tx_p.pkt[APP.tx_p.process_cnt];
    
         if (p_cmds_c->conn_handle == BLE_CONN_HANDLE_INVALID)
         {
             ble_gap_addr_t* target_addr = app_disc_id_check(&txp->header.target.node);
             if(target_addr){
-                NRF_LOG_INFO("WAIT FOR PERIPHERAL - TARGET %s\r\n",STR_PUSH(target_addr->addr,1));
+                LOG_I("WAIT FOR PERIPHERAL - TARGET %s\r\n",STR_PUSH(target_addr->addr,1));
                 err_code = sd_ble_gap_connect(target_addr,&m_scan_params,&m_connection_param);
                 ERR_CHK("Connection Request Failed");
                 return;
             }
-            NRF_LOG_ERROR("TARGET NOT FOUND\r\n");
+            LOG_E("TARGET NOT FOUND\r\n");
             return;
         }
         
         if(!p_cmds_c->handles.assigned){
-            NRF_LOG_INFO("WAIT FOR HANDLE ASSIGNED\r\n");
-            app_state.tx_p.process = false;
+            LOG_I("WAIT FOR HANDLE ASSIGNED\r\n");
+            APP.tx_p.process = false;
             return;
         }
 
@@ -59,12 +59,12 @@ void packet_send(ble_cmds_c_t* p_cmds_c)
         }
   
         if(!p_cmds_c->state.idle){
-            NRF_LOG_DEBUG("Wait For IDLE\r\n");
+            LOG_D("Wait For IDLE\r\n");
             return;
         }
 
         if(p_cmds_c->state.send){
-            NRF_LOG_DEBUG("Wait For Response\r\n");
+            LOG_D("Wait For Response\r\n");
             return;
         }
         
@@ -74,14 +74,14 @@ void packet_send(ble_cmds_c_t* p_cmds_c)
             if(!p_cmds_c->state.header){
                 err_code = cmds_c_header_update(p_cmds_c,&txp->header);
                 ERR_CHK("Header Update Failed");
-                NRF_LOG_INFO("Header UPDATE SUCCESS\r\n");
+                LOG_I("Header UPDATE SUCCESS\r\n");
                 return;
             }
             
             if(!p_cmds_c->state.data_1){
                 err_code = cmds_c_data_1_update(p_cmds_c,&txp->data);
                 ERR_CHK("Data Update Failed");
-                NRF_LOG_INFO("Data UPDATE SUCCESS\r\n");
+                LOG_I("Data UPDATE SUCCESS\r\n");
                 return;
             }
             
@@ -90,22 +90,22 @@ void packet_send(ble_cmds_c_t* p_cmds_c)
             if(!p_cmds_c->state.data_2){
                 err_code = cmds_c_data_2_update(p_cmds_c,&txp->data);
                 ERR_CHK("Data Update Failed");
-                NRF_LOG_INFO("Data UPDATE SUCCESS\r\n");
+                LOG_I("Data UPDATE SUCCESS\r\n");
                 return;
             }
         }
         
         if(!p_cmds_c->state.interpret){
-            NRF_LOG_INFO("WAIT FOR PACKET INTERPRETING\r\n");
+            LOG_I("WAIT FOR PACKET INTERPRETING\r\n");
             nrf_delay_ms(100);
             return;
         }
         
         else if(p_cmds_c->state.interpret){
-            app_state.tx_p.tx_queue[app_state.tx_p.process_count] = CMDS_C_TXP_QUEUE_UNAVAILABLE;
-            app_state.tx_p.process_count++;
-            if(app_state.tx_p.tx_queue[app_state.tx_p.process_count] == CMDS_C_TXP_QUEUE_UNAVAILABLE){
-                app_state.tx_p.process = false;
+            APP.tx_p.tx_queue[APP.tx_p.process_cnt] = CMDS_C_TXP_QUEUE_UNAVAILABLE;
+            APP.tx_p.process_cnt++;
+            if(APP.tx_p.tx_queue[APP.tx_p.process_cnt] == CMDS_C_TXP_QUEUE_UNAVAILABLE){
+                APP.tx_p.process = false;
             }
         }
     }
@@ -116,29 +116,29 @@ void packet_send(ble_cmds_c_t* p_cmds_c)
 void data_builder(uint8_t *p_data)
 {
     uint8_t p_idx= 0 ;
-    for(int i=0;i<app_state.net.disc.count;i++){
-        memcpy(&p_data[p_idx],app_state.net.disc.peer[i].p_addr.addr,BLE_GAP_ADDR_LEN);
+    for(int i=0;i<APP.net.disc.count;i++){
+        memcpy(&p_data[p_idx],APP.net.disc.peer[i].p_addr.addr,BLE_GAP_ADDR_LEN);
         
-        uint8_t u_rssi = -app_state.net.disc.peer[i].rssi;
+        uint8_t u_rssi = -APP.net.disc.peer[i].rssi;
         memcpy(&p_data[p_idx+BLE_GAP_ADDR_LEN],&u_rssi,sizeof(uint8_t));
         
         p_idx= p_idx+BLE_GAP_ADDR_LEN+sizeof(uint8_t);
     }
 }
 
-void packet_build(uint8_t build_cmd)
+void pkt_build(uint8_t build_cmd)
 {
-    NRF_LOG_INFO("PACKET BUILD TXP : %d, RXP : %d, \r\n",app_state.tx_p.packet_count,app_state.rx_p.process_count);
-    p_packet* txp = &app_state.tx_p.packet[app_state.tx_p.packet_count];
-    p_packet* rxp = &app_state.rx_p.packet[app_state.rx_p.process_count];
+    LOG_I("PACKET BUILD TXP : %d, RXP : %d, \r\n",APP.tx_p.pkt_cnt,APP.rx_p.process_cnt);
+    p_pkt* txp = &APP.tx_p.pkt[APP.tx_p.pkt_cnt];
+    p_pkt* rxp = &APP.rx_p.pkt[APP.rx_p.process_cnt];
 
     switch(build_cmd)
     {
         case CMDS_C_BUILD_SCAN_RESULT:
-            txp->header.type = CMDS_PACKET_TYPE_NETWORK_SCAN_RESPONSE;
-            txp->header.source.node = app_state.dev.my_id;
+            txp->header.type = CMDS_PKT_TYPE_NET_SCAN_RESPONSE;
+            txp->header.source.node = APP.dev.my_id;
             txp->header.source.sensor = 0;
-            txp->header.target.node = app_state.dev.root_id;
+            txp->header.target.node = APP.dev.root_id;
             txp->header.target.sensor = 0;
             txp->header.index.now = 1;
             txp->header.index.total = 1;
@@ -154,10 +154,10 @@ void packet_build(uint8_t build_cmd)
         default:
             break;
     }
-    app_state.tx_p.process = true;
-    app_state.tx_p.tx_queue[app_state.tx_p.queue_index] = app_state.tx_p.packet_count;
-    app_state.tx_p.packet_count++;
-    app_state.tx_p.queue_index++;
+    APP.tx_p.process = true;
+    APP.tx_p.tx_queue[APP.tx_p.queue_index] = APP.tx_p.pkt_cnt;
+    APP.tx_p.pkt_cnt++;
+    APP.tx_p.queue_index++;
 }
 
 void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t * p_evt)
@@ -199,12 +199,12 @@ void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t *
             }
         }
         
-        NRF_LOG_DEBUG("HEADER :%02x, DATA_1 :%02x, DATA_2 :%02x\r\n",hdlr->header_handle, hdlr->data_1_handle, hdlr->data_2_handle);
-        NRF_LOG_DEBUG("RESULT :%02x , CCCD : %02x\r\n",hdlr->result_handle, hdlr->result_cccd_handle);
+        LOG_D("HEADER :%02x, DATA_1 :%02x, DATA_2 :%02x\r\n",hdlr->header_handle, hdlr->data_1_handle, hdlr->data_2_handle);
+        LOG_D("RESULT :%02x , CCCD : %02x\r\n",hdlr->result_handle, hdlr->result_cccd_handle);
         if(hdlr->header_handle&&hdlr->data_1_handle&&hdlr->data_2_handle&&hdlr->result_handle&&hdlr->result_cccd_handle){
-            NRF_LOG_DEBUG("ALL HANDLER ASSIGNED\r\n");
+            LOG_D("ALL HANDLER ASSIGNED\r\n");
             hdlr->assigned=true;
-            app_state.tx_p.process = true;
+            APP.tx_p.process = true;
         }
     }
 }
@@ -215,7 +215,7 @@ static void on_write_rsp(ble_cmds_c_t * p_cmds_c, const ble_evt_t * p_ble_evt)
        p_ble_evt->evt.gattc_evt.params.write_rsp.handle == p_cmds_c->handles.result_cccd_handle)
     {
         p_cmds_c->notification = true;
-        NRF_LOG_DEBUG("PERIPHERAL's NOTIFICATION ENABLED!!\r\n");
+        LOG_D("PERIPHERAL's NOTIFICATION ENABLED!!\r\n");
     }
 }
 
@@ -230,25 +230,25 @@ static void on_hvx(ble_cmds_c_t * p_cmds_c, const ble_evt_t * p_ble_evt)
             p_cmds_c->state.send = false;
             
             uint8_t  * p_data = (uint8_t *) p_evt_hvx->data;
-            if(p_data[0] == CMDS_PACKET_RESULT_IDLE){
+            if(p_data[0] == CMDS_PKT_RSLT_IDLE){
                 p_cmds_c->state.idle = true;
-                NRF_LOG_DEBUG("IDLE OK\r\n");
+                LOG_D("IDLE OK\r\n");
             }
-            else if(p_data[0] == CMDS_PACKET_RESULT_HEADER_OK){
+            else if(p_data[0] == CMDS_PKT_RSLT_HEADER_OK){
                 p_cmds_c->state.header = true;
-                NRF_LOG_DEBUG("HEADER OK\r\n");
+                LOG_D("HEADER OK\r\n");
             }
-            else if(p_data[0] == CMDS_PACKET_RESULT_DATA_1_OK){
+            else if(p_data[0] == CMDS_PKT_RSLT_DATA_1_OK){
                 p_cmds_c->state.data_1 = true;
-                NRF_LOG_DEBUG("DATA_1 OK\r\n");
+                LOG_D("DATA_1 OK\r\n");
             }
-            else if(p_data[0] == CMDS_PACKET_RESULT_DATA_2_OK){
+            else if(p_data[0] == CMDS_PKT_RSLT_DATA_2_OK){
                 p_cmds_c->state.data_2 = true;
-                NRF_LOG_DEBUG("DATA_2 OK\r\n");
+                LOG_D("DATA_2 OK\r\n");
             }
-            else if(p_data[0] == CMDS_PACKET_RESULT_INTERPRET_OK){
+            else if(p_data[0] == CMDS_PKT_RSLT_INTERPRET_OK){
                 p_cmds_c->state.interpret = true;
-                NRF_LOG_DEBUG("INTERPRET OK\r\n");
+                LOG_D("INTERPRET OK\r\n");
             }
         }
     }

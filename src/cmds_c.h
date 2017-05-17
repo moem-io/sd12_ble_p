@@ -47,8 +47,8 @@ typedef struct
 void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t * p_evt);
 void ble_cmds_c_on_ble_evt(ble_cmds_c_t * p_cmds_c, const ble_evt_t * p_ble_evt);
 
-void packet_build(uint8_t build_cmd);
-void packet_send(ble_cmds_c_t* p_cmds_c);
+void pkt_build(uint8_t build_cmd);
+void pkt_send(ble_cmds_c_t* p_cmds_c);
 
 uint32_t ble_cmds_c_init(ble_cmds_c_t * p_cmds_c);
 

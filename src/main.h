@@ -9,10 +9,10 @@
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
 
-#define MAX_DISC_QUEUE 10  /** Max Discovery Queue **/
-#define MAX_RSSI_COUNT 255  /** Max RSSI NORMALIZE COUNT **/
-#define MAX_PACKET_COUNT 20
-#define MAX_DATA_LENGTH 80
+#define MAX_DISC_QUEUE 5  /** Max Discovery Queue **/
+#define MAX_RSSI_CNT 255  /** Max RSSI NORMALIZE COUNT **/
+#define MAX_PKT_CNT 20
+#define MAX_DATA_LEN 80
 #define MAX_DEV_NAME 10
 
 #define APP_STATUS_SUCCESS              0x0000
@@ -48,7 +48,7 @@ typedef struct {
 }p_header;
 
 typedef struct {
-    uint8_t p_data[MAX_DATA_LENGTH];
+    uint8_t p_data[MAX_DATA_LEN];
 }p_data;
 
 typedef struct {
@@ -59,7 +59,7 @@ typedef struct {
     p_header header;
     p_data data;
     p_result result;
-}p_packet;
+}p_pkt;
 
 
 typedef struct
@@ -67,7 +67,7 @@ typedef struct
     uint8_t                 id;
     ble_gap_addr_t p_addr;
     int8_t         rssi;
-    uint8_t         rssi_count;
+    uint8_t         rssi_cnt;
 } gap_data;
 
 typedef struct
@@ -102,37 +102,37 @@ typedef struct
 
 typedef struct
 {
-    uint8_t packet_count;
-    uint8_t header_count;
-    uint8_t data_count;
+    uint8_t pkt_cnt;
+    uint8_t header_cnt;
+    uint8_t data_cnt;
     bool    process;
-    uint8_t process_count;
-    p_packet packet[MAX_PACKET_COUNT];
-} app_packet_rx;
+    uint8_t process_cnt;
+    p_pkt pkt[MAX_PKT_CNT];
+} app_pkt_rx;
 
 typedef struct
 {
-    uint8_t packet_count;
+    uint8_t pkt_cnt;
 
     uint8_t queue_index;
-    int8_t tx_queue[MAX_PACKET_COUNT];
+    int8_t tx_queue[MAX_PKT_CNT];
 
     bool    process;
-    uint8_t process_count;
+    uint8_t process_cnt;
 
-    p_packet packet[MAX_PACKET_COUNT];
-} app_packet_tx;
+    p_pkt pkt[MAX_PKT_CNT];
+} app_pkt_tx;
 
 typedef struct
 {
     app_dev_condition dev;
     app_net_condition net;
     app_timer_condition timer;
-    app_packet_rx rx_p;
-    app_packet_tx tx_p;
+    app_pkt_rx rx_p;
+    app_pkt_tx tx_p;
 } app_condition;
 
-extern app_condition app_state;
+extern app_condition APP;
 extern void scan_start(void);
 extern const ble_gap_scan_params_t m_scan_params;
 extern const ble_gap_conn_params_t m_connection_param;

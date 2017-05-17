@@ -104,7 +104,7 @@
 
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                            /**< Handle of the current connection. */
 
-app_condition app_state;
+app_condition APP;
 
 static ble_cmds_t                  m_cmds_s;
 static ble_cmds_c_t              m_cmds_c_s;
@@ -168,12 +168,12 @@ static void pm_evt_handler(pm_evt_t const * p_evt)
     {
         case PM_EVT_BONDED_PEER_CONNECTED:
         {
-            NRF_LOG_INFO("Connected to a previously bonded device.\r\n");
+            LOG_I("Connected to a previously bonded device.\r\n");
         } break;
 
         case PM_EVT_CONN_SEC_SUCCEEDED:
         {
-            NRF_LOG_INFO("Connection secured. Role: %d. conn_handle: %d, Procedure: %d\r\n",
+            LOG_I("Connection secured. Role: %d. conn_handle: %d, Procedure: %d\r\n",
                          ble_conn_state_role(p_evt->conn_handle),
                          p_evt->conn_handle,
                          p_evt->params.conn_sec_succeeded.procedure);
@@ -260,9 +260,9 @@ static void pm_evt_handler(pm_evt_t const * p_evt)
 
 static void timer_timeout_handler(void * p_context)
 {
-    NRF_LOG_DEBUG("Timer Timeout!!\r\n");
-    app_state.timer.status = APP_TIMER_STATUS_DISABLED;
-    app_state.timer.timeout = APP_TIMER_TIMEOUT_TRUE;
+    LOG_D("Timer Timeout!!\r\n");
+    APP.timer.status = APP_TIMER_STATUS_DISABLED;
+    APP.timer.timeout = APP_TIMER_TIMEOUT_TRUE;
 }
 
 /**@brief Function for the Timer initialization.
@@ -293,8 +293,8 @@ static void gap_params_init(void)
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&sec_mode);
 
     err_code = sd_ble_gap_device_name_set(&sec_mode,
-                                          (const uint8_t *)app_state.dev.name,
-                                          strlen(app_state.dev.name));
+                                          (const uint8_t *)APP.dev.name,
+                                          strlen(APP.dev.name));
     APP_ERROR_CHECK(err_code);
                                           
     memset(&gap_conn_params, 0, sizeof(gap_conn_params));
@@ -412,7 +412,7 @@ void scan_start(void)
     {
         APP_ERROR_CHECK(err_code);
     }
-    NRF_LOG_INFO("Start Scanning\r\n");
+    LOG_I("Start Scanning\r\n");
 }
 
 
@@ -448,23 +448,23 @@ static void sleep_mode_enter(void)
 //170228 [TODO] : BLE_EVT_T GAT_EVT-> RSSI CHANGED??
 //170228 [TODO] : IF NO NODE FOUND??
 void net_disc(const ble_evt_t * const p_ble_evt){
-  gap_disc * disc = &app_state.net.disc;
+  gap_disc * disc = &APP.net.disc;
   static int base_rssi[MAX_DISC_QUEUE];
   
   if(disc->count < MAX_DISC_QUEUE){
     const ble_gap_evt_adv_report_t* p_adv_report =  & p_ble_evt->evt.gap_evt.params.adv_report;
     if (is_uuid_present(&m_cmds_uuid, p_adv_report))
     {
-//      NRF_LOG_INFO("CMD SVC FOUND!!\r\n");
+//      LOG_I("CMD SVC FOUND!!\r\n");
 
       for(int i=0;i<disc->count;i++){
         if(!memcmp(disc->peer[i].p_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)){
-          if(disc->peer[i].rssi_count < MAX_RSSI_COUNT){
+          if(disc->peer[i].rssi_cnt < MAX_RSSI_CNT){
             base_rssi[i] +=  p_adv_report->rssi;
-            disc->peer[i].rssi_count++;
-            disc->peer[i].rssi = base_rssi[i]/disc->peer[i].rssi_count;
-            NRF_LOG_DEBUG("count %d : Addr : %s Rssi : %d \r\n",
-            disc->peer[i].rssi_count, STR_PUSH(disc->peer[i].p_addr.addr,1),disc->peer[i].rssi);
+            disc->peer[i].rssi_cnt++;
+            disc->peer[i].rssi = base_rssi[i]/disc->peer[i].rssi_cnt;
+            LOG_D("count %d : Addr : %s Rssi : %d \r\n",
+            disc->peer[i].rssi_cnt, STR_PUSH(disc->peer[i].p_addr.addr,1),disc->peer[i].rssi);
           }
           return;
         }
@@ -472,17 +472,17 @@ void net_disc(const ble_evt_t * const p_ble_evt){
 
       disc->peer[disc->count].p_addr=p_adv_report->peer_addr;
       disc->peer[disc->count].rssi= p_adv_report->rssi;
-      disc->peer[disc->count].rssi_count=1;
+      disc->peer[disc->count].rssi_cnt=1;
       base_rssi[disc->count] = p_adv_report->rssi;
       disc->count +=1;
       
       for(int i=0;i<disc->count;i++){
-          NRF_LOG_INFO("No %d : Addr : %s Rssi : %d \r\n",i, STR_PUSH(disc->peer[i].p_addr.addr,1),disc->peer[i].rssi);
+          LOG_I("No %d : Addr : %s Rssi : %d \r\n",i, STR_PUSH(disc->peer[i].p_addr.addr,1),disc->peer[i].rssi);
       }
     }
   }
   else{
-    NRF_LOG_ERROR("MAX_DISC_COUNT OVER!!\r\n");
+    LOG_E("MAX_DISC_COUNT OVER!!\r\n");
   }
 }
     
@@ -508,7 +508,7 @@ static void on_ble_central_evt(const ble_evt_t * const p_ble_evt)
     {
         case BLE_GAP_EVT_CONNECTED:
         {
-            NRF_LOG_INFO("Central Connected \r\n");
+            LOG_I("Central Connected \r\n");
             
             bsp_board_led_on(CENTRAL_CONNECTED_LED);
             err_code = ble_db_discovery_start(&m_ble_db_discovery, p_gap_evt->conn_handle);
@@ -517,7 +517,7 @@ static void on_ble_central_evt(const ble_evt_t * const p_ble_evt)
 
         case BLE_GAP_EVT_DISCONNECTED:
         {
-            NRF_LOG_INFO("Central disconnected (reason: %d)\r\n",p_gap_evt->params.disconnected.reason);
+            LOG_I("Central disconnected (reason: %d)\r\n",p_gap_evt->params.disconnected.reason);
             
             bsp_board_led_off(CENTRAL_CONNECTED_LED);
         } break; // BLE_GAP_EVT_DISCONNECTED
@@ -531,13 +531,13 @@ static void on_ble_central_evt(const ble_evt_t * const p_ble_evt)
         {
             if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_SCAN)
             {
-                NRF_LOG_INFO("NET SCANNING TIMEOUT -- %d FOUND!!\r\n",app_state.net.disc.count);
-								app_state.net.discovered = APP_NET_DISCOVERED_TRUE; 
-								packet_build(CMDS_C_BUILD_SCAN_RESULT);
+                LOG_I("NET SCANNING TIMEOUT -- %d FOUND!!\r\n",APP.net.disc.count);
+								APP.net.discovered = APP_NET_DISCOVERED_TRUE; 
+								pkt_build(CMDS_C_BUILD_SCAN_RESULT);
             }
             else if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_CONN)
             {
-                NRF_LOG_INFO("Connection Request timed out.\r\n");
+                LOG_I("Connection Request timed out.\r\n");
             }
         } break; // BLE_GAP_EVT_TIMEOUT
 
@@ -551,7 +551,7 @@ static void on_ble_central_evt(const ble_evt_t * const p_ble_evt)
 
         case BLE_GATTC_EVT_TIMEOUT:
             // Disconnect on GATT Client timeout event.
-            NRF_LOG_DEBUG("GATT Client Timeout.\r\n");
+            LOG_D("GATT Client Timeout.\r\n");
             err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
                                              BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
             APP_ERROR_CHECK(err_code);
@@ -559,7 +559,7 @@ static void on_ble_central_evt(const ble_evt_t * const p_ble_evt)
 
         case BLE_GATTS_EVT_TIMEOUT:
             // Disconnect on GATT Server timeout event.
-            NRF_LOG_DEBUG("GATT Server Timeout.\r\n");
+            LOG_D("GATT Server Timeout.\r\n");
             err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle,
                                              BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
             APP_ERROR_CHECK(err_code);
@@ -591,16 +591,16 @@ static void on_ble_peripheral_evt(ble_evt_t * p_ble_evt)
     switch (p_ble_evt->header.evt_id)
     {
         case BLE_GAP_EVT_CONNECTED:
-            NRF_LOG_INFO("Peripheral connected\r\n");
+            LOG_I("Peripheral connected\r\n");
             break; //BLE_GAP_EVT_CONNECTED
 
         case BLE_GAP_EVT_DISCONNECTED:
-            NRF_LOG_INFO("Peripheral disconnected\r\n");
+            LOG_I("Peripheral disconnected\r\n");
             break;//BLE_GAP_EVT_DISCONNECTED
 
         case BLE_GATTC_EVT_TIMEOUT:
             // Disconnect on GATT Client timeout event.
-            NRF_LOG_DEBUG("GATT Client Timeout.\r\n");
+            LOG_D("GATT Client Timeout.\r\n");
             err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gattc_evt.conn_handle,
                                              BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
             APP_ERROR_CHECK(err_code);
@@ -608,7 +608,7 @@ static void on_ble_peripheral_evt(ble_evt_t * p_ble_evt)
 
         case BLE_GATTS_EVT_TIMEOUT:
             // Disconnect on GATT Server timeout event.
-            NRF_LOG_DEBUG("GATT Server Timeout.\r\n");
+            LOG_D("GATT Server Timeout.\r\n");
             err_code = sd_ble_gap_disconnect(p_ble_evt->evt.gatts_evt.conn_handle,
                                              BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
             APP_ERROR_CHECK(err_code);
@@ -676,7 +676,7 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt)
     switch (ble_adv_evt)
     {
         case BLE_ADV_EVT_FAST:
-            NRF_LOG_INFO("Fast advertising\r\n");
+            LOG_I("Fast advertising\r\n");
             err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
             APP_ERROR_CHECK(err_code);
             break;
@@ -702,7 +702,7 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
     uint16_t conn_handle;
     uint16_t role;
     
-//    NRF_LOG_DEBUG("EVT ID : %d \r\n",p_ble_evt->header.evt_id);
+//    LOG_D("EVT ID : %d \r\n",p_ble_evt->header.evt_id);
     ble_conn_state_on_ble_evt(p_ble_evt);
     pm_on_ble_evt(p_ble_evt);
     
@@ -726,8 +726,8 @@ static void ble_evt_dispatch(ble_evt_t * p_ble_evt)
         ble_db_discovery_on_ble_evt(&m_ble_db_discovery, p_ble_evt);
         ble_cmds_c_on_ble_evt(&m_cmds_c_s,p_ble_evt);
     }
-    packet_interpret(&m_cmds_s,p_ble_evt);
-    packet_send(&m_cmds_c_s);
+    pkt_interpret(&m_cmds_s,p_ble_evt);
+    pkt_send(&m_cmds_c_s);
 
     bsp_btn_ble_on_ble_evt(p_ble_evt);
 }
@@ -946,7 +946,7 @@ static void device_preset()
     uint8_t num_rand_bytes_available;
     uint8_t rand_number;
 
-    err_code=sd_ble_gap_address_get(&app_state.dev.my_addr);
+    err_code=sd_ble_gap_address_get(&APP.dev.my_addr);
     APP_ERROR_CHECK(err_code);
     
     nrf_delay_ms(100); // wait for random pool to be filled.
@@ -958,7 +958,7 @@ static void device_preset()
         APP_ERROR_CHECK(err_code);
     }
     
-    sprintf(app_state.dev.name, "%s%03d", DEVICE_NAME_PREFIX,rand_number);
+    sprintf(APP.dev.name, "%s%03d", DEVICE_NAME_PREFIX,rand_number);
 }
 
 
@@ -969,8 +969,8 @@ int main(void)
     uint32_t err_code;
     bool     erase_bonds;
 
-    memset(&app_state, 0, sizeof(app_state));
-    memset(&app_state.tx_p.tx_queue,CMDS_C_TXP_QUEUE_UNAVAILABLE,sizeof(app_state.tx_p.tx_queue)); //for tx_queue index
+    memset(&APP, 0, sizeof(APP));
+    memset(&APP.tx_p.tx_queue,CMDS_C_TXP_QUEUE_UNAVAILABLE,sizeof(APP.tx_p.tx_queue)); //for tx_queue index
     
     // Initialize.
     err_code = NRF_LOG_INIT(NULL);
@@ -982,7 +982,7 @@ int main(void)
     peer_manager_init(erase_bonds);
     if (erase_bonds == true)
     {
-        NRF_LOG_INFO("Bonds erased!\r\n");
+        LOG_I("Bonds erased!\r\n");
     }
     
     device_preset();
@@ -996,8 +996,8 @@ int main(void)
     advertising_init();
     conn_params_init();
 
-    NRF_LOG_DEBUG("Ram Size : %d kb \r\n",sizeof(app_state)/1024);    
-    NRF_LOG_DEBUG("%s Addr : %s\r\n",LOG_PUSH(app_state.dev.name), STR_PUSH(app_state.dev.my_addr.addr,1));
+    LOG_D("Ram Size : %d kb \r\n",sizeof(APP)/1024);    
+    LOG_D("%s Addr : %s\r\n",LOG_PUSH(APP.dev.name), STR_PUSH(APP.dev.my_addr.addr,1));
 
     advertising_start();
     APP_ERROR_CHECK(err_code);
