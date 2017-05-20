@@ -747,7 +747,7 @@ static void sys_evt_dispatch(uint32_t sys_evt)
     fs_sys_event_handler(sys_evt);
 
     // Dispatch to the Advertising module last, since it will check if there are any
-    // pending flash operations in fstorage. Let fstorage process system events first,
+    // pending flash operations in fstorage. Let fstorage proc system events first,
     // so that it can report correctly to the Advertising module.
     ble_advertising_on_sys_evt(sys_evt);
 }

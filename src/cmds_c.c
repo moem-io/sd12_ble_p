@@ -30,8 +30,8 @@ void pkt_send(ble_cmds_c_t* p_cmds_c)
 {
     uint32_t err_code;
     
-    if(APP.tx_p.process){
-        p_pkt* txp = &APP.tx_p.pkt[APP.tx_p.process_cnt];
+    if(APP.tx_p.proc){
+        p_pkt* txp = &APP.tx_p.pkt[APP.tx_p.proc_cnt];
    
         if (p_cmds_c->conn_handle == BLE_CONN_HANDLE_INVALID)
         {
@@ -48,7 +48,7 @@ void pkt_send(ble_cmds_c_t* p_cmds_c)
         
         if(!p_cmds_c->handles.assigned){
             LOG_I("WAIT FOR HANDLE ASSIGNED\r\n");
-            APP.tx_p.process = false;
+            APP.tx_p.proc = false;
             return;
         }
 
@@ -102,10 +102,10 @@ void pkt_send(ble_cmds_c_t* p_cmds_c)
         }
         
         else if(p_cmds_c->state.interpret){
-            APP.tx_p.tx_queue[APP.tx_p.process_cnt] = CMDS_C_TXP_QUEUE_UNAVAILABLE;
-            APP.tx_p.process_cnt++;
-            if(APP.tx_p.tx_queue[APP.tx_p.process_cnt] == CMDS_C_TXP_QUEUE_UNAVAILABLE){
-                APP.tx_p.process = false;
+            APP.tx_p.tx_queue[APP.tx_p.proc_cnt] = CMDS_C_TXP_QUEUE_UNAVAILABLE;
+            APP.tx_p.proc_cnt++;
+            if(APP.tx_p.tx_queue[APP.tx_p.proc_cnt] == CMDS_C_TXP_QUEUE_UNAVAILABLE){
+                APP.tx_p.proc = false;
             }
         }
     }
@@ -131,9 +131,9 @@ void data_builder(uint8_t *p_data)
 
 void pkt_build(uint8_t build_cmd)
 {
-    LOG_I("PACKET BUILD TXP : %d, RXP : %d, \r\n",APP.tx_p.pkt_cnt,APP.rx_p.process_cnt);
+    LOG_I("PACKET BUILD TXP : %d, RXP : %d, \r\n",APP.tx_p.pkt_cnt,APP.rx_p.proc_cnt);
     p_pkt* txp = &APP.tx_p.pkt[APP.tx_p.pkt_cnt];
-    p_pkt* rxp = &APP.rx_p.pkt[APP.rx_p.process_cnt];
+    p_pkt* rxp = &APP.rx_p.pkt[APP.rx_p.proc_cnt];
 
     switch(build_cmd)
     {
@@ -157,7 +157,7 @@ void pkt_build(uint8_t build_cmd)
         default:
             break;
     }
-    APP.tx_p.process = true;
+    APP.tx_p.proc = true;
     APP.tx_p.tx_queue[APP.tx_p.queue_index] = APP.tx_p.pkt_cnt;
     APP.tx_p.pkt_cnt++;
     APP.tx_p.queue_index++;
@@ -175,7 +175,7 @@ void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t *
         uint32_t i;
       
           ble_cmds_c_handles_t* hdlr = &p_cmds_c->handles;
-
+      LOG_D("Discovered Evt Count : %d\r\n",p_evt->params.discovered_db.char_count);
         for (i = 0; i < p_evt->params.discovered_db.char_count; i++)
         {
             switch (p_chars[i].characteristic.uuid.uuid)
@@ -207,7 +207,7 @@ void ble_cmds_c_on_db_disc_evt(ble_cmds_c_t * p_cmds_c, ble_db_discovery_evt_t *
         if(hdlr->header_handle&&hdlr->data_1_handle&&hdlr->data_2_handle&&hdlr->result_handle&&hdlr->result_cccd_handle){
             LOG_D("ALL HANDLER ASSIGNED\r\n");
             hdlr->assigned=true;
-            APP.tx_p.process = true;
+            APP.tx_p.proc = true;
         }
     }
 }

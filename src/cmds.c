@@ -19,8 +19,8 @@ void pkt_interpret(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
 {
     uint32_t err_code;
 
-    if(APP.rx_p.process){        
-        p_pkt *rxp = &(APP.rx_p.pkt[APP.rx_p.process_cnt]);
+    if(APP.rx_p.proc){        
+        p_pkt *rxp = &(APP.rx_p.pkt[APP.rx_p.proc_cnt]);
            
         uint8_t buff1[7];
         memcpy(buff1, &rxp->header,sizeof(buff1));
@@ -28,7 +28,7 @@ void pkt_interpret(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
         uint8_t buff2[20];
         memcpy(buff2, &rxp->data,sizeof(buff2));
 
-        LOG_D("[%d]th PACKET INTERPRET\r\n",APP.rx_p.process_cnt);
+        LOG_D("[%d]th PACKET INTERPRET\r\n",APP.rx_p.proc_cnt);
         LOG_D(" Header : %.14s\r\n", STR_PUSH(buff1,0));
         LOG_D(" DATA : %.28s\r\n", STR_PUSH(buff2,0));
         
@@ -89,7 +89,7 @@ void pkt_interpret(ble_cmds_t * p_cmds, ble_evt_t * p_ble_evt)
         }
         
         cmds_result_update(p_cmds,CMDS_PKT_RSLT_INTERPRET_OK);
-        APP.rx_p.process = false;
+        APP.rx_p.proc = false;
         nrf_delay_ms(100);
         err_code = sd_ble_gap_disconnect(p_cmds->conn_handle,BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
         APP_ERROR_CHECK(err_code);
@@ -105,7 +105,7 @@ static void data_cnt_chk(uint8_t *pkt_type, uint8_t cnt)
     {
         APP.rx_p.data_cnt++;
 			  APP.rx_p.pkt_cnt++;
-			  APP.rx_p.process = true;
+			  APP.rx_p.proc = true;
     }
 }
 

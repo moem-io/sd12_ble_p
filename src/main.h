@@ -105,8 +105,8 @@ typedef struct
     uint8_t pkt_cnt;
     uint8_t header_cnt;
     uint8_t data_cnt;
-    bool    process;
-    uint8_t process_cnt;
+    bool    proc;
+    uint8_t proc_cnt;
     p_pkt pkt[MAX_PKT_CNT];
 } app_pkt_rx;
 
@@ -117,8 +117,8 @@ typedef struct
     uint8_t queue_index;
     int8_t tx_queue[MAX_PKT_CNT];
 
-    bool    process;
-    uint8_t process_cnt;
+    bool    proc;
+    uint8_t proc_cnt;
 
     p_pkt pkt[MAX_PKT_CNT];
 } app_pkt_tx;
