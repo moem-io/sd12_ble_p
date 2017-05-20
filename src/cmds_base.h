@@ -17,9 +17,9 @@ static const ble_uuid_t m_cmds_uuid = {
 
 #define MAX_CHAR_LEN (GATT_MTU_SIZE_DEFAULT - 3)
 
-#define MAX_HEADER_LEN 7
-#define MAX_DATA_LEN 20
-#define MAX_RESULT_LEN 1
+#define HEADER_LEN 7
+#define DATA_LEN 20
+#define RESULT_LEN 1
 
 #define PKT_TYPE_NET_SCAN_REQUEST 1
 #define PKT_TYPE_NET_SCAN_RESPONSE 2

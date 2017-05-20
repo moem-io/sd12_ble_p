@@ -97,6 +97,10 @@ void pkt_send(cen_t *p_cen) {
             if (APP.tx_p.tx_que[APP.tx_p.proc_cnt] == CEN_TXP_QUEUE_UNAVAILABLE) {
                 APP.tx_p.proc = false;
             }
+            
+            LOG_I("CENTRAL CLOSING CONNECTION\r\n");
+            err_code = sd_ble_gap_disconnect(p_cen->conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
+            APP_ERROR_CHECK(err_code);
         }
     }
 
@@ -131,13 +135,13 @@ void pkt_build(uint8_t build_type) {
             txp->header.target.node = APP.dev.root_id;
             txp->header.target.sensor = 0;
             txp->header.index.now = 1;
-            txp->header.index.total = (int) ceil((float) APP.net.disc.count * 8 / MAX_DATA_LEN);
+            txp->header.index.total = (int) ceil((float) APP.net.disc.count * 8 / DATA_LEN);
 
             data_builder(txp->data.p_data);
             break;
 
         case CEN_BUILD_PACKET_ROUTE:
-            memcpy(&txp->header, &rxp->header, MAX_HEADER_LEN);
+            memcpy(&txp->header, &rxp->header, HEADER_LEN);
             memcpy(&txp->data, &rxp->data, MAX_PKT_DATA_LEN);
             break;
 

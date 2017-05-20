@@ -14,15 +14,13 @@ static void app_disc_id_update(p_pkt *rxp) {
 }
 
 void pkt_interpret(per_t *p_per, ble_evt_t *p_ble_evt) {
-    uint32_t err_code;
-
     if (APP.rx_p.proc) {
         p_pkt *rxp = &(APP.rx_p.pkt[APP.rx_p.proc_cnt]);
 
-        uint8_t buff1[7];
+        uint8_t buff1[HEADER_LEN];
         memcpy(buff1, &rxp->header, sizeof(buff1));
 
-        uint8_t buff2[20];
+        uint8_t buff2[MAX_PKT_DATA_LEN];
         memcpy(buff2, &rxp->data, sizeof(buff2));
 
         LOG_D("[%d]th PACKET INTERPRET\r\n", APP.rx_p.proc_cnt);
@@ -79,9 +77,6 @@ void pkt_interpret(per_t *p_per, ble_evt_t *p_ble_evt) {
         per_result_update(p_per, PKT_RSLT_INTERPRET_OK);
         APP.rx_p.proc = false;
         nrf_delay_ms(100);
-        err_code = sd_ble_gap_disconnect(p_per->conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-        APP_ERROR_CHECK(err_code);
-
     }
 }
 
@@ -144,7 +139,7 @@ static void gatts_value_get(per_t *p_per, uint16_t handle, ble_gatts_value_t *rx
 
 static void per_result_update(per_t *p_per, uint8_t result_type) {
     uint32_t err_code;
-    uint8_t result[MAX_RESULT_LEN] = {result_type};
+    uint8_t result[RESULT_LEN] = {result_type};
 
     err_code = per_value_update(p_per, &p_per->result_hdlrs, result, sizeof(result));
     APP_ERROR_CHECK(err_code);
@@ -277,16 +272,16 @@ uint32_t per_init(per_t *p_per) {
                                         &p_per->service_handle);
     APP_ERROR_CHECK(err_code);
 
-    err_code = per_char_add(p_per,CMDS_HEADER_UUID,MAX_HEADER_LEN,&p_per->header_hdlrs);
+    err_code = per_char_add(p_per,CMDS_HEADER_UUID,HEADER_LEN,&p_per->header_hdlrs);
     APP_ERROR_CHECK(err_code);
     
-    err_code = per_char_add(p_per,CMDS_DATA_1_UUID,MAX_DATA_LEN,&p_per->data_1_hdlrs);
+    err_code = per_char_add(p_per,CMDS_DATA_1_UUID,DATA_LEN,&p_per->data_1_hdlrs);
     APP_ERROR_CHECK(err_code);
 
-    err_code = per_char_add(p_per,CMDS_DATA_2_UUID,MAX_DATA_LEN,&p_per->data_2_hdlrs);
+    err_code = per_char_add(p_per,CMDS_DATA_2_UUID,DATA_LEN,&p_per->data_2_hdlrs);
     APP_ERROR_CHECK(err_code);
     
-    err_code = per_char_add(p_per, CMDS_RESULT_UUID, MAX_RESULT_LEN, &p_per->result_hdlrs);
+    err_code = per_char_add(p_per, CMDS_RESULT_UUID, RESULT_LEN, &p_per->result_hdlrs);
     APP_ERROR_CHECK(err_code);
 
     return NRF_SUCCESS;
