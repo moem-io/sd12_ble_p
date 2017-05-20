@@ -9,14 +9,14 @@
 #include <math.h>
 #include "nrf_delay.h"
 
-char* uint8_t_to_str(uint8_t *data_addr,uint8_t length, bool reverse);
+char *uint8_t_to_str(uint8_t *data_addr, uint8_t length, bool reverse);
 
-#define TO_STR(str,rev)                                                  uint8_t_to_str(str,sizeof(str),rev)
-#define TO_VSTR(str,str_len,rev)                                     uint8_t_to_str(str,str_len,rev)
+#define TO_STR(str, rev)                                                  uint8_t_to_str(str,sizeof(str),rev)
+#define TO_VSTR(str, str_len, rev)                                     uint8_t_to_str(str,str_len,rev)
 
 #define LOG_PUSH(str)                                             nrf_log_push(str)
-#define STR_PUSH(str,rev)                                        nrf_log_push(TO_STR(str,rev))
-#define VSTR_PUSH(str,str_len,rev)                          nrf_log_push(TO_VSTR(str,str_len,rev))
+#define STR_PUSH(str, rev)                                        nrf_log_push(TO_STR(str,rev))
+#define VSTR_PUSH(str, str_len, rev)                          nrf_log_push(TO_VSTR(str,str_len,rev))
 
 #define LOG_D                                               NRF_LOG_DEBUG
 #define LOG_I                                               NRF_LOG_INFO

@@ -1,11 +1,12 @@
 #ifndef MAIN_H__
 #define MAIN_H__
 
-#include "cmds.h"
-#include "cmds_c.h"
+#include "per.h"
+#include "cen.h"
 #include <stdint.h>
 
 #define NRF_LOG_MODULE_NAME "APP"
+
 #include "nrf_log.h"
 #include "nrf_log_ctrl.h"
 
@@ -33,98 +34,90 @@
 typedef struct {
     uint8_t node;
     uint8_t sensor;
-}p_address;
+} p_address;
 
 typedef struct {
     uint8_t now;
     uint8_t total;
-}p_index;
+} p_index;
 
 typedef struct {
     uint8_t type;
     p_index index;
     p_address source;
     p_address target;
-}p_header;
+} p_header;
 
 typedef struct {
     uint8_t p_data[MAX_DATA_LEN];
-}p_data;
+} p_data;
 
 typedef struct {
     uint8_t result;
-}p_result;
+} p_result;
 
 typedef struct {
     p_header header;
     p_data data;
     p_result result;
-}p_pkt;
+} p_pkt;
 
 
-typedef struct
-{
-    uint8_t                 id;
+typedef struct {
+    uint8_t id;
     ble_gap_addr_t p_addr;
-    int8_t         rssi;
-    uint8_t         rssi_cnt;
+    int8_t rssi;
+    uint8_t rssi_cnt;
 } gap_data;
 
-typedef struct
-{
-  uint8_t count;
-  gap_data peer[MAX_DISC_QUEUE];
+typedef struct {
+    uint8_t count;
+    gap_data peer[MAX_DISC_QUEUE];
 } gap_disc;
 
-typedef struct
-{
-    uint8_t         my_id;
-    uint8_t         root_id; //ALWAYS 0
+typedef struct {
+    uint8_t my_id;
+    uint8_t root_id; //ALWAYS 0
     char name[MAX_DEV_NAME];
     ble_gap_addr_t my_addr;
     ble_gap_addr_t connected_central;
     ble_gap_addr_t parent;
     bool parent_set;
-}app_dev_condition;
+} app_dev_condition;
 
-typedef struct
-{
+typedef struct {
     bool status;
-    bool timeout;  
+    bool timeout;
 } app_timer_condition;
 
-typedef struct
-{
+typedef struct {
     bool established;
     bool discovered;
     gap_disc disc;
 } app_net_condition;
 
-typedef struct
-{
+typedef struct {
     uint8_t pkt_cnt;
     uint8_t header_cnt;
     uint8_t data_cnt;
-    bool    proc;
+    bool proc;
     uint8_t proc_cnt;
     p_pkt pkt[MAX_PKT_CNT];
 } app_pkt_rx;
 
-typedef struct
-{
+typedef struct {
     uint8_t pkt_cnt;
 
-    uint8_t queue_index;
-    int8_t tx_queue[MAX_PKT_CNT];
+    uint8_t que_idx;
+    int8_t tx_que[MAX_PKT_CNT];
 
-    bool    proc;
+    bool proc;
     uint8_t proc_cnt;
 
     p_pkt pkt[MAX_PKT_CNT];
 } app_pkt_tx;
 
-typedef struct
-{
+typedef struct {
     app_dev_condition dev;
     app_net_condition net;
     app_timer_condition timer;
@@ -133,7 +126,9 @@ typedef struct
 } app_condition;
 
 extern app_condition APP;
+
 extern void scan_start(void);
+
 extern const ble_gap_scan_params_t m_scan_params;
 extern const ble_gap_conn_params_t m_connection_param;
 #endif

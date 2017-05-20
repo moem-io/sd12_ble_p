@@ -38,4 +38,6 @@ JLink*.*
 *.h~
 *.TMP
 
-
+.idea/*
+CMakeLists.txt
+cmake-build-debug/*

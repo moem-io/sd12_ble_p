@@ -390,14 +390,14 @@
               <FilePath>config\sdk_config.h</FilePath>
             </File>
             <File>
-              <FileName>cmds.c</FileName>
+              <FileName>per.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\src\cmds.c</FilePath>
+              <FilePath>..\src\per.c</FilePath>
             </File>
             <File>
-              <FileName>cmds_c.c</FileName>
+              <FileName>cen.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\src\cmds_c.c</FilePath>
+              <FilePath>..\src\cen.c</FilePath>
             </File>
             <File>
               <FileName>util_misc.c</FileName>
@@ -3278,14 +3278,14 @@
               <FilePath>config\sdk_config.h</FilePath>
             </File>
             <File>
-              <FileName>cmds.c</FileName>
+              <FileName>per.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\src\cmds.c</FilePath>
+              <FilePath>..\src\per.c</FilePath>
             </File>
             <File>
-              <FileName>cmds_c.c</FileName>
+              <FileName>cen.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\src\cmds_c.c</FilePath>
+              <FilePath>..\src\cen.c</FilePath>
             </File>
             <File>
               <FileName>util_misc.c</FileName>
