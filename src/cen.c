@@ -118,27 +118,27 @@ void data_builder(uint8_t *p_data) {
     LOG_I("PACKET BUILD %s, \r\n", VSTR_PUSH(p_data, APP.net.disc.count * unit, 0));
 }
 
-void pkt_build(uint8_t build_cmd) {
+void pkt_build(uint8_t build_type) {
     LOG_I("PACKET BUILD TXP : %d, RXP : %d, \r\n", APP.tx_p.pkt_cnt, APP.rx_p.proc_cnt);
     p_pkt *txp = &APP.tx_p.pkt[APP.tx_p.pkt_cnt];
     p_pkt *rxp = &APP.rx_p.pkt[APP.rx_p.proc_cnt];
 
-    switch (build_cmd) {
+    switch (build_type) {
         case CEN_BUILD_SCAN_RESULT:
-            txp->header.type = CMDS_PKT_TYPE_NET_SCAN_RESPONSE;
+            txp->header.type = PKT_TYPE_NET_SCAN_RESPONSE;
             txp->header.source.node = APP.dev.my_id;
             txp->header.source.sensor = 0;
             txp->header.target.node = APP.dev.root_id;
             txp->header.target.sensor = 0;
             txp->header.index.now = 1;
-            txp->header.index.total = (int) ceil((float) APP.net.disc.count * 8 / CMDS_DATA_MAX_LEN);
+            txp->header.index.total = (int) ceil((float) APP.net.disc.count * 8 / MAX_DATA_LEN);
 
             data_builder(txp->data.p_data);
             break;
 
         case CEN_BUILD_PACKET_ROUTE:
-            memcpy(&txp->header, &rxp->header, CMDS_HEADER_MAX_LEN);
-            memcpy(&txp->data, &rxp->data, MAX_DATA_LEN);
+            memcpy(&txp->header, &rxp->header, MAX_HEADER_LEN);
+            memcpy(&txp->data, &rxp->data, MAX_PKT_DATA_LEN);
             break;
 
         default:
@@ -163,19 +163,19 @@ void cen_on_db_disc_evt(cen_t *p_cen, ble_db_discovery_evt_t *p_evt) {
         LOG_D("Discovered Evt Count : %d\r\n", p_evt->params.discovered_db.char_count);
         for (i = 0; i < p_evt->params.discovered_db.char_count; i++) {
             switch (p_chars[i].characteristic.uuid.uuid) {
-                case CMDS_CHAR_HEADER_UUID:
+                case CMDS_HEADER_UUID:
                     hdlr->header_hdlr = p_chars[i].characteristic.handle_value;
                     break;
 
-                case CMDS_CHAR_DATA_1_UUID:
+                case CMDS_DATA_1_UUID:
                     hdlr->data_1_hdlr = p_chars[i].characteristic.handle_value;
                     break;
 
-                case CMDS_CHAR_DATA_2_UUID:
+                case CMDS_DATA_2_UUID:
                     hdlr->data_2_hdlr = p_chars[i].characteristic.handle_value;
                     break;
 
-                case CMDS_CHAR_RESULT_UUID:
+                case CMDS_RESULT_UUID:
                     hdlr->result_hdlr = p_chars[i].characteristic.handle_value;
                     hdlr->result_cccd_hdlr = p_chars[i].cccd_handle;
                     break;
@@ -187,8 +187,7 @@ void cen_on_db_disc_evt(cen_t *p_cen, ble_db_discovery_evt_t *p_evt) {
 
         LOG_D("HEADER :%02x, DATA_1 :%02x, DATA_2 :%02x\r\n", hdlr->header_hdlr, hdlr->data_1_hdlr, hdlr->data_2_hdlr);
         LOG_D("RESULT :%02x , CCCD : %02x\r\n", hdlr->result_hdlr, hdlr->result_cccd_hdlr);
-        if (hdlr->header_hdlr && hdlr->data_1_hdlr && hdlr->data_2_hdlr && hdlr->result_hdlr &&
-            hdlr->result_cccd_hdlr) {
+        if (hdlr->header_hdlr && hdlr->data_1_hdlr && hdlr->data_2_hdlr && hdlr->result_hdlr && hdlr->result_cccd_hdlr) {
             LOG_D("ALL HANDLER ASSIGNED\r\n");
             hdlr->assigned = true;
             APP.tx_p.proc = true;
@@ -214,19 +213,19 @@ static void on_hvx(cen_t *p_cen, const ble_evt_t *p_ble_evt) {
             p_cen->state.send = false;
 
             uint8_t *p_data = (uint8_t *) p_evt_hvx->data;
-            if (p_data[0] == CMDS_PKT_RSLT_IDLE) {
+            if (p_data[0] == PKT_RSLT_IDLE) {
                 p_cen->state.idle = true;
                 LOG_D("IDLE OK\r\n");
-            } else if (p_data[0] == CMDS_PKT_RSLT_HEADER_OK) {
+            } else if (p_data[0] == PKT_RSLT_HEADER_OK) {
                 p_cen->state.header = true;
                 LOG_D("HEADER OK\r\n");
-            } else if (p_data[0] == CMDS_PKT_RSLT_DATA_1_OK) {
+            } else if (p_data[0] == PKT_RSLT_DATA_1_OK) {
                 p_cen->state.data_1 = true;
                 LOG_D("DATA_1 OK\r\n");
-            } else if (p_data[0] == CMDS_PKT_RSLT_DATA_2_OK) {
+            } else if (p_data[0] == PKT_RSLT_DATA_2_OK) {
                 p_cen->state.data_2 = true;
                 LOG_D("DATA_2 OK\r\n");
-            } else if (p_data[0] == CMDS_PKT_RSLT_INTERPRET_OK) {
+            } else if (p_data[0] == PKT_RSLT_INTERPRET_OK) {
                 p_cen->state.interpret = true;
                 LOG_D("INTERPRET OK\r\n");
             }
@@ -273,13 +272,30 @@ uint32_t cen_init(cen_t *p_cen) {
 
     p_cen->uuid_type = cmds_uuid.type;
     p_cen->conn_handle = BLE_CONN_HANDLE_INVALID;
-    p_cen->hdlrs.header_hdlr = BLE_GATT_HANDLE_INVALID;
-    p_cen->hdlrs.data_1_hdlr = BLE_GATT_HANDLE_INVALID;
-    p_cen->hdlrs.data_2_hdlr = BLE_GATT_HANDLE_INVALID;
-    p_cen->hdlrs.result_hdlr = BLE_GATT_HANDLE_INVALID;
-    p_cen->hdlrs.result_cccd_hdlr = BLE_GATT_HANDLE_INVALID;
+    memset(&p_cen->hdlrs, BLE_GATT_HANDLE_INVALID, sizeof(cen_handlers_t));
 
     return ble_db_discovery_evt_register(&cmds_uuid);
+}
+
+
+static uint32_t cen_value_update(cen_t *p_cen, uint16_t *handle, uint8_t *p_string, uint16_t length) {
+    if (p_cen->conn_handle == BLE_CONN_HANDLE_INVALID) {
+        return NRF_ERROR_INVALID_STATE;
+    }
+    if (length > MAX_CHAR_LEN) {
+        return NRF_ERROR_INVALID_PARAM;
+    }
+
+    const ble_gattc_write_params_t write_params = {
+        .write_op = BLE_GATT_OP_WRITE_CMD,
+        .flags    = BLE_GATT_EXEC_WRITE_FLAG_PREPARED_WRITE,
+        .handle   = *handle,
+        .offset   = 0,
+        .len      = length,
+        .p_value  = p_string
+    };
+
+    return sd_ble_gattc_write(p_cen->conn_handle, &write_params);
 }
 
 /**@brief Function for creating a message for writing to the CCCD.
@@ -300,26 +316,6 @@ static uint32_t cccd_configure(uint16_t conn_handle, uint16_t cccd_handle, bool 
     };
 
     return sd_ble_gattc_write(conn_handle, &write_params);
-}
-
-static uint32_t cen_value_update(cen_t *p_cen, uint16_t *handle, uint8_t *p_string, uint16_t length) {
-    if (p_cen->conn_handle == BLE_CONN_HANDLE_INVALID) {
-        return NRF_ERROR_INVALID_STATE;
-    }
-    if (length > CMDS_DATA_MAX_LEN) {
-        return NRF_ERROR_INVALID_PARAM;
-    }
-
-    const ble_gattc_write_params_t write_params = {
-        .write_op = BLE_GATT_OP_WRITE_CMD,
-        .flags    = BLE_GATT_EXEC_WRITE_FLAG_PREPARED_WRITE,
-        .handle   = *handle,
-        .offset   = 0,
-        .len      = length,
-        .p_value  = p_string
-    };
-
-    return sd_ble_gattc_write(p_cen->conn_handle, &write_params);
 }
 
 uint32_t cen_noti_enable(cen_t *p_cen, uint16_t *handle) {

@@ -13,7 +13,7 @@
 #define MAX_DISC_QUEUE 5  /** Max Discovery Queue **/
 #define MAX_RSSI_CNT 255  /** Max RSSI NORMALIZE COUNT **/
 #define MAX_PKT_CNT 20
-#define MAX_DATA_LEN 80
+#define MAX_PKT_DATA_LEN 80
 #define MAX_DEV_NAME 10
 
 #define APP_STATUS_SUCCESS              0x0000
@@ -49,7 +49,7 @@ typedef struct {
 } p_header;
 
 typedef struct {
-    uint8_t p_data[MAX_DATA_LEN];
+    uint8_t p_data[MAX_PKT_DATA_LEN];
 } p_data;
 
 typedef struct {

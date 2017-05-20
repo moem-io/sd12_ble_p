@@ -11,12 +11,6 @@
 #include "util.h"
 #include "main.h"
 
-#define CMDS_MAX_DATA_LEN (GATT_MTU_SIZE_DEFAULT - 3)
-
-#define CMDS_HEADER_MAX_LEN 7
-#define CMDS_DATA_MAX_LEN 20
-#define CMDS_RESULT_MAX_LEN 1
-
 typedef struct {
     bool notification;
     uint8_t uuid_type;

@@ -30,7 +30,7 @@ void pkt_interpret(per_t *p_per, ble_evt_t *p_ble_evt) {
         LOG_D(" DATA : %.28s\r\n", STR_PUSH(buff2, 0));
 
         switch (rxp->header.type) {
-            case CMDS_PKT_TYPE_NET_SCAN_REQUEST:
+            case PKT_TYPE_NET_SCAN_REQUEST:
                 if (APP.dev.my_id == 0) {
                     LOG_D("Device ID not set!\r\n");
                     app_dev_parent_set(&APP.dev.connected_central);
@@ -62,7 +62,7 @@ void pkt_interpret(per_t *p_per, ble_evt_t *p_ble_evt) {
                 }
                 break;
 
-            case CMDS_PKT_TYPE_NET_SCAN_RESPONSE:
+            case PKT_TYPE_NET_SCAN_RESPONSE:
                 if (!APP.net.discovered) {
                     LOG_E("Network not discovered\r\n");
                     break;
@@ -76,7 +76,7 @@ void pkt_interpret(per_t *p_per, ble_evt_t *p_ble_evt) {
                 break;
         }
 
-        per_result_update(p_per, CMDS_PKT_RSLT_INTERPRET_OK);
+        per_result_update(p_per, PKT_RSLT_INTERPRET_OK);
         APP.rx_p.proc = false;
         nrf_delay_ms(100);
         err_code = sd_ble_gap_disconnect(p_per->conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
@@ -144,7 +144,7 @@ static void gatts_value_get(per_t *p_per, uint16_t handle, ble_gatts_value_t *rx
 
 static void per_result_update(per_t *p_per, uint8_t result_type) {
     uint32_t err_code;
-    uint8_t result[CMDS_RESULT_MAX_LEN] = {result_type};
+    uint8_t result[MAX_RESULT_LEN] = {result_type};
 
     err_code = per_value_update(p_per, &p_per->result_hdlrs, result, sizeof(result));
     APP_ERROR_CHECK(err_code);
@@ -167,17 +167,17 @@ static void on_write(per_t *p_per, ble_evt_t *p_ble_evt) {
         gatts_value_get(p_per, p_per->header_hdlrs.value_handle, &rx_data);
         header_parser(&rx_data);
 
-        per_result_update(p_per, CMDS_PKT_RSLT_HEADER_OK);
+        per_result_update(p_per, PKT_RSLT_HEADER_OK);
     } else if (p_evt_write->handle == p_per->data_1_hdlrs.value_handle) {
         gatts_value_get(p_per, p_per->data_1_hdlrs.value_handle, &rx_data);
         data_1_parser(&rx_data);
 
-        per_result_update(p_per, CMDS_PKT_RSLT_DATA_1_OK);
+        per_result_update(p_per, PKT_RSLT_DATA_1_OK);
     } else if (p_evt_write->handle == p_per->data_2_hdlrs.value_handle) {
         gatts_value_get(p_per, p_per->data_2_hdlrs.value_handle, &rx_data);
         data_2_parser(&rx_data);
 
-        per_result_update(p_per, CMDS_PKT_RSLT_DATA_2_OK);
+        per_result_update(p_per, PKT_RSLT_DATA_2_OK);
     } else if (p_evt_write->handle == p_per->result_hdlrs.value_handle) {
         gatts_value_get(p_per, p_per->result_hdlrs.value_handle, &rx_data);
     } else if (p_evt_write->handle == p_per->result_hdlrs.cccd_handle) {
@@ -185,7 +185,7 @@ static void on_write(per_t *p_per, ble_evt_t *p_ble_evt) {
         p_per->notification = true;
         LOG_D("NOTIFICATION ENABLED BY CENTRAL!!\r\n");
 
-        per_result_update(p_per, CMDS_PKT_RSLT_IDLE);
+        per_result_update(p_per, PKT_RSLT_IDLE);
     }
 }
 
@@ -214,19 +214,30 @@ void per_on_ble_evt(per_t *p_per, ble_evt_t *p_ble_evt) {
 }
 
 
-static uint32_t per_char_header_add(per_t *p_per) {
+static uint32_t per_char_add(per_t *p_per,int uuid, int len, ble_gatts_char_handles_t *hdlr) {
     ble_gatts_char_md_t char_md;
     ble_gatts_attr_t attr_char_value;
-    ble_uuid_t char_uuid;
     ble_gatts_attr_md_t attr_md;
+    ble_uuid_t char_uuid;
 
     char_uuid.type = p_per->uuid_type;
-    char_uuid.uuid = CMDS_CHAR_HEADER_UUID;
+    char_uuid.uuid = uuid;
 
     memset(&char_md, 0, sizeof(char_md));
     char_md.char_props.read = 1;
     char_md.char_props.write = 1;
 
+    if (uuid == CMDS_RESULT_UUID) {
+        ble_gatts_attr_md_t cccd_md;
+
+        memset(&cccd_md, 0, sizeof(cccd_md));
+        BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.read_perm);
+        BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.write_perm);
+        cccd_md.vloc = BLE_GATTS_VLOC_STACK;
+        char_md.p_cccd_md = &cccd_md;
+        char_md.char_props.notify = 1;
+    }
+    
     memset(&attr_md, 0, sizeof(attr_md));
     attr_md.vloc = BLE_GATTS_VLOC_STACK;
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.read_perm);
@@ -236,135 +247,17 @@ static uint32_t per_char_header_add(per_t *p_per) {
     attr_char_value.p_uuid = &char_uuid;
     attr_char_value.p_attr_md = &attr_md;
     attr_char_value.init_offs = 0;
-    attr_char_value.max_len = CMDS_HEADER_MAX_LEN;
-    attr_char_value.init_len = CMDS_HEADER_MAX_LEN;
+    attr_char_value.max_len = len;
+    attr_char_value.init_len = len;
 
-    uint8_t value[CMDS_HEADER_MAX_LEN];
-    memset(value, 0, sizeof(value));
-
-    attr_char_value.p_value = value;
-
-    return sd_ble_gatts_characteristic_add(p_per->service_handle,
-                                           &char_md,
-                                           &attr_char_value,
-                                           &p_per->header_hdlrs);
-}
-
-static uint32_t per_char_data_1_add(per_t *p_per) {
-    ble_gatts_char_md_t char_md;
-    ble_gatts_attr_t attr_char_value;
-    ble_gatts_attr_md_t attr_md;
-    ble_uuid_t char_uuid;
-
-    char_uuid.type = p_per->uuid_type;
-    char_uuid.uuid = CMDS_CHAR_DATA_1_UUID;
-
-    memset(&char_md, 0, sizeof(char_md));
-    char_md.char_props.read = 1;
-    char_md.char_props.write = 1;
-
-    memset(&attr_md, 0, sizeof(attr_md));
-    attr_md.vloc = BLE_GATTS_VLOC_STACK;
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.read_perm);
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.write_perm);
-
-    memset(&attr_char_value, 0, sizeof(attr_char_value));
-    attr_char_value.p_uuid = &char_uuid;
-    attr_char_value.p_attr_md = &attr_md;
-    attr_char_value.init_offs = 0;
-    attr_char_value.max_len = CMDS_DATA_MAX_LEN;
-    attr_char_value.init_len = CMDS_DATA_MAX_LEN;
-
-    uint8_t value[CMDS_DATA_MAX_LEN];
+    uint8_t value[len];
     memset(&value, 0, sizeof(value));
 
     attr_char_value.p_value = value;
 
-
-    return sd_ble_gatts_characteristic_add(p_per->service_handle,
-                                           &char_md,
-                                           &attr_char_value,
-                                           &p_per->data_1_hdlrs);
+    return sd_ble_gatts_characteristic_add(p_per->service_handle, &char_md, &attr_char_value, hdlr);
 }
 
-static uint32_t per_char_data_2_add(per_t *p_per) {
-    ble_gatts_char_md_t char_md;
-    ble_gatts_attr_t attr_char_value;
-    ble_gatts_attr_md_t attr_md;
-    ble_uuid_t char_uuid;
-
-    char_uuid.type = p_per->uuid_type;
-    char_uuid.uuid = CMDS_CHAR_DATA_2_UUID;
-
-    memset(&char_md, 0, sizeof(char_md));
-    char_md.char_props.read = 1;
-    char_md.char_props.write = 1;
-
-    memset(&attr_md, 0, sizeof(attr_md));
-    attr_md.vloc = BLE_GATTS_VLOC_STACK;
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.read_perm);
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.write_perm);
-
-    memset(&attr_char_value, 0, sizeof(attr_char_value));
-    attr_char_value.p_uuid = &char_uuid;
-    attr_char_value.p_attr_md = &attr_md;
-    attr_char_value.init_offs = 0;
-    attr_char_value.max_len = CMDS_DATA_MAX_LEN;
-    attr_char_value.init_len = CMDS_DATA_MAX_LEN;
-
-    uint8_t value[CMDS_DATA_MAX_LEN];
-    memset(&value, 0, sizeof(value));
-
-    attr_char_value.p_value = value;
-
-
-    return sd_ble_gatts_characteristic_add(p_per->service_handle,
-                                           &char_md,
-                                           &attr_char_value,
-                                           &p_per->data_2_hdlrs);
-}
-
-static uint32_t per_char_result_add(per_t *p_per) {
-    ble_gatts_char_md_t char_md;
-    ble_gatts_attr_md_t cccd_md;
-    ble_gatts_attr_t attr_char_value;
-    ble_gatts_attr_md_t attr_md;
-    ble_uuid_t char_uuid;
-
-    char_uuid.type = p_per->uuid_type;
-    char_uuid.uuid = CMDS_CHAR_RESULT_UUID;
-
-    memset(&char_md, 0, sizeof(char_md));
-    char_md.char_props.read = 1;
-    char_md.char_props.write = 1;
-
-    memset(&cccd_md, 0, sizeof(cccd_md));
-
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.read_perm);
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&cccd_md.write_perm);
-    cccd_md.vloc = BLE_GATTS_VLOC_STACK;
-    char_md.p_cccd_md = &cccd_md;
-    char_md.char_props.notify = 1;
-
-    memset(&attr_md, 0, sizeof(attr_md));
-    attr_md.vloc = BLE_GATTS_VLOC_STACK;
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.read_perm);
-    BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.write_perm);
-
-    memset(&attr_char_value, 0, sizeof(attr_char_value));
-    attr_char_value.p_uuid = &char_uuid;
-    attr_char_value.p_attr_md = &attr_md;
-    attr_char_value.init_offs = 0;
-    attr_char_value.max_len = CMDS_RESULT_MAX_LEN;
-    attr_char_value.init_len = CMDS_RESULT_MAX_LEN;
-    uint8_t value[CMDS_RESULT_MAX_LEN] = {CMDS_PKT_RSLT_IDLE};
-    attr_char_value.p_value = value;
-
-    return sd_ble_gatts_characteristic_add(p_per->service_handle,
-                                           &char_md,
-                                           &attr_char_value,
-                                           &p_per->result_hdlrs);
-}
 
 uint32_t per_init(per_t *p_per) {
     uint32_t err_code;
@@ -384,16 +277,16 @@ uint32_t per_init(per_t *p_per) {
                                         &p_per->service_handle);
     APP_ERROR_CHECK(err_code);
 
-    err_code = per_char_header_add(p_per);
+    err_code = per_char_add(p_per,CMDS_HEADER_UUID,MAX_HEADER_LEN,&p_per->header_hdlrs);
+    APP_ERROR_CHECK(err_code);
+    
+    err_code = per_char_add(p_per,CMDS_DATA_1_UUID,MAX_DATA_LEN,&p_per->data_1_hdlrs);
     APP_ERROR_CHECK(err_code);
 
-    err_code = per_char_data_1_add(p_per);
+    err_code = per_char_add(p_per,CMDS_DATA_2_UUID,MAX_DATA_LEN,&p_per->data_2_hdlrs);
     APP_ERROR_CHECK(err_code);
-
-    err_code = per_char_data_2_add(p_per);
-    APP_ERROR_CHECK(err_code);
-
-    err_code = per_char_result_add(p_per);
+    
+    err_code = per_char_add(p_per, CMDS_RESULT_UUID, MAX_RESULT_LEN, &p_per->result_hdlrs);
     APP_ERROR_CHECK(err_code);
 
     return NRF_SUCCESS;
@@ -406,7 +299,7 @@ uint32_t per_value_update(per_t *p_per, ble_gatts_char_handles_t *data_handle, u
         return NRF_ERROR_INVALID_STATE;
     }
 
-    if (length > CMDS_MAX_DATA_LEN) {
+    if (length > MAX_CHAR_LEN) {
         return NRF_ERROR_INVALID_PARAM;
     }
 
