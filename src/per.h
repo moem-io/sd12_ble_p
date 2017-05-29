@@ -23,11 +23,11 @@ typedef struct {
 } per_t;
 
 
-void pkt_interpret(per_t *p_per, ble_evt_t *p_ble_evt);
+void pkt_interpret(per_t *p_per);
 
 uint32_t per_init(per_t *p_per);
 
-void per_on_ble_evt(per_t *p_per, ble_evt_t *p_ble_evt);
+void app_per_evt(per_t *p_per, ble_evt_t *p_ble_evt);
 
 uint32_t per_value_update(per_t *p_per, ble_gatts_char_handles_t *data_handle, uint8_t *p_string, uint16_t length);
 

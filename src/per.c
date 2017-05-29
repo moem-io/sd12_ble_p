@@ -13,7 +13,7 @@ static void app_disc_id_update(p_pkt *rxp) {
     }
 }
 
-void pkt_interpret(per_t *p_per, ble_evt_t *p_ble_evt) {
+void pkt_interpret(per_t *p_per) {
     if (APP.rx_p.proc) {
         p_pkt *rxp = &(APP.rx_p.pkt[APP.rx_p.proc_cnt]);
 
@@ -27,6 +27,18 @@ void pkt_interpret(per_t *p_per, ble_evt_t *p_ble_evt) {
         LOG_D(" Header : %.14s\r\n", STR_PUSH(buff1, 0));
         LOG_D(" DATA : %.28s\r\n", STR_PUSH(buff2, 0));
 
+        if(APP.dev.my_id != 0 && APP.dev.my_id != rxp->header.target.node) {
+            LOG_D("PACKET ROUTE!\r\n");
+            app_disc_id_update(rxp);
+
+            if (!APP.net.discovered) {
+                LOG_E("Network not discovered\r\n");
+                return;
+            }
+
+            pkt_build(CEN_BUILD_PACKET_ROUTE);
+        }
+                
         switch (rxp->header.type) {
             case PKT_TYPE_NET_SCAN_REQUEST:
                 if (APP.dev.my_id == 0) {
@@ -47,16 +59,6 @@ void pkt_interpret(per_t *p_per, ble_evt_t *p_ble_evt) {
                     LOG_I("Network Re-Scan Initialized.\r\n");
 
                     scan_start();
-                } else if (APP.dev.my_id != rxp->header.target.node) {
-                    LOG_D("PACKET ROUTE!\r\n");
-                    app_disc_id_update(rxp);
-
-                    if (!APP.net.discovered) {
-                        LOG_E("Network not discovered\r\n");
-                        break;
-                    }
-
-                    pkt_build(CEN_BUILD_PACKET_ROUTE);
                 }
                 break;
 
@@ -75,7 +77,8 @@ void pkt_interpret(per_t *p_per, ble_evt_t *p_ble_evt) {
         }
 
         per_result_update(p_per, PKT_RSLT_INTERPRET_OK);
-        APP.rx_p.proc = false;
+        APP.rx_p.proc_cnt++;
+				APP.rx_p.proc = false;
         nrf_delay_ms(100);
     }
 }
@@ -147,7 +150,8 @@ static void per_result_update(per_t *p_per, uint8_t result_type) {
 }
 
 static void on_write(per_t *p_per, ble_evt_t *p_ble_evt) {
-    ble_gatts_evt_write_t *p_evt_write = &p_ble_evt->evt.gatts_evt.params.write;
+		LOG_I("ON Per Write\r\n");
+		ble_gatts_evt_write_t *p_evt_write = &p_ble_evt->evt.gatts_evt.params.write;
 
     // Decclare buffer variable to hold received data. The data can only be 32 bit long.
     uint8_t data_buffer[20];
@@ -176,6 +180,8 @@ static void on_write(per_t *p_per, ble_evt_t *p_ble_evt) {
     } else if (p_evt_write->handle == p_per->result_hdlrs.value_handle) {
         gatts_value_get(p_per, p_per->result_hdlrs.value_handle, &rx_data);
     } else if (p_evt_write->handle == p_per->result_hdlrs.cccd_handle) {
+			
+			  LOG_I("ON NOTI WRITE :%s \r\n",VSTR_PUSH(rx_data.p_value,20,0));
         gatts_value_get(p_per, p_per->result_hdlrs.cccd_handle, &rx_data);
         p_per->notification = true;
         LOG_D("NOTIFICATION ENABLED BY CENTRAL!!\r\n");
@@ -184,12 +190,11 @@ static void on_write(per_t *p_per, ble_evt_t *p_ble_evt) {
     }
 }
 
-void per_on_ble_evt(per_t *p_per, ble_evt_t *p_ble_evt) {
+void app_per_evt(per_t *p_per, ble_evt_t *p_ble_evt) {
     switch (p_ble_evt->header.evt_id) {
         case BLE_GAP_EVT_CONNECTED:
             p_per->conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
-            memcpy(&APP.dev.connected_central, &p_ble_evt->evt.gap_evt.params.connected.peer_addr,
-                   sizeof(ble_gap_addr_t));
+            memcpy(&APP.dev.connected_central, &p_ble_evt->evt.gap_evt.params.connected.peer_addr, sizeof(ble_gap_addr_t));
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
@@ -267,9 +272,7 @@ uint32_t per_init(per_t *p_per) {
 
     per_uuid.uuid = CMDS_UUID;
 
-    err_code = sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY,
-                                        &per_uuid,
-                                        &p_per->service_handle);
+    err_code = sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY, &per_uuid, &p_per->service_handle);
     APP_ERROR_CHECK(err_code);
 
     err_code = per_char_add(p_per,CMDS_HEADER_UUID,HEADER_LEN,&p_per->header_hdlrs);

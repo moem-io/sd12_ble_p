@@ -25,7 +25,11 @@ uint32_t cen_data_2_update(cen_t *p_cen, p_data *data) {
 void pkt_send(cen_t *p_cen) {
     uint32_t err_code;
 
+//		LOG_I("txp, rxp,%d,%d \r\n",APP.tx_p.proc_cnt, APP.rx_p.proc_cnt);
+	
     if (APP.tx_p.proc) {
+			nrf_delay_ms(100);
+			
         p_pkt *txp = &APP.tx_p.pkt[APP.tx_p.proc_cnt];
 
         if (p_cen->conn_handle == BLE_CONN_HANDLE_INVALID) {
@@ -39,10 +43,10 @@ void pkt_send(cen_t *p_cen) {
             LOG_E("TARGET NOT FOUND\r\n");
             return;
         }
-
+				
         if (!p_cen->hdlrs.assigned) {
             LOG_I("WAIT FOR HANDLE ASSIGNED\r\n");
-            APP.tx_p.proc = false;
+						APP.tx_p.proc = false;
             return;
         }
 
@@ -89,7 +93,6 @@ void pkt_send(cen_t *p_cen) {
 
         if (!p_cen->state.interpret) {
             LOG_I("WAIT FOR PACKET INTERPRETING\r\n");
-            nrf_delay_ms(100);
             return;
         } else if (p_cen->state.interpret) {
             APP.tx_p.tx_que[APP.tx_p.proc_cnt] = CEN_TXP_QUEUE_UNAVAILABLE;
@@ -107,7 +110,7 @@ void pkt_send(cen_t *p_cen) {
 }
 
 //Function name Rename
-void data_builder(uint8_t *p_data) {
+void scan_res_builder(uint8_t *p_data) {
     uint8_t p_idx = 0;
     uint8_t unit = BLE_GAP_ADDR_LEN + sizeof(uint8_t);
 
@@ -119,7 +122,7 @@ void data_builder(uint8_t *p_data) {
 
         p_idx = p_idx + unit;
     }
-    LOG_I("PACKET BUILD %s, \r\n", VSTR_PUSH(p_data, APP.net.disc.count * unit, 0));
+    LOG_I("SCAN_RESPONSE BUILD %s, \r\n", VSTR_PUSH(p_data, APP.net.disc.count * unit, 0));
 }
 
 void pkt_build(uint8_t build_type) {
@@ -137,12 +140,16 @@ void pkt_build(uint8_t build_type) {
             txp->header.index.now = 1;
             txp->header.index.total = (int) ceil((float) APP.net.disc.count * 8 / DATA_LEN);
 
-            data_builder(txp->data.p_data);
+            scan_res_builder(txp->data.p_data);
             break;
 
-        case CEN_BUILD_PACKET_ROUTE:
+        case CEN_BUILD_PACKET_ROUTE:				
             memcpy(&txp->header, &rxp->header, HEADER_LEN);
             memcpy(&txp->data, &rxp->data, MAX_PKT_DATA_LEN);
+				
+						LOG_I("PACKET Route RXPh : %s, TXPh : %s, \r\n", VSTR_PUSH((uint8_t *) &rxp->header, HEADER_LEN, 0),VSTR_PUSH((uint8_t *) &txp->header, HEADER_LEN, 0));
+						LOG_I("PACKET Route RXPd : %s, TXPd : %s, \r\n", VSTR_PUSH((uint8_t *) &rxp->data, DATA_LEN, 0),VSTR_PUSH((uint8_t *) &txp->data, DATA_LEN, 0));
+
             break;
 
         default:
@@ -237,7 +244,7 @@ static void on_hvx(cen_t *p_cen, const ble_evt_t *p_ble_evt) {
     }
 }
 
-void cen_on_ble_evt(cen_t *p_cen, const ble_evt_t *p_ble_evt) {
+void app_cen_evt(cen_t *p_cen, const ble_evt_t *p_ble_evt) {
     switch (p_ble_evt->header.evt_id) {
         case BLE_GAP_EVT_CONNECTED:
             p_cen->conn_handle = p_ble_evt->evt.gap_evt.conn_handle;

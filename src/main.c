@@ -424,7 +424,6 @@ static void sleep_mode_enter(void) {
 }
 
 
-//170228 [TODO] : BLE_EVT_T GAT_EVT-> RSSI CHANGED??
 //170228 [TODO] : IF NO NODE FOUND??
 void net_disc(const ble_evt_t *const p_ble_evt) {
     gap_disc *disc = &APP.net.disc;
@@ -477,7 +476,7 @@ void net_disc(const ble_evt_t *const p_ble_evt) {
  *
  * @param[in]   p_ble_evt   Bluetooth stack event.
  */
-static void on_ble_central_evt(const ble_evt_t *const p_ble_evt) {
+static void nrf_cen_evt(const ble_evt_t *const p_ble_evt) {
     const ble_gap_evt_t *const p_gap_evt = &p_ble_evt->evt.gap_evt;
     ret_code_t err_code;
 
@@ -558,7 +557,7 @@ static void on_ble_central_evt(const ble_evt_t *const p_ble_evt) {
  *
  * @param[in] p_ble_evt  Bluetooth stack event.
  */
-static void on_ble_peripheral_evt(ble_evt_t *p_ble_evt) {
+static void nrf_per_evt(ble_evt_t *p_ble_evt) {
     ret_code_t err_code;
     switch (p_ble_evt->header.evt_id) {
         case BLE_GAP_EVT_CONNECTED:
@@ -654,40 +653,30 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt) {
     }
 }
 
-/**@brief Function for dispatching a BLE stack event to all modules with a BLE stack event handler.
- *
- * @details This function is called from the BLE Stack event interrupt handler after a BLE stack
- *          event has been received.
- *
- * @param[in] p_ble_evt  Bluetooth stack event.
- */
 static void ble_evt_dispatch(ble_evt_t *p_ble_evt) {
     uint16_t conn_handle;
     uint16_t role;
 
-//    LOG_D("EVT ID : %d \r\n",p_ble_evt->header.evt_id);
+    LOG_D("EVT ID : %d \r\n",p_ble_evt->header.evt_id);
     ble_conn_state_on_ble_evt(p_ble_evt);
     pm_on_ble_evt(p_ble_evt);
 
     conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
     role = ble_conn_state_role(conn_handle);
 
-    // Based on the role this device plays in the connection, dispatch to the right applications.
     if (role == BLE_GAP_ROLE_PERIPH) {
-        on_ble_peripheral_evt(p_ble_evt);
-        per_on_ble_evt(&m_per_s, p_ble_evt);
+        nrf_per_evt(p_ble_evt);
+        app_per_evt(&m_per_s, p_ble_evt);
 
         ble_advertising_on_ble_evt(p_ble_evt);
         ble_conn_params_on_ble_evt(p_ble_evt);
     } else if ((role == BLE_GAP_ROLE_CENTRAL)
                || (p_ble_evt->header.evt_id == BLE_GAP_EVT_ADV_REPORT)
                || (p_ble_evt->header.evt_id == BLE_GAP_EVT_TIMEOUT)) {
-        on_ble_central_evt(p_ble_evt);
+        nrf_cen_evt(p_ble_evt);
         ble_db_discovery_on_ble_evt(&m_ble_db_discovery, p_ble_evt);
-        cen_on_ble_evt(&m_cen_s, p_ble_evt);
+        app_cen_evt(&m_cen_s, p_ble_evt);
     }
-    pkt_interpret(&m_per_s, p_ble_evt);
-    pkt_send(&m_cen_s);
 
     bsp_btn_ble_on_ble_evt(p_ble_evt);
 }
@@ -712,16 +701,11 @@ static void sys_evt_dispatch(uint32_t sys_evt) {
 }
 
 
-/**@brief Function for initializing the BLE stack.
- *
- * @details Initializes the SoftDevice and the BLE event interrupt.
- */
 static void ble_stack_init(void) {
     uint32_t err_code;
 
     nrf_clock_lf_cfg_t clock_lf_cfg = NRF_CLOCK_LFCLKSRC;
 
-    // Initialize the SoftDevice handler module.
     SOFTDEVICE_HANDLER_INIT(&clock_lf_cfg, NULL);
 
     ble_enable_params_t ble_enable_params;
@@ -730,7 +714,6 @@ static void ble_stack_init(void) {
                                                     &ble_enable_params);
     APP_ERROR_CHECK(err_code);
 
-    // Check the ram settings against the used number of links
     CHECK_RAM_START_ADDR(CENTRAL_LINK_COUNT, PERIPHERAL_LINK_COUNT);
 
     // Enable BLE stack.
@@ -740,11 +723,9 @@ static void ble_stack_init(void) {
     err_code = softdevice_enable(&ble_enable_params);
     APP_ERROR_CHECK(err_code);
 
-    // Register with the SoftDevice handler module for BLE events.
     err_code = softdevice_ble_evt_handler_set(ble_evt_dispatch);
     APP_ERROR_CHECK(err_code);
 
-    // Register with the SoftDevice handler module for BLE events.
     err_code = softdevice_sys_evt_handler_set(sys_evt_dispatch);
     APP_ERROR_CHECK(err_code);
 }
@@ -878,6 +859,7 @@ static void buttons_leds_init(bool *p_erase_bonds) {
 }
 
 
+
 /**@brief Function for the Power manager.
  */
 static void power_manage(void) {
@@ -947,6 +929,9 @@ int main(void) {
     APP_ERROR_CHECK(err_code);
 
     for (;;) {
+			  pkt_interpret(&m_per_s);
+				pkt_send(&m_cen_s);
+
         if (NRF_LOG_PROCESS() == false) {
             power_manage();
         }
