@@ -9,6 +9,9 @@
 #include <math.h>
 #include "nrf_delay.h"
 
+#include "nrf_log.h"
+#include "nrf_log_ctrl.h"
+
 char *uint8_t_to_str(uint8_t *data_addr, uint8_t length, bool reverse);
 
 #define TO_STR(str, rev)                                                  uint8_t_to_str(str,sizeof(str),rev)

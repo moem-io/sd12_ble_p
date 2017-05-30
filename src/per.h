@@ -9,7 +9,6 @@
 
 #include "cmds_base.h"
 #include "util.h"
-#include "main.h"
 
 typedef struct {
     bool notification;

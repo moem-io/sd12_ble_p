@@ -1,30 +1,3 @@
-/* Copyright (c) 2014 Nordic Semiconductor. All Rights Reserved.
- *
- * The information contained herein is property of Nordic Semiconductor ASA.
- * Terms and conditions of usage are described in detail in NORDIC
- * SEMICONDUCTOR STANDARD SOFTWARE LICENSE AGREEMENT.
- *
- * Licensees are granted free, non-transferable use of the information. NO
- * WARRANTY of ANY KIND is provided. This heading must NOT be removed from
- * the file.
- *
- */
-
-/** @file
- *
- * @defgroup ble_sdk_app_template_main main.c
- * @{
- * @ingroup ble_sdk_app_template
- * @brief Template project main file.
- *
- * This file contains a template for creating a new application. It has the code necessary to wakeup
- * from button, advertise, get a connection restart advertising on disconnect and if no new
- * connection created go back to system-off mode.
- * It can easily be used as a starting point for creating a new application, the comments identified
- * with 'YOUR_JOB' indicates where and how you can customize.
- */
-
-
 #include "nordic_common.h"
 #include "nrf.h"
 #include "app_error.h"
@@ -54,6 +27,8 @@
 
 #include "util.h"
 #include "main.h"
+
+#define NRF_LOG_MODULE_NAME "APP"
 
 #define IS_SRVC_CHANGED_CHARACT_PRESENT 1                                           /**< Include or not the service_changed characteristic. if not enabled, the server's database cannot be changed for the lifetime of the device*/
 
@@ -677,6 +652,8 @@ static void ble_evt_dispatch(ble_evt_t *p_ble_evt) {
         ble_db_discovery_on_ble_evt(&m_ble_db_discovery, p_ble_evt);
         app_cen_evt(&m_cen_s, p_ble_evt);
     }
+               
+    pkt_send(&m_cen_s);
 
     bsp_btn_ble_on_ble_evt(p_ble_evt);
 }
@@ -929,8 +906,7 @@ int main(void) {
     APP_ERROR_CHECK(err_code);
 
     for (;;) {
-			  pkt_interpret(&m_per_s);
-				pkt_send(&m_cen_s);
+        pkt_interpret(&m_per_s);
 
         if (NRF_LOG_PROCESS() == false) {
             power_manage();

@@ -1,5 +1,7 @@
 #include "per.h"
 
+#define NRF_LOG_MODULE_NAME "[per]"
+
 static void per_result_update(per_t *p_per, uint8_t result_type);
 
 static void app_disc_id_update(p_pkt *rxp) {
@@ -78,7 +80,7 @@ void pkt_interpret(per_t *p_per) {
 
         per_result_update(p_per, PKT_RSLT_INTERPRET_OK);
         APP.rx_p.proc_cnt++;
-				APP.rx_p.proc = false;
+        APP.rx_p.proc = false;
         nrf_delay_ms(100);
     }
 }
@@ -150,8 +152,8 @@ static void per_result_update(per_t *p_per, uint8_t result_type) {
 }
 
 static void on_write(per_t *p_per, ble_evt_t *p_ble_evt) {
-		LOG_I("ON Per Write\r\n");
-		ble_gatts_evt_write_t *p_evt_write = &p_ble_evt->evt.gatts_evt.params.write;
+    LOG_I("ON Per Write\r\n");
+    ble_gatts_evt_write_t *p_evt_write = &p_ble_evt->evt.gatts_evt.params.write;
 
     // Decclare buffer variable to hold received data. The data can only be 32 bit long.
     uint8_t data_buffer[20];
@@ -180,8 +182,8 @@ static void on_write(per_t *p_per, ble_evt_t *p_ble_evt) {
     } else if (p_evt_write->handle == p_per->result_hdlrs.value_handle) {
         gatts_value_get(p_per, p_per->result_hdlrs.value_handle, &rx_data);
     } else if (p_evt_write->handle == p_per->result_hdlrs.cccd_handle) {
-			
-			  LOG_I("ON NOTI WRITE :%s \r\n",VSTR_PUSH(rx_data.p_value,20,0));
+      
+        LOG_I("ON NOTI WRITE :%s \r\n",VSTR_PUSH(rx_data.p_value,20,0));
         gatts_value_get(p_per, p_per->result_hdlrs.cccd_handle, &rx_data);
         p_per->notification = true;
         LOG_D("NOTIFICATION ENABLED BY CENTRAL!!\r\n");
@@ -198,6 +200,7 @@ void app_per_evt(per_t *p_per, ble_evt_t *p_ble_evt) {
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
+          LOG_D("RESETTING Peripheral\r\n");
             memset(&APP.dev.connected_central, 0, sizeof(ble_gap_addr_t));
             p_per->notification = false;
             p_per->conn_handle = BLE_CONN_HANDLE_INVALID;
@@ -286,6 +289,10 @@ uint32_t per_init(per_t *p_per) {
     
     err_code = per_char_add(p_per, CMDS_RESULT_UUID, RESULT_LEN, &p_per->result_hdlrs);
     APP_ERROR_CHECK(err_code);
+    
+   LOG_D("BEF - HEADER :%02x, DATA_1 :%02x, DATA_2 :%02x\r\n",p_per->header_hdlrs.value_handle, p_per->data_1_hdlrs.value_handle,p_per->data_2_hdlrs.value_handle);
+  LOG_D("RESULT :%02x , CCCD : %02x\r\n", p_per->result_hdlrs.value_handle, p_per->result_hdlrs.cccd_handle);
+
 
     return NRF_SUCCESS;
 }

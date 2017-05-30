@@ -8,7 +8,6 @@
 #include "cmds_base.h"
 
 #include "app_error.h"
-#include "main.h"
 #include "util.h"
 
 #define CEN_BUILD_SCAN_RESULT 1

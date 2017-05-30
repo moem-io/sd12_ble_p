@@ -1,5 +1,7 @@
 #include "cen.h"
 
+#define NRF_LOG_MODULE_NAME "[cen]"
+
 static uint32_t cccd_configure(uint16_t conn_handle, uint16_t cccd_handle, bool enable);
 static uint32_t cen_noti_enable(cen_t *p_cen, uint16_t *handle);
 static uint32_t cen_value_update(cen_t *p_cen, uint16_t *handle, uint8_t *p_string, uint16_t length);
@@ -25,14 +27,15 @@ uint32_t cen_data_2_update(cen_t *p_cen, p_data *data) {
 void pkt_send(cen_t *p_cen) {
     uint32_t err_code;
 
-//		LOG_I("txp, rxp,%d,%d \r\n",APP.tx_p.proc_cnt, APP.rx_p.proc_cnt);
-	
+//    LOG_I("txp, rxp,%d,%d \r\n",APP.tx_p.proc_cnt, APP.rx_p.proc_cnt);
+  
     if (APP.tx_p.proc) {
-			nrf_delay_ms(100);
-			
+      nrf_delay_ms(100);
+      
         p_pkt *txp = &APP.tx_p.pkt[APP.tx_p.proc_cnt];
 
         if (p_cen->conn_handle == BLE_CONN_HANDLE_INVALID) {
+            nrf_delay_ms(500);
             ble_gap_addr_t *target_addr = app_disc_id_check(&txp->header.target.node);
             if (target_addr) {
                 LOG_I("WAIT FOR PERIPHERAL - TARGET %s\r\n", STR_PUSH(target_addr->addr, 1));
@@ -43,14 +46,15 @@ void pkt_send(cen_t *p_cen) {
             LOG_E("TARGET NOT FOUND\r\n");
             return;
         }
-				
+        
         if (!p_cen->hdlrs.assigned) {
             LOG_I("WAIT FOR HANDLE ASSIGNED\r\n");
-						APP.tx_p.proc = false;
+            APP.tx_p.proc = false;
             return;
         }
 
         if (!p_cen->notification) {
+            LOG_D("ENABLING NOTIFICATION \r\n");
             err_code = cen_noti_enable(p_cen, &p_cen->hdlrs.result_cccd_hdlr);
             ERR_CHK("Noti Enable Failed");
             return;
@@ -58,11 +62,13 @@ void pkt_send(cen_t *p_cen) {
 
         if (!p_cen->state.idle) {
             LOG_D("Wait For IDLE\r\n");
+            APP.tx_p.proc = false;
             return;
         }
 
         if (p_cen->state.send) {
             LOG_D("Wait For Response\r\n");
+            APP.tx_p.proc = false;
             return;
         } else if (!p_cen->state.send) {
             p_cen->state.send = true;
@@ -143,12 +149,12 @@ void pkt_build(uint8_t build_type) {
             scan_res_builder(txp->data.p_data);
             break;
 
-        case CEN_BUILD_PACKET_ROUTE:				
+        case CEN_BUILD_PACKET_ROUTE:        
             memcpy(&txp->header, &rxp->header, HEADER_LEN);
             memcpy(&txp->data, &rxp->data, MAX_PKT_DATA_LEN);
-				
-						LOG_I("PACKET Route RXPh : %s, TXPh : %s, \r\n", VSTR_PUSH((uint8_t *) &rxp->header, HEADER_LEN, 0),VSTR_PUSH((uint8_t *) &txp->header, HEADER_LEN, 0));
-						LOG_I("PACKET Route RXPd : %s, TXPd : %s, \r\n", VSTR_PUSH((uint8_t *) &rxp->data, DATA_LEN, 0),VSTR_PUSH((uint8_t *) &txp->data, DATA_LEN, 0));
+        
+            LOG_I("PACKET Route RXPh : %s, TXPh : %s, \r\n", VSTR_PUSH((uint8_t *) &rxp->header, HEADER_LEN, 0),VSTR_PUSH((uint8_t *) &txp->header, HEADER_LEN, 0));
+            LOG_I("PACKET Route RXPd : %s, TXPd : %s, \r\n", VSTR_PUSH((uint8_t *) &rxp->data, DATA_LEN, 0),VSTR_PUSH((uint8_t *) &txp->data, DATA_LEN, 0));
 
             break;
 
@@ -164,13 +170,19 @@ void pkt_build(uint8_t build_type) {
 void cen_on_db_disc_evt(cen_t *p_cen, ble_db_discovery_evt_t *p_evt) {
     ble_gatt_db_char_t *p_chars = p_evt->params.discovered_db.charateristics;
 
+        cen_handlers_t *hdlr = &p_cen->hdlrs;
+  
+          LOG_D("BEF - HEADER :%02x, DATA_1 :%02x, DATA_2 :%02x\r\n", hdlr->header_hdlr, hdlr->data_1_hdlr, hdlr->data_2_hdlr);
+        LOG_D("RESULT :%02x , CCCD : %02x\r\n", hdlr->result_hdlr, hdlr->result_cccd_hdlr);
+
+  
     // Check if the CMDS was discovered.
     if (p_evt->evt_type == BLE_DB_DISCOVERY_COMPLETE &&
         p_evt->params.discovered_db.srv_uuid.uuid == CMDS_UUID &&
         p_evt->params.discovered_db.srv_uuid.type == p_cen->uuid_type) {
         uint32_t i;
 
-        cen_handlers_t *hdlr = &p_cen->hdlrs;
+  
         LOG_D("Discovered Evt Count : %d\r\n", p_evt->params.discovered_db.char_count);
         for (i = 0; i < p_evt->params.discovered_db.char_count; i++) {
             switch (p_chars[i].characteristic.uuid.uuid) {
@@ -222,7 +234,8 @@ static void on_hvx(cen_t *p_cen, const ble_evt_t *p_ble_evt) {
     if (p_cen->hdlrs.assigned) {
         if (p_evt_hvx->handle == p_cen->hdlrs.result_hdlr) {
             p_cen->state.send = false;
-
+            APP.tx_p.proc = true;
+          
             uint8_t *p_data = (uint8_t *) p_evt_hvx->data;
             if (p_data[0] == PKT_RSLT_IDLE) {
                 p_cen->state.idle = true;
@@ -251,6 +264,7 @@ void app_cen_evt(cen_t *p_cen, const ble_evt_t *p_ble_evt) {
             break;
 
         case BLE_GATTC_EVT_WRITE_RSP:
+            LOG_D("PERIPHERAL's Write RSP %02x %d!!\r\n",p_ble_evt->evt.gattc_evt.params.write_rsp.handle,p_ble_evt->evt.gattc_evt.gatt_status);
             on_write_rsp(p_cen, p_ble_evt);
             break;
 
@@ -259,10 +273,13 @@ void app_cen_evt(cen_t *p_cen, const ble_evt_t *p_ble_evt) {
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
+            LOG_D("RESETTING CENTRAL\r\n");
             memset(&p_cen->state, 0, sizeof(cen_state_t));
             memset(&p_cen->hdlrs, 0, sizeof(cen_handlers_t));
             p_cen->notification = false;
             p_cen->conn_handle = BLE_CONN_HANDLE_INVALID;
+                    LOG_D("RESETTING CENTRAL Done\r\n");
+
             break;
 
         default:

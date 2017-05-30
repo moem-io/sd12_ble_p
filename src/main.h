@@ -5,11 +5,6 @@
 #include "cen.h"
 #include <stdint.h>
 
-#define NRF_LOG_MODULE_NAME "APP"
-
-#include "nrf_log.h"
-#include "nrf_log_ctrl.h"
-
 #define MAX_DISC_QUEUE 5  /** Max Discovery Queue **/
 #define MAX_RSSI_CNT 255  /** Max RSSI NORMALIZE COUNT **/
 #define MAX_PKT_CNT 20
