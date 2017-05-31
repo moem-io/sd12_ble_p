@@ -1,5 +1,6 @@
 #include "per.h"
 
+
 #define NRF_LOG_MODULE_NAME "[per]"
 
 static void per_result_update(per_t *p_per, uint8_t result_type);

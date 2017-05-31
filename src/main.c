@@ -1,5 +1,4 @@
 #include "nordic_common.h"
-#include "nrf.h"
 #include "app_error.h"
 #include "ble.h"
 #include "ble_hci.h"
@@ -17,16 +16,10 @@
 
 #include "bsp.h"
 #include "bsp_btn_ble.h"
-#include "sensorsim.h"
-#include "nrf_gpio.h"
 
-#include "ble_hci.h"
-#include "ble_advdata.h"
-#include "ble_advertising.h"
 #include "ble_conn_state.h"
 
 #include "util.h"
-#include "main.h"
 
 #define NRF_LOG_MODULE_NAME "APP"
 
@@ -429,7 +422,8 @@ void net_disc(const ble_evt_t *const p_ble_evt) {
             disc->cnt += 1;
 
             for (int i = 0; i < disc->cnt; i++) {
-                LOG_I("No %d : Addr : %s Rssi : %d \r\n", i, STR_PUSH(disc->peer[i].p_addr.addr, 1), disc->peer[i].rssi);
+                LOG_I("No %d : Addr : %s Rssi : %d \r\n", i, STR_PUSH(disc->peer[i].p_addr.addr, 1),
+                      disc->peer[i].rssi);
             }
         }
     } else {
@@ -459,7 +453,7 @@ static void nrf_cen_evt(const ble_evt_t *const p_ble_evt) {
             LOG_I("Central Connected \r\n");
 
             bsp_board_led_on(CENTRAL_CONNECTED_LED);
-            memset(&m_ble_db_discovery,0,sizeof(m_ble_db_discovery));
+            memset(&m_ble_db_discovery, 0, sizeof(m_ble_db_discovery));
             err_code = ble_db_discovery_start(&m_ble_db_discovery, p_gap_evt->conn_handle);
             APP_ERROR_CHECK(err_code);
         }
@@ -603,12 +597,6 @@ static void nrf_per_evt(ble_evt_t *p_ble_evt) {
 }
 
 
-/**@brief Function for handling advertising events.
- *
- * @details This function will be called for advertising events which are passed to the application.
- *
- * @param[in] ble_adv_evt  Advertising event.
- */
 static void on_adv_evt(ble_adv_evt_t ble_adv_evt) {
     uint32_t err_code;
 
@@ -632,7 +620,7 @@ static void ble_evt_dispatch(ble_evt_t *p_ble_evt) {
     uint16_t conn_handle;
     uint16_t role;
 
-    LOG_D("EVT ID : %d \r\n",p_ble_evt->header.evt_id);
+    LOG_D("EVT ID : %d \r\n", p_ble_evt->header.evt_id);
     ble_conn_state_on_ble_evt(p_ble_evt);
     pm_on_ble_evt(p_ble_evt);
 
@@ -652,7 +640,7 @@ static void ble_evt_dispatch(ble_evt_t *p_ble_evt) {
         ble_db_discovery_on_ble_evt(&m_ble_db_discovery, p_ble_evt);
         app_cen_evt(&m_cen_s, p_ble_evt);
     }
-               
+
     pkt_send(&m_cen_s);
 
     bsp_btn_ble_on_ble_evt(p_ble_evt);
@@ -836,7 +824,6 @@ static void buttons_leds_init(bool *p_erase_bonds) {
 }
 
 
-
 /**@brief Function for the Power manager.
  */
 static void power_manage(void) {
@@ -913,8 +900,3 @@ int main(void) {
         }
     }
 }
-
-
-/**
- * @}
- */
