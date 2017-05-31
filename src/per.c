@@ -3,6 +3,7 @@
 
 #define NRF_LOG_MODULE_NAME "[per]"
 
+static void  per_value_reset(per_t *p_per);
 static void per_result_update(per_t *p_per, uint8_t result_type);
 
 static void app_disc_id_update(p_pkt *rxp) {
@@ -29,7 +30,7 @@ void pkt_interpret(per_t *p_per) {
         LOG_D("[%d]th PACKET INTERPRET\r\n", APP.rx_p.proc_cnt);
         LOG_D(" Header : %.14s\r\n", STR_PUSH(buff1, 0));
         LOG_D(" DATA : %.28s\r\n", STR_PUSH(buff2, 0));
-
+        
         if(APP.dev.my_id != 0 && APP.dev.my_id != rxp->header.target.node) {
             LOG_D("PACKET ROUTE!\r\n");
 
@@ -91,7 +92,8 @@ void pkt_interpret(per_t *p_per) {
             default:
                 break;
         }
-
+        
+        per_value_reset(p_per);
         per_result_update(p_per, PKT_RSLT_INTERPRET_OK);
         APP.rx_p.proc_cnt++;
         APP.rx_p.proc = false;
@@ -101,7 +103,7 @@ void pkt_interpret(per_t *p_per) {
 
 static void data_cnt_chk(uint8_t *pkt_type, uint8_t cnt) {
     p_header *pheader = &(APP.rx_p.pkt[APP.rx_p.header_cnt - 1].header);
-    LOG_D("PACKET HEADER INDEX TOTAL : %d NOW : %d \r\n", pheader->index.total, cnt);
+    LOG_D("PACKET DATA CHAR TOTAL : %d NOW : %d \r\n", pheader->index.total, cnt);
 
     if (pheader->index.total == cnt) {
         APP.rx_p.data_cnt++;
@@ -113,9 +115,7 @@ static void data_cnt_chk(uint8_t *pkt_type, uint8_t cnt) {
 
 static void header_parser(ble_gatts_value_t *rx_data) {
     p_header *pheader = &(APP.rx_p.pkt[APP.rx_p.header_cnt].header);
-
-    LOG_D("Header : %s\r\n", VSTR_PUSH(rx_data->p_value, rx_data->len, 0));
-
+  
     pheader->type = rx_data->p_value[0];
     pheader->index.now = rx_data->p_value[1];
     pheader->index.total = rx_data->p_value[2];
@@ -123,8 +123,7 @@ static void header_parser(ble_gatts_value_t *rx_data) {
     pheader->source.sensor = rx_data->p_value[4];
     pheader->target.node = rx_data->p_value[5];
     pheader->target.sensor = rx_data->p_value[6];
-    LOG_D("Header TYPE : %02x\r\n", pheader->type);
-    LOG_D("Header INDEX : %02x / %02x\r\n", pheader->index.now, pheader->index.total);
+    LOG_D("Header TYPE : %02x INDEX : %02x / %02x\r\n", pheader->type, pheader->index.now, pheader->index.total);
     LOG_D("Header SOURCE : %02x - %02x\r\n", pheader->source.node, pheader->source.sensor);
     LOG_D("Header TARGET : %02x - %02x\r\n", pheader->target.node, pheader->target.sensor);
 
@@ -153,8 +152,21 @@ static void data_2_parser(ble_gatts_value_t *rx_data) {
 
 static void gatts_value_get(per_t *p_per, uint16_t handle, ble_gatts_value_t *rx_data) {
     sd_ble_gatts_value_get(p_per->conn_handle, handle, rx_data);
-    LOG_I("[R] Handle %#06x Value : %s \r\n", handle, VSTR_PUSH(rx_data->p_value, rx_data->len, 0));
+    LOG_I("[rxP %d]th Handle %#06x Value : %s \r\n", APP.rx_p.data_cnt, handle, VSTR_PUSH(rx_data->p_value, rx_data->len, 0));
 }
+
+
+static void per_value_reset(per_t *p_per){
+    uint32_t err_code;
+    
+    uint8_t data[DATA_LEN] = {0,};
+    err_code = per_value_update(p_per, &p_per->data_1_hdlrs, data, sizeof(data));
+    ERR_CHK("Data 1 Char reset");
+
+    err_code = per_value_update(p_per, &p_per->data_1_hdlrs, data, sizeof(data));
+    ERR_CHK("Data 2 Char reset");
+}
+
 
 static void per_result_update(per_t *p_per, uint8_t result_type) {
     uint32_t err_code;
@@ -166,7 +178,6 @@ static void per_result_update(per_t *p_per, uint8_t result_type) {
 }
 
 static void on_write(per_t *p_per, ble_evt_t *p_ble_evt) {
-    LOG_I("ON Per Write\r\n");
     ble_gatts_evt_write_t *p_evt_write = &p_ble_evt->evt.gatts_evt.params.write;
 
     // Decclare buffer variable to hold received data. The data can only be 32 bit long.
@@ -196,8 +207,6 @@ static void on_write(per_t *p_per, ble_evt_t *p_ble_evt) {
     } else if (p_evt_write->handle == p_per->result_hdlrs.value_handle) {
         gatts_value_get(p_per, p_per->result_hdlrs.value_handle, &rx_data);
     } else if (p_evt_write->handle == p_per->result_hdlrs.cccd_handle) {
-      
-        LOG_I("ON NOTI WRITE :%s \r\n",VSTR_PUSH(rx_data.p_value,20,0));
         gatts_value_get(p_per, p_per->result_hdlrs.cccd_handle, &rx_data);
         p_per->notification = true;
         LOG_D("NOTIFICATION ENABLED BY CENTRAL!!\r\n");
@@ -290,23 +299,22 @@ uint32_t per_init(per_t *p_per) {
     per_uuid.uuid = CMDS_UUID;
 
     err_code = sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY, &per_uuid, &p_per->service_handle);
-    APP_ERROR_CHECK(err_code);
+    ERR_CHK("Service init");
 
     err_code = per_char_add(p_per,CMDS_HEADER_UUID,HEADER_LEN,&p_per->header_hdlrs);
-    APP_ERROR_CHECK(err_code);
+    ERR_CHK("Header Char init");
     
     err_code = per_char_add(p_per,CMDS_DATA_1_UUID,DATA_LEN,&p_per->data_1_hdlrs);
-    APP_ERROR_CHECK(err_code);
+    ERR_CHK("Data 1 Char init");
 
     err_code = per_char_add(p_per,CMDS_DATA_2_UUID,DATA_LEN,&p_per->data_2_hdlrs);
-    APP_ERROR_CHECK(err_code);
+    ERR_CHK("Data 2 Char init");
     
     err_code = per_char_add(p_per, CMDS_RESULT_UUID, RESULT_LEN, &p_per->result_hdlrs);
-    APP_ERROR_CHECK(err_code);
-    
-   LOG_D("BEF - HEADER :%02x, DATA_1 :%02x, DATA_2 :%02x\r\n",p_per->header_hdlrs.value_handle, p_per->data_1_hdlrs.value_handle,p_per->data_2_hdlrs.value_handle);
-  LOG_D("RESULT :%02x , CCCD : %02x\r\n", p_per->result_hdlrs.value_handle, p_per->result_hdlrs.cccd_handle);
+    ERR_CHK("Result Char init");
 
+    LOG_D("BEF - HEADER :%02x, DATA_1 :%02x, DATA_2 :%02x\r\n",p_per->header_hdlrs.value_handle, p_per->data_1_hdlrs.value_handle,p_per->data_2_hdlrs.value_handle);
+    LOG_D("RESULT :%02x , CCCD : %02x\r\n", p_per->result_hdlrs.value_handle, p_per->result_hdlrs.cccd_handle);
 
     return NRF_SUCCESS;
 }
@@ -321,7 +329,13 @@ uint32_t per_value_update(per_t *p_per, ble_gatts_char_handles_t *data_handle, u
     if (length > MAX_CHAR_LEN) {
         return NRF_ERROR_INVALID_PARAM;
     }
-
+    
+    uint8_t param_type = BLE_GATT_HVX_INDICATION;
+    
+    if(data_handle->value_handle == p_per->result_hdlrs.value_handle){
+        param_type = BLE_GATT_HVX_NOTIFICATION;
+    }
+    
     ble_gatts_hvx_params_t hvx_params;
     memset(&hvx_params, 0, sizeof(hvx_params));
 
@@ -329,7 +343,7 @@ uint32_t per_value_update(per_t *p_per, ble_gatts_char_handles_t *data_handle, u
     hvx_params.offset = 0;
     hvx_params.p_len = &length;
     hvx_params.p_data = p_string;
-    hvx_params.type = BLE_GATT_HVX_NOTIFICATION;
+    hvx_params.type = param_type;
 
     return sd_ble_gatts_hvx(p_per->conn_handle, &hvx_params);
 }

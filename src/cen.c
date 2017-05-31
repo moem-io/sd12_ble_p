@@ -1,6 +1,5 @@
 #include "cen.h"
 
-
 #define NRF_LOG_MODULE_NAME "[cen]"
 
 static uint32_t cccd_configure(uint16_t conn_handle, uint16_t cccd_handle, bool enable);
@@ -17,6 +16,7 @@ uint32_t cen_header_update(cen_t *p_cen, p_header *header) {
 
 uint32_t cen_data_1_update(cen_t *p_cen, p_data *data) {
     uint8_t buff[20];
+  
     memcpy(buff, &data->p_data[0], sizeof(buff));
     return cen_value_update(p_cen, &p_cen->hdlrs.data_1_hdlr, buff, sizeof(buff));
 }
@@ -144,10 +144,10 @@ void pkt_base(p_pkt *txp, uint8_t build_type) {
 }
 
 void pkt_build(uint8_t build_type) {
-    LOG_I("PACKET BUILD TXP : %d, RXP : %d, \r\n", APP.tx_p.pkt_cnt, APP.rx_p.proc_cnt);
     p_pkt *txp = &APP.tx_p.pkt[APP.tx_p.pkt_cnt];
     p_pkt *rxp = &APP.rx_p.pkt[APP.rx_p.proc_cnt];
 
+    LOG_I("PACKET BUILD TXP : %d, RXP : %d, \r\n", APP.tx_p.pkt_cnt, APP.rx_p.proc_cnt);
 
     if (build_type == CEN_BUILD_PACKET_ROUTE) {
         memcpy(&txp->header, &rxp->header, HEADER_LEN);
@@ -293,8 +293,6 @@ void app_cen_evt(cen_t *p_cen, const ble_evt_t *p_ble_evt) {
             memset(&p_cen->hdlrs, 0, sizeof(cen_handlers_t));
             p_cen->notification = false;
             p_cen->conn_handle = BLE_CONN_HANDLE_INVALID;
-            LOG_D("RESETTING CENTRAL Done\r\n");
-
             break;
 
         default:

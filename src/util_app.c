@@ -46,17 +46,17 @@ void app_dev_parent_set(ble_gap_addr_t *addr) {
 *          https://www.bluetooth.org/Technical/AssignedNumbers/generic_access_profile.htm
 *
 * @param[in]   p_target_uuid The uuid to search fir
-* @param[in]   p_adv_report  Pointer to the advertisement report.
+* @param[in]   adv_report  Pointer to the advertisement report.
 *
 * @retval      true if the UUID is present in the advertisement report. Otherwise false
 */
-bool is_uuid_present(const ble_uuid_t *p_target_uuid, const ble_gap_evt_adv_report_t *p_adv_report) {
+bool is_uuid_present(const ble_uuid_t *p_target_uuid, const ble_gap_evt_adv_report_t *adv_report) {
     uint32_t err_code;
     uint32_t index = 0;
-    uint8_t *p_data = (uint8_t *) p_adv_report->data;
+    uint8_t *p_data = (uint8_t *) adv_report->data;
     ble_uuid_t extracted_uuid;
 
-    while (index < p_adv_report->dlen) {
+    while (index < adv_report->dlen) {
         uint8_t field_length = p_data[index];
         uint8_t field_type = p_data[index + 1];
 

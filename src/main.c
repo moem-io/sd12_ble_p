@@ -620,7 +620,7 @@ static void ble_evt_dispatch(ble_evt_t *p_ble_evt) {
     uint16_t conn_handle;
     uint16_t role;
 
-    LOG_D("EVT ID : %d \r\n", p_ble_evt->header.evt_id);
+//    LOG_D("EVT ID : %d \r\n", p_ble_evt->header.evt_id);
     ble_conn_state_on_ble_evt(p_ble_evt);
     pm_on_ble_evt(p_ble_evt);
 
@@ -640,7 +640,7 @@ static void ble_evt_dispatch(ble_evt_t *p_ble_evt) {
         ble_db_discovery_on_ble_evt(&m_ble_db_discovery, p_ble_evt);
         app_cen_evt(&m_cen_s, p_ble_evt);
     }
-
+    pkt_interpret(&m_per_s);
     pkt_send(&m_cen_s);
 
     bsp_btn_ble_on_ble_evt(p_ble_evt);
@@ -893,8 +893,6 @@ int main(void) {
     APP_ERROR_CHECK(err_code);
 
     for (;;) {
-        pkt_interpret(&m_per_s);
-
         if (NRF_LOG_PROCESS() == false) {
             power_manage();
         }
