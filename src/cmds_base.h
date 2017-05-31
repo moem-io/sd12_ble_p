@@ -24,6 +24,18 @@ static const ble_uuid_t m_cmds_uuid = {
 #define PKT_TYPE_NET_SCAN_REQUEST 1
 #define PKT_TYPE_NET_SCAN_RESPONSE 2
 
+#define PKT_TYPE_NET_PATH_UPDATE 100
+#define PKT_TYPE_NET_PATH_UPDATE_RESPONSE 101
+
+#define PKT_TYPE_NET_ACK_REQUEST 102
+#define PKT_TYPE_NET_ACK_RESPONSE 103
+
+#define PKT_TYPE_NET_JOIN_REQUEST 104
+#define PKT_TYPE_NET_JOIN_RESPONSE 105
+
+#define PKT_DATA_ERROR 0
+#define PKT_DATA_SUCCESS 1
+
 
 #define PKT_RSLT_IDLE              ((uint8_t) 0)
 #define PKT_RSLT_HEADER_OK ((uint8_t) 1)

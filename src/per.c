@@ -10,7 +10,7 @@ static void app_disc_id_update(p_pkt *rxp) {
         LOG_I("ADDR %s ID %d -> %d !!\r\n", STR_PUSH(APP.net.disc.peer[result].p_addr.addr, 1),
               APP.net.disc.peer[result].id, rxp->header.target.node);
         APP.net.disc.peer[result].id = rxp->header.target.node;
-    } else {
+    } else if(result == GAP_DISC_ADDR_NOT_FOUND) {
         LOG_E("[FATAL]Can't set ID. ADDR NOT FOUND!!");
     }
 }
@@ -31,7 +31,10 @@ void pkt_interpret(per_t *p_per) {
 
         if(APP.dev.my_id != 0 && APP.dev.my_id != rxp->header.target.node) {
             LOG_D("PACKET ROUTE!\r\n");
-            app_disc_id_update(rxp);
+
+            if(rxp->header.type == PKT_TYPE_NET_SCAN_REQUEST){
+                app_disc_id_update(rxp);
+            }
 
             if (!APP.net.discovered) {
                 LOG_E("Network not discovered\r\n");
@@ -45,10 +48,10 @@ void pkt_interpret(per_t *p_per) {
             case PKT_TYPE_NET_SCAN_REQUEST:
                 if (APP.dev.my_id == 0) {
                     LOG_D("Device ID not set!\r\n");
-                    app_dev_parent_set(&APP.dev.connected_central);
+                    app_dev_parent_set(&APP.dev.conn_cen);
 
                     if (memcmp(APP.dev.my_addr.addr, rxp->data.p_data, BLE_GAP_ADDR_LEN)) {
-                        LOG_E("SET Device ID FIRST!!\r\n");
+                        LOG_E("WRONG Device ID FIRST!!\r\n");
                     } else {
                         APP.dev.my_id = rxp->header.target.node; //ID SETTING
                         LOG_I("Device ID SET : %d !!\r\n", APP.dev.my_id);
@@ -64,14 +67,24 @@ void pkt_interpret(per_t *p_per) {
                 }
                 break;
 
-            case PKT_TYPE_NET_SCAN_RESPONSE:
+            case PKT_TYPE_NET_PATH_UPDATE:
                 if (!APP.net.discovered) {
                     LOG_E("Network not discovered\r\n");
                     break;
                 }
+///////////////////////////////////////////////////////////
+                LOG_D("PATH UPDATING!\r\n");
+                pkt_build(PKT_TYPE_NET_PATH_UPDATE_RESPONSE);
+                break;
 
-                LOG_D("PACKET ROUTE!\r\n");
-                pkt_build(CEN_BUILD_PACKET_ROUTE);
+            case PKT_TYPE_NET_ACK_REQUEST:
+                if (!APP.net.discovered) {
+                    LOG_E("Network not discovered\r\n");
+                    break;
+                }
+///////////////////////////////////////////////////////////
+                LOG_D("ACK REQUEST!\r\n");
+                pkt_build(PKT_TYPE_NET_ACK_RESPONSE);
                 break;
 
             default:
@@ -196,12 +209,12 @@ void app_per_evt(per_t *p_per, ble_evt_t *p_ble_evt) {
     switch (p_ble_evt->header.evt_id) {
         case BLE_GAP_EVT_CONNECTED:
             p_per->conn_handle = p_ble_evt->evt.gap_evt.conn_handle;
-            memcpy(&APP.dev.connected_central, &p_ble_evt->evt.gap_evt.params.connected.peer_addr, sizeof(ble_gap_addr_t));
+            memcpy(&APP.dev.conn_cen, &p_ble_evt->evt.gap_evt.params.connected.peer_addr, sizeof(ble_gap_addr_t));
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
           LOG_D("RESETTING Peripheral\r\n");
-            memset(&APP.dev.connected_central, 0, sizeof(ble_gap_addr_t));
+            memset(&APP.dev.conn_cen, 0, sizeof(ble_gap_addr_t));
             p_per->notification = false;
             p_per->conn_handle = BLE_CONN_HANDLE_INVALID;
             break;

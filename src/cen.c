@@ -120,7 +120,7 @@ void scan_res_builder(uint8_t *p_data) {
     uint8_t p_idx = 0;
     uint8_t unit = BLE_GAP_ADDR_LEN + sizeof(uint8_t);
 
-    for (int i = 0; i < APP.net.disc.count; i++) {
+    for (int i = 0; i < APP.net.disc.cnt; i++) {
         memcpy(&p_data[p_idx], APP.net.disc.peer[i].p_addr.addr, BLE_GAP_ADDR_LEN);
 
         uint8_t u_rssi = -APP.net.disc.peer[i].rssi;
@@ -128,7 +128,15 @@ void scan_res_builder(uint8_t *p_data) {
 
         p_idx = p_idx + unit;
     }
-    LOG_I("SCAN_RESPONSE BUILD %s, \r\n", VSTR_PUSH(p_data, APP.net.disc.count * unit, 0));
+    LOG_I("SCAN_RESPONSE BUILD %s, \r\n", VSTR_PUSH(p_data, APP.net.disc.cnt * unit, 0));
+}
+void pkt_base(p_pkt *txp,uint8_t build_type){
+    txp->header.type = build_type;
+    txp->header.index.now = 1;
+    txp->header.source.node = APP.dev.my_id;
+    txp->header.source.sensor = 0;
+    txp->header.target.node = APP.dev.root_id;
+    txp->header.target.sensor = 0;
 }
 
 void pkt_build(uint8_t build_type) {
@@ -136,31 +144,37 @@ void pkt_build(uint8_t build_type) {
     p_pkt *txp = &APP.tx_p.pkt[APP.tx_p.pkt_cnt];
     p_pkt *rxp = &APP.rx_p.pkt[APP.rx_p.proc_cnt];
 
+    
+    if(build_type == CEN_BUILD_PACKET_ROUTE){
+        memcpy(&txp->header, &rxp->header, HEADER_LEN);
+        memcpy(&txp->data, &rxp->data, MAX_PKT_DATA_LEN);
+        
+        LOG_I("PACKET Route RXPh : %s, TXPh : %s, \r\n", VSTR_PUSH((uint8_t *) &rxp->header, HEADER_LEN, 0),VSTR_PUSH((uint8_t *) &txp->header, HEADER_LEN, 0));
+        LOG_I("PACKET Route RXPd : %s, TXPd : %s, \r\n", VSTR_PUSH((uint8_t *) &rxp->data, DATA_LEN, 0),VSTR_PUSH((uint8_t *) &txp->data, DATA_LEN, 0));
+    } 
+    else {
+    pkt_base(txp,build_type);
+        
     switch (build_type) {
-        case CEN_BUILD_SCAN_RESULT:
-            txp->header.type = PKT_TYPE_NET_SCAN_RESPONSE;
-            txp->header.source.node = APP.dev.my_id;
-            txp->header.source.sensor = 0;
-            txp->header.target.node = APP.dev.root_id;
-            txp->header.target.sensor = 0;
-            txp->header.index.now = 1;
-            txp->header.index.total = (int) ceil((float) APP.net.disc.count * 8 / DATA_LEN);
-
+        case PKT_TYPE_NET_SCAN_RESPONSE:
+            txp->header.index.total = (int) ceil((float) APP.net.disc.cnt * 8 / DATA_LEN);
             scan_res_builder(txp->data.p_data);
             break;
 
-        case CEN_BUILD_PACKET_ROUTE:        
-            memcpy(&txp->header, &rxp->header, HEADER_LEN);
-            memcpy(&txp->data, &rxp->data, MAX_PKT_DATA_LEN);
-        
-            LOG_I("PACKET Route RXPh : %s, TXPh : %s, \r\n", VSTR_PUSH((uint8_t *) &rxp->header, HEADER_LEN, 0),VSTR_PUSH((uint8_t *) &txp->header, HEADER_LEN, 0));
-            LOG_I("PACKET Route RXPd : %s, TXPd : %s, \r\n", VSTR_PUSH((uint8_t *) &rxp->data, DATA_LEN, 0),VSTR_PUSH((uint8_t *) &txp->data, DATA_LEN, 0));
-
+        case PKT_TYPE_NET_PATH_UPDATE_RESPONSE:
+            txp->header.index.total = 1;
+            txp->data.p_data[0] = PKT_DATA_SUCCESS;
             break;
-
+        
+        case PKT_TYPE_NET_ACK_RESPONSE:
+            txp->header.index.total = 1;
+            txp->data.p_data[0] = PKT_DATA_SUCCESS;
+            break;
+                
         default:
             break;
     }
+}
     APP.tx_p.proc = true;
     APP.tx_p.tx_que[APP.tx_p.que_idx] = APP.tx_p.pkt_cnt;
     APP.tx_p.pkt_cnt++;
@@ -170,19 +184,13 @@ void pkt_build(uint8_t build_type) {
 void cen_on_db_disc_evt(cen_t *p_cen, ble_db_discovery_evt_t *p_evt) {
     ble_gatt_db_char_t *p_chars = p_evt->params.discovered_db.charateristics;
 
-        cen_handlers_t *hdlr = &p_cen->hdlrs;
-  
-          LOG_D("BEF - HEADER :%02x, DATA_1 :%02x, DATA_2 :%02x\r\n", hdlr->header_hdlr, hdlr->data_1_hdlr, hdlr->data_2_hdlr);
-        LOG_D("RESULT :%02x , CCCD : %02x\r\n", hdlr->result_hdlr, hdlr->result_cccd_hdlr);
-
-  
     // Check if the CMDS was discovered.
     if (p_evt->evt_type == BLE_DB_DISCOVERY_COMPLETE &&
         p_evt->params.discovered_db.srv_uuid.uuid == CMDS_UUID &&
         p_evt->params.discovered_db.srv_uuid.type == p_cen->uuid_type) {
         uint32_t i;
 
-  
+        cen_handlers_t *hdlr = &p_cen->hdlrs;  
         LOG_D("Discovered Evt Count : %d\r\n", p_evt->params.discovered_db.char_count);
         for (i = 0; i < p_evt->params.discovered_db.char_count; i++) {
             switch (p_chars[i].characteristic.uuid.uuid) {

@@ -10,6 +10,8 @@
 #define MAX_PKT_CNT 20
 #define MAX_PKT_DATA_LEN 80
 #define MAX_DEV_NAME 10
+#define MAX_NODE_CNT 10
+#define MAX_DEPTH_CNT 5 
 
 #define APP_STATUS_SUCCESS              0x0000
 #define APP_STATUS_UNKNOWN              0x0001
@@ -66,7 +68,7 @@ typedef struct {
 } gap_data;
 
 typedef struct {
-    uint8_t count;
+    uint8_t cnt;
     gap_data peer[MAX_DISC_QUEUE];
 } gap_disc;
 
@@ -75,7 +77,7 @@ typedef struct {
     uint8_t root_id; //ALWAYS 0
     char name[MAX_DEV_NAME];
     ble_gap_addr_t my_addr;
-    ble_gap_addr_t connected_central;
+    ble_gap_addr_t conn_cen;
     ble_gap_addr_t parent;
     bool parent_set;
 } app_dev_condition;
@@ -89,6 +91,9 @@ typedef struct {
     bool established;
     bool discovered;
     gap_disc disc;
+    
+    uint8_t path[MAX_NODE_CNT][MAX_DEPTH_CNT];
+    
 } app_net_condition;
 
 typedef struct {

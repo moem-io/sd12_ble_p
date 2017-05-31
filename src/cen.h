@@ -10,8 +10,6 @@
 #include "app_error.h"
 #include "util.h"
 
-#define CEN_BUILD_SCAN_RESULT 1
-#define CEN_BUILD_DATA_RESULT 2
 #define CEN_BUILD_PACKET_ROUTE 3
 
 #define CEN_TXP_QUEUE_UNAVAILABLE -1

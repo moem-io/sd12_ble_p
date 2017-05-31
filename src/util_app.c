@@ -3,7 +3,7 @@
 #define NRF_LOG_MODULE_NAME "[util]"
 
 int8_t app_disc_addr_check(uint8_t *p_data) {
-    for (int i = 0; i < APP.net.disc.count; i++) {
+    for (int i = 0; i < APP.net.disc.cnt; i++) {
         if (!memcmp(APP.net.disc.peer[i].p_addr.addr, p_data, BLE_GAP_ADDR_LEN)) {
             LOG_D("ADDR FOUND!\r\n");
             return i;
@@ -18,7 +18,7 @@ ble_gap_addr_t *app_disc_id_check(uint8_t *id) {
     if (*id == 0) {
         return &APP.dev.parent;
     }
-    for (int i = 0; i < APP.net.disc.count; i++) {
+    for (int i = 0; i < APP.net.disc.cnt; i++) {
         if (!memcmp(&APP.net.disc.peer[i].id, id, sizeof(uint8_t))) {
             LOG_D("ID FOUND!\r\n");
             return &APP.net.disc.peer[i].p_addr;
