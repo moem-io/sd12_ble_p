@@ -4,6 +4,7 @@
 #define NRF_LOG_MODULE_NAME "[per]"
 
 static void  per_value_reset(per_t *p_per);
+static uint32_t per_char_reset(per_t *p_per, ble_gatts_char_handles_t *data_handle, uint8_t *p_string, uint16_t length);
 static void per_result_update(per_t *p_per, uint8_t result_type);
 
 static void app_disc_id_update(p_pkt *rxp) {
@@ -160,10 +161,10 @@ static void per_value_reset(per_t *p_per){
     uint32_t err_code;
     
     uint8_t data[DATA_LEN] = {0,};
-    err_code = per_value_update(p_per, &p_per->data_1_hdlrs, data, sizeof(data));
+    err_code = per_char_reset(p_per, &p_per->data_1_hdlrs, data, sizeof(data));
     ERR_CHK("Data 1 Char reset");
 
-    err_code = per_value_update(p_per, &p_per->data_1_hdlrs, data, sizeof(data));
+    err_code = per_char_reset(p_per, &p_per->data_2_hdlrs, data, sizeof(data));
     ERR_CHK("Data 2 Char reset");
 }
 
@@ -172,7 +173,7 @@ static void per_result_update(per_t *p_per, uint8_t result_type) {
     uint32_t err_code;
     uint8_t result[RESULT_LEN] = {result_type};
 
-    err_code = per_value_update(p_per, &p_per->result_hdlrs, result, sizeof(result));
+    err_code = per_char_update(p_per, &p_per->result_hdlrs, result, sizeof(result));
     APP_ERROR_CHECK(err_code);
     LOG_I("Result : %s \r\n", STR_PUSH(result, 0));
 }
@@ -320,7 +321,18 @@ uint32_t per_init(per_t *p_per) {
 }
 
 
-uint32_t per_value_update(per_t *p_per, ble_gatts_char_handles_t *data_handle, uint8_t *p_string, uint16_t length) {
+uint32_t per_char_reset(per_t *p_per, ble_gatts_char_handles_t *data_handle, uint8_t *p_string, uint16_t length){
+    ble_gatts_value_t p_val;
+    memset(&p_val, 0, sizeof(p_val));
+        
+    p_val.len = length;
+    p_val.offset = 0;
+    p_val.p_value = p_string;
+    
+    return sd_ble_gatts_value_set(p_per->conn_handle,data_handle->value_handle, &p_val);
+}
+
+uint32_t per_char_update(per_t *p_per, ble_gatts_char_handles_t *data_handle, uint8_t *p_string, uint16_t length) {
     if ((p_per->conn_handle == BLE_CONN_HANDLE_INVALID) || (!p_per->notification)) {
         LOG_E("Check Noti or Conn State!!\r\n");
         return NRF_ERROR_INVALID_STATE;
