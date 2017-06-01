@@ -41,10 +41,20 @@ void pkt_send(cen_t *p_cen) {
             nrf_delay_ms(500);
             ble_gap_addr_t *target_addr = app_disc_id_check(&txp->header.target.node);
             if (target_addr) {
-                LOG_I("WAIT FOR PERIPHERAL - TARGET %s\r\n", STR_PUSH(target_addr->addr, 1));
+                LOG_I("WAIT FOR PERIPHERAL - TARGET %s, type: %d\r\n", STR_PUSH(target_addr->addr, 1),target_addr->addr_type);
                 err_code = sd_ble_gap_connect(target_addr, &m_scan_params, &m_connection_param);
                 ERR_CHK("Connection Request Failed");
                 return;
+            }
+            else{
+                memset(target_addr,0,sizeof(ble_gap_addr_t));
+                LOG_I("WAIT FOR PERIPHERAL - TARGET %s, type: %d\r\n", STR_PUSH(target_addr->addr, 1),target_addr->addr_type);
+
+                target_addr ->addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC;
+                memcpy(target_addr ->addr,txp->data.p_data,BLE_GAP_ADDR_LEN);
+
+                LOG_I("WAIT FOR PERIPHERAL - TARGET %s, type: %d\r\n", STR_PUSH(target_addr->addr, 1),target_addr->addr_type);
+                err_code = sd_ble_gap_connect(target_addr, &m_scan_params, &m_connection_param);
             }
             LOG_E("TARGET NOT FOUND\r\n");
             return;
