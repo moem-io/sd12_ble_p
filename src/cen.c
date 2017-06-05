@@ -36,26 +36,23 @@ void pkt_send(cen_t *p_cen) {
         nrf_delay_ms(100);
 
         p_pkt *txp = &APP.tx_p.pkt[APP.tx_p.proc_cnt];
-
+        ble_gap_addr_t *target_addr;
         if (p_cen->conn_handle == BLE_CONN_HANDLE_INVALID) {
             nrf_delay_ms(500);
-            ble_gap_addr_t *target_addr = app_disc_id_check(&txp->header.target.node);
+
+            target_addr = get_node(&txp->header.target.node,1,0);
+            
+            if (!target_addr && txp->header.type == PKT_TYPE_NET_SCAN_REQUEST){
+                target_addr = get_node(txp->data.p_data,0,1);
+            }
+
             if (target_addr) {
                 LOG_I("WAIT FOR PERIPHERAL - TARGET %s, type: %d\r\n", STR_PUSH(target_addr->addr, 1),target_addr->addr_type);
                 err_code = sd_ble_gap_connect(target_addr, &m_scan_params, &m_connection_param);
                 ERR_CHK("Connection Request Failed");
                 return;
             }
-            else{
-                memset(target_addr,0,sizeof(ble_gap_addr_t));
-                LOG_I("WAIT FOR PERIPHERAL - TARGET %s, type: %d\r\n", STR_PUSH(target_addr->addr, 1),target_addr->addr_type);
 
-                target_addr ->addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC;
-                memcpy(target_addr ->addr,txp->data.p_data,BLE_GAP_ADDR_LEN);
-
-                LOG_I("WAIT FOR PERIPHERAL - TARGET %s, type: %d\r\n", STR_PUSH(target_addr->addr, 1),target_addr->addr_type);
-                err_code = sd_ble_gap_connect(target_addr, &m_scan_params, &m_connection_param);
-            }
             LOG_E("TARGET NOT FOUND\r\n");
             return;
         }
@@ -133,15 +130,15 @@ void scan_res_builder(uint8_t *p_data) {
     uint8_t p_idx = 0;
     uint8_t unit = BLE_GAP_ADDR_LEN + sizeof(uint8_t);
 
-    for (int i = 0; i < APP.net.disc.cnt; i++) {
-        memcpy(&p_data[p_idx], APP.net.disc.peer[i].p_addr.addr, BLE_GAP_ADDR_LEN);
+    for (int i = 0; i < APP.net.node.cnt; i++) {
+        memcpy(&p_data[p_idx], APP.net.node.peer[i].p_addr.addr, BLE_GAP_ADDR_LEN);
 
-        uint8_t u_rssi = -APP.net.disc.peer[i].rssi;
+        uint8_t u_rssi = -APP.net.node.peer[i].rssi;
         memcpy(&p_data[p_idx + BLE_GAP_ADDR_LEN], &u_rssi, sizeof(uint8_t));
 
         p_idx = p_idx + unit;
     }
-    LOG_I("SCAN_RESPONSE BUILD %s, \r\n", VSTR_PUSH(p_data, APP.net.disc.cnt * unit, 0));
+    LOG_I("SCAN_RESPONSE BUILD %s, \r\n", VSTR_PUSH(p_data, APP.net.node.cnt * unit, 0));
 }
 
 void pkt_base(p_pkt *txp, uint8_t build_type) {
@@ -172,7 +169,7 @@ void pkt_build(uint8_t build_type) {
 
         switch (build_type) {
             case PKT_TYPE_NET_SCAN_RESPONSE:
-                txp->header.index.total = (int) ceil((float) APP.net.disc.cnt * 8 / DATA_LEN);
+                txp->header.index.total = (int) ceil((float) APP.net.node.cnt * 8 / DATA_LEN);
                 scan_res_builder(txp->data.p_data);
                 break;
 

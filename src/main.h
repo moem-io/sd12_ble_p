@@ -6,12 +6,13 @@
 #include "cen.h"
 #include <stdint.h>
 
+#define MIN_DISC_REG_CNT 5
 #define MAX_DISC_QUEUE 5  /** Max Discovery Queue **/
 #define MAX_RSSI_CNT 255  /** Max RSSI NORMALIZE COUNT **/
 #define MAX_PKT_CNT 20
 #define MAX_PKT_DATA_LEN 80
 #define MAX_DEV_NAME 10
-#define MAX_NODE_CNT 10
+#define MAX_NODE_CNT 40
 #define MAX_DEPTH_CNT 5 
 
 #define APP_STATUS_SUCCESS              0x0000
@@ -66,11 +67,13 @@ typedef struct {
     ble_gap_addr_t p_addr;
     int8_t rssi;
     uint8_t rssi_cnt;
+    bool disc;
+    uint8_t path[MAX_DEPTH_CNT];
 } gap_data;
 
 typedef struct {
     uint8_t cnt;
-    gap_data peer[MAX_DISC_QUEUE];
+    gap_data peer[MAX_NODE_CNT];
 } gap_disc;
 
 typedef struct {
@@ -91,10 +94,7 @@ typedef struct {
 typedef struct {
     bool established;
     bool discovered;
-    gap_disc disc;
-    
-    uint8_t path[MAX_NODE_CNT][MAX_DEPTH_CNT];
-    
+    gap_disc node;
 } app_net_condition;
 
 typedef struct {

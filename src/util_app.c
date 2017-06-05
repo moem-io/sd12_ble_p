@@ -3,9 +3,25 @@
 
 #define NRF_LOG_MODULE_NAME "[util]"
 
-int8_t app_disc_addr_check(uint8_t *p_data) {
-    for (int8_t i = 0; i < APP.net.disc.cnt; i++) {
-        if (!memcmp(APP.net.disc.peer[i].p_addr.addr, p_data, BLE_GAP_ADDR_LEN)) {
+uint8_t analyze_data(uint8_t *p_data, uint8_t size) {
+    uint8_t end_data[DATA_LEN] = {0x00,};
+    int unit_size = MAX_PKT_DATA_LEN /  size;
+    int i =0;
+
+    for(i=0; i < unit_size; i++){
+        if(!memcmp(&p_data[i*size],end_data,size)){
+            break;
+        }
+    }
+    
+    return i;
+}
+
+
+//TODO: [BUG] only 128 idx can be retreived. 
+int8_t get_addr_idx(uint8_t *p_data){
+    for (int8_t i = 0; i < APP.net.node.cnt; i++) {
+        if (!memcmp(APP.net.node.peer[i].p_addr.addr, p_data, BLE_GAP_ADDR_LEN)) {
             LOG_D("ADDR FOUND!\r\n");
             return i;
         }
@@ -15,19 +31,100 @@ int8_t app_disc_addr_check(uint8_t *p_data) {
 }
 
 
-ble_gap_addr_t *app_disc_id_check(uint8_t *id) {
-    if (*id == 0) {
-        return &APP.dev.parent;
+int8_t get_id_idx(uint8_t *id) {
+    if (*id == 0) { // MAY NOT BE USED.
+        return GAP_DISC_ROOT_FOUND;
     }
-    for (int i = 0; i < APP.net.disc.cnt; i++) {
-        if (!memcmp(&APP.net.disc.peer[i].id, id, sizeof(uint8_t))) {
+    for (int i = 0; i < APP.net.node.cnt; i++) {
+        if (!memcmp(&APP.net.node.peer[i].id, id, sizeof(uint8_t))) {
             LOG_D("ID FOUND!\r\n");
-            return &APP.net.disc.peer[i].p_addr;
+            return i;
         }
     }
     LOG_D("ID NOT FOUND!\r\n");
     return GAP_DISC_ID_NOT_FOUND;
 }
+
+
+ble_gap_addr_t *get_node(uint8_t *p_data, bool id, bool addr) {
+    int idx = (id) ? get_id_idx(p_data): get_addr_idx(p_data);
+    
+    if(idx == GAP_DISC_ROOT_FOUND) {
+        return &APP.dev.parent;
+    } else if(idx) {
+        return &APP.net.node.peer[idx].p_addr;
+    }
+    
+    return NULL;
+}
+
+
+//just for scan response
+bool add_node(uint8_t *n_addr, uint8_t *src_id) {
+    gap_data* peer = APP.net.node.peer;
+    int8_t conn_idx = 0; 
+
+    LOG_D("Node CNT : %d r\n",APP.net.node.cnt);
+    if(get_addr_idx(n_addr)){
+        LOG_I("Already Found!");
+        return false;
+    }
+    
+    if(!memcmp(n_addr, APP.dev.my_addr.addr, BLE_GAP_ADDR_LEN)){
+        int8_t node_idx = get_id_idx(src_id);
+        if(node_idx) {
+            peer[node_idx].disc = true;
+            LOG_I("Found by One-Side. \r\n");
+        }
+        return false;
+    } 
+    
+    LOG_I("Node ADD!\r\n");
+    ble_gap_addr_t new_addr;
+    memset(&new_addr,0,sizeof(new_addr));
+    new_addr.addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC; // TODO: MAYBE this might be wrong.
+
+    memcpy(new_addr.addr,n_addr,BLE_GAP_ADDR_LEN);
+    peer[APP.net.node.cnt].p_addr = new_addr;
+
+    conn_idx = get_addr_idx(APP.dev.conn_cen.addr);
+    peer[APP.net.node.cnt].path[0]= peer[conn_idx].id;
+    
+    LOG_D("Addr set : %s, PATH : %s \r\n", STR_PUSH(peer[APP.net.node.cnt].p_addr.addr, 1), STR_PUSH(peer[APP.net.node.cnt].path, 0));
+    
+    APP.net.node.cnt++;
+    return true;
+}
+
+
+void update_node(p_pkt *rxp) {
+    gap_data* peer = APP.net.node.peer;
+    
+    int8_t res = 0;
+    switch (rxp->header.type) {
+        case PKT_TYPE_NET_SCAN_REQUEST:
+            res = get_addr_idx(rxp->data.p_data);
+            if (res >= 0) {
+                LOG_I("ADDR %s ID %d -> %d !!\r\n", STR_PUSH(peer[res].p_addr.addr, 1),
+                      peer[res].id, rxp->header.target.node);
+                peer[res].id = rxp->header.target.node;
+            } else if(res == GAP_DISC_ADDR_NOT_FOUND) {
+                LOG_E("UNDISCOVERED REQUEST\r\n");
+            }
+            break;
+        
+        case PKT_TYPE_NET_SCAN_RESPONSE:
+             res = analyze_data(rxp->data.p_data,7);
+            
+            for(int i=0; i<res; i++){
+                add_node(&rxp->data.p_data[i*7], &rxp->header.source.node);
+            }
+            break;
+    }
+}
+
+
+
 
 
 void app_dev_parent_set(ble_gap_addr_t *addr) {

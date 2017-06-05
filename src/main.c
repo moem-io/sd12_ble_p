@@ -393,41 +393,54 @@ static void sleep_mode_enter(void) {
 
 
 //170228 [TODO] : IF NO NODE FOUND??
+// TODO: More Structured. Check if Duplicate Exists.
 void net_disc(const ble_evt_t *const p_ble_evt) {
-    gap_disc *disc = &APP.net.disc;
+    gap_disc *node = &APP.net.node;
     static int base_rssi[MAX_DISC_QUEUE];
 
-    if (disc->cnt < MAX_DISC_QUEUE) {
+    if (node->cnt < MAX_DISC_QUEUE) {
         const ble_gap_evt_adv_report_t *p_adv_report = &p_ble_evt->evt.gap_evt.params.adv_report;
         if (is_uuid_present(&m_cmds_uuid, p_adv_report)) {
 //      LOG_I("CMD SVC FOUND!!\r\n");
 
-            for (int i = 0; i < disc->cnt; i++) {
-                if (!memcmp(disc->peer[i].p_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)) {
-                    if (disc->peer[i].rssi_cnt < MAX_RSSI_CNT) {
+            for (int i = 0; i < node->cnt; i++) {
+                if (!memcmp(node->peer[i].p_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)) {
+                    if (node->peer[i].rssi_cnt < MAX_RSSI_CNT) {
                         base_rssi[i] += p_adv_report->rssi;
-                        disc->peer[i].rssi_cnt++;
-                        disc->peer[i].rssi = base_rssi[i] / disc->peer[i].rssi_cnt;
+                        node->peer[i].rssi_cnt++;
+                        node->peer[i].rssi = base_rssi[i] / node->peer[i].rssi_cnt;
                         LOG_D("count %d : Addr : %s Rssi : %d \r\n",
-                              disc->peer[i].rssi_cnt, STR_PUSH(disc->peer[i].p_addr.addr, 1), disc->peer[i].rssi);
+                              node->peer[i].rssi_cnt, STR_PUSH(node->peer[i].p_addr.addr, 1), node->peer[i].rssi);
                     }
                     return;
                 }
             }
 
-            disc->peer[disc->cnt].p_addr = p_adv_report->peer_addr;
-            disc->peer[disc->cnt].rssi = p_adv_report->rssi;
-            disc->peer[disc->cnt].rssi_cnt = 1;
-            base_rssi[disc->cnt] = p_adv_report->rssi;
-            disc->cnt += 1;
+            node->peer[node->cnt].p_addr = p_adv_report->peer_addr;
+            node->peer[node->cnt].rssi = p_adv_report->rssi;
+            node->peer[node->cnt].rssi_cnt = 1;
+            node->peer[node->cnt].disc = true;
+            base_rssi[node->cnt] = p_adv_report->rssi;
+            node->cnt += 1;
 
-            for (int i = 0; i < disc->cnt; i++) {
-                LOG_I("No %d : Addr : %s Rssi : %d \r\n", i, STR_PUSH(disc->peer[i].p_addr.addr, 1),
-                      disc->peer[i].rssi);
+            for (int i = 0; i < node->cnt; i++) {
+                LOG_I("No %d : Addr : %s Rssi : %d \r\n", i, STR_PUSH(node->peer[i].p_addr.addr, 1),
+                      node->peer[i].rssi);
             }
         }
     } else {
         LOG_E("MAX_DISC_COUNT OVER!!\r\n");
+    }
+}
+
+void node_disc_chk() {
+    for (int i = 0; i < APP.net.node.cnt; i++) {
+        if (APP.net.node.peer[i].rssi_cnt < MIN_DISC_REG_CNT) {
+            for (int j = i; j < APP.net.node.cnt; j++) {
+                APP.net.node.peer[j] = APP.net.node.peer[j + 1];
+                APP.net.node.cnt -= 1;
+            }
+        }
     }
 }
 
@@ -473,8 +486,11 @@ static void nrf_cen_evt(const ble_evt_t *const p_ble_evt) {
 
         case BLE_GAP_EVT_TIMEOUT: {
             if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_SCAN) {
-                LOG_I("NET SCANNING TIMEOUT -- %d FOUND!!\r\n", APP.net.disc.cnt);
+                LOG_I("NET SCANNING TIMEOUT -- %d FOUND!!\r\n", APP.net.node.cnt);
+                node_disc_chk();                    
+                LOG_I("NET Discovery Checked! -- %d FOUND!!\r\n", APP.net.node.cnt);
                 APP.net.discovered = APP_NET_DISCOVERED_TRUE;
+
                 pkt_build(PKT_TYPE_NET_SCAN_RESPONSE);
             } else if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_CONN) {
                 LOG_I("Connection Request timed out.\r\n");

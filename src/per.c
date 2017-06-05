@@ -7,16 +7,6 @@ static void  per_value_reset(per_t *p_per);
 static uint32_t per_char_reset(per_t *p_per, ble_gatts_char_handles_t *data_handle, uint8_t *p_string, uint16_t length);
 static void per_result_update(per_t *p_per, uint8_t result_type);
 
-static void app_disc_id_update(p_pkt *rxp) {
-    int8_t result = app_disc_addr_check(rxp->data.p_data);
-    if (result >= 0) {
-        LOG_I("ADDR %s ID %d -> %d !!\r\n", STR_PUSH(APP.net.disc.peer[result].p_addr.addr, 1),
-              APP.net.disc.peer[result].id, rxp->header.target.node);
-        APP.net.disc.peer[result].id = rxp->header.target.node;
-    } else if(result == GAP_DISC_ADDR_NOT_FOUND) {
-        LOG_E("[FATAL]Can't set ID. ADDR NOT FOUND!!");
-    }
-}
 
 void pkt_interpret(per_t *p_per) {
     if (APP.rx_p.proc) {
@@ -32,18 +22,14 @@ void pkt_interpret(per_t *p_per) {
         LOG_D(" Header : %.14s\r\n", STR_PUSH(buff1, 0));
         LOG_D(" DATA : %.28s\r\n", STR_PUSH(buff2, 0));
         
+        update_node(rxp);
+
         if(APP.dev.my_id != 0 && APP.dev.my_id != rxp->header.target.node) {
             LOG_D("PACKET ROUTE!\r\n");
-
-            if(rxp->header.type == PKT_TYPE_NET_SCAN_REQUEST){
-                app_disc_id_update(rxp);
-            }
-
             if (!APP.net.discovered) {
                 LOG_E("Network not discovered\r\n");
                 return;
             }
-
             pkt_build(CEN_BUILD_PACKET_ROUTE);
         }
                 
@@ -52,22 +38,19 @@ void pkt_interpret(per_t *p_per) {
                 if (APP.dev.my_id == 0) {
                     LOG_D("Device ID not set!\r\n");
                     app_dev_parent_set(&APP.dev.conn_cen);
-
                     if (memcmp(APP.dev.my_addr.addr, rxp->data.p_data, BLE_GAP_ADDR_LEN)) {
-                        LOG_E("WRONG Device ID FIRST!!\r\n");
+                        LOG_E("WRONG Device ADDR!!\r\n");
+                        break;
                     } else {
                         APP.dev.my_id = rxp->header.target.node; //ID SETTING
                         LOG_I("Device ID SET : %d !!\r\n", APP.dev.my_id);
-
-                        LOG_I("[MOD] Network Not Discovered.\r\n");
-                        scan_start();
+                        LOG_I("Network Not Discovered.\r\n");
                     }
                 } else if (APP.dev.my_id == rxp->header.target.node) {
                     APP.net.discovered = APP_NET_DISCOVERED_FALSE;
                     LOG_I("Network Re-Scan Initialized.\r\n");
-
-                    scan_start();
                 }
+                scan_start();
                 break;
 
             case PKT_TYPE_NET_PATH_UPDATE:
