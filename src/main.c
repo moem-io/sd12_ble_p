@@ -20,7 +20,10 @@
 #include "ble_conn_state.h"
 
 #include "util.h"
+
 #include "Fuel_Gauge.h"
+#include "Button.h"
+#include "LED.h"
 
 #define NRF_LOG_MODULE_NAME "APP"
 
@@ -871,14 +874,14 @@ static void device_preset() {
     
     Fuel_Gauge_Init();
     
-    nrf_delay_ms(100); // wait for random pool to be filled.
+    LED_Init();
+    
+    Button_Init();
+    
+}
 
-    if(Fuel_Gauge_Config()) {
-        LOG_D("BQ27441 is Worked!!\n\r");
-        LOG_D("%s", LOG_PUSH(Fuel_Gauge_getBatteryStatus()));
-    } else{
-        LOG_D("BQ27441 isn't Worked!!\n\r");
-    }
+void Button_Click_CallBack(){
+    LOG_D("Button Pressed\r\n");
 }
 
 
@@ -920,6 +923,15 @@ int main(void) {
     advertising_start();
     APP_ERROR_CHECK(err_code);
 
+    
+    if(Fuel_Gauge_Config()) {
+        LOG_D("BQ27441 is Worked!! %s \r\n", LOG_PUSH(Fuel_Gauge_getBatteryStatus()));
+    } else{
+        LOG_D("BQ27441 isn't Worked!!\r\n");
+    }
+    
+    LED_Enough();
+    
     for (;;) {
         if (NRF_LOG_PROCESS() == false) {
             power_manage();

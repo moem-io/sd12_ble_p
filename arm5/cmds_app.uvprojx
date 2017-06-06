@@ -414,6 +414,16 @@
               <FileType>1</FileType>
               <FilePath>..\src\Fuel_Gauge.c</FilePath>
             </File>
+            <File>
+              <FileName>LED.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\LED.c</FilePath>
+            </File>
+            <File>
+              <FileName>Button.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\Button.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -1829,6 +1839,31 @@
               <FileType>1</FileType>
               <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\drivers_nrf\twi_master\nrf_drv_twi.c</FilePath>
             </File>
+            <File>
+              <FileName>nrf_drv_pwm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\drivers_nrf\pwm\nrf_drv_pwm.c</FilePath>
+            </File>
+            <File>
+              <FileName>nrf_drv_ppi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\drivers_nrf\ppi\nrf_drv_ppi.c</FilePath>
+            </File>
+            <File>
+              <FileName>nrf_nvic.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\drivers_nrf\nrf_soc_nosd\nrf_nvic.c</FilePath>
+            </File>
+            <File>
+              <FileName>nrf_soc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\drivers_nrf\nrf_soc_nosd\nrf_soc.c</FilePath>
+            </File>
+            <File>
+              <FileName>nrf_drv_timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\drivers_nrf\timer\nrf_drv_timer.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -2553,6 +2588,11 @@
               <FileName>app_twi.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\libraries\twi\app_twi.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_pwm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\libraries\pwm\app_pwm.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -3317,6 +3357,16 @@
               <FileType>1</FileType>
               <FilePath>..\src\Fuel_Gauge.c</FilePath>
             </File>
+            <File>
+              <FileName>LED.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\LED.c</FilePath>
+            </File>
+            <File>
+              <FileName>Button.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\Button.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -4732,6 +4782,31 @@
               <FileType>1</FileType>
               <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\drivers_nrf\twi_master\nrf_drv_twi.c</FilePath>
             </File>
+            <File>
+              <FileName>nrf_drv_pwm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\drivers_nrf\pwm\nrf_drv_pwm.c</FilePath>
+            </File>
+            <File>
+              <FileName>nrf_drv_ppi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\drivers_nrf\ppi\nrf_drv_ppi.c</FilePath>
+            </File>
+            <File>
+              <FileName>nrf_nvic.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\drivers_nrf\nrf_soc_nosd\nrf_nvic.c</FilePath>
+            </File>
+            <File>
+              <FileName>nrf_soc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\drivers_nrf\nrf_soc_nosd\nrf_soc.c</FilePath>
+            </File>
+            <File>
+              <FileName>nrf_drv_timer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\drivers_nrf\timer\nrf_drv_timer.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -5456,6 +5531,11 @@
               <FileName>app_twi.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\libraries\twi\app_twi.c</FilePath>
+            </File>
+            <File>
+              <FileName>app_pwm.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\libraries\pwm\app_pwm.c</FilePath>
             </File>
           </Files>
         </Group>
