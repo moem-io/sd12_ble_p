@@ -20,6 +20,7 @@
 #include "ble_conn_state.h"
 
 #include "util.h"
+#include "Fuel_Gauge.h"
 
 #define NRF_LOG_MODULE_NAME "APP"
 
@@ -867,6 +868,17 @@ static void device_preset() {
     }
 
     sprintf(APP.dev.name, "%s%03d", DEVICE_NAME_PREFIX, rand_number);
+    
+    Fuel_Gauge_Init();
+    
+    nrf_delay_ms(100); // wait for random pool to be filled.
+
+    if(Fuel_Gauge_Config()) {
+        LOG_D("BQ27441 is Worked!!\n\r");
+        LOG_D("%s", LOG_PUSH(Fuel_Gauge_getBatteryStatus()));
+    } else{
+        LOG_D("BQ27441 isn't Worked!!\n\r");
+    }
 }
 
 

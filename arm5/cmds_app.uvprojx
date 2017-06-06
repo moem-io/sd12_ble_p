@@ -409,6 +409,11 @@
               <FileType>1</FileType>
               <FilePath>..\src\util_app.c</FilePath>
             </File>
+            <File>
+              <FileName>Fuel_Gauge.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\Fuel_Gauge.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -1819,6 +1824,11 @@
                 </FileArmAds>
               </FileOption>
             </File>
+            <File>
+              <FileName>nrf_drv_twi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\drivers_nrf\twi_master\nrf_drv_twi.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -2538,6 +2548,11 @@
                   </Cads>
                 </FileArmAds>
               </FileOption>
+            </File>
+            <File>
+              <FileName>app_twi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\libraries\twi\app_twi.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -3297,6 +3312,11 @@
               <FileType>1</FileType>
               <FilePath>..\src\util_app.c</FilePath>
             </File>
+            <File>
+              <FileName>Fuel_Gauge.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\Fuel_Gauge.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -4707,6 +4727,11 @@
                 </FileArmAds>
               </FileOption>
             </File>
+            <File>
+              <FileName>nrf_drv_twi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\drivers_nrf\twi_master\nrf_drv_twi.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -5426,6 +5451,11 @@
                   </Cads>
                 </FileArmAds>
               </FileOption>
+            </File>
+            <File>
+              <FileName>app_twi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\Downloads\nRF5_SDK_12.2.0_f012efa\components\libraries\twi\app_twi.c</FilePath>
             </File>
           </Files>
         </Group>
