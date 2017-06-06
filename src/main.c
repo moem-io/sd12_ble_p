@@ -486,8 +486,8 @@ static void nrf_cen_evt(const ble_evt_t *const p_ble_evt) {
 
         case BLE_GAP_EVT_TIMEOUT: {
             if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_SCAN) {
-                LOG_I("NET SCANNING TIMEOUT -- %d FOUND!!\r\n", APP.net.node.cnt);
-                node_disc_chk();                    
+//                LOG_I("NET SCANNING TIMEOUT -- %d FOUND!!\r\n", APP.net.node.cnt);
+//                node_disc_chk();                    
                 LOG_I("NET Discovery Checked! -- %d FOUND!!\r\n", APP.net.node.cnt);
                 APP.net.discovered = APP_NET_DISCOVERED_TRUE;
 

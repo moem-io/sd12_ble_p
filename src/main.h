@@ -10,7 +10,7 @@
 #define MAX_DISC_QUEUE 5  /** Max Discovery Queue **/
 #define MAX_RSSI_CNT 255  /** Max RSSI NORMALIZE COUNT **/
 #define MAX_PKT_CNT 20
-#define MAX_PKT_DATA_LEN 80
+#define MAX_PKT_DATA_LEN 40
 #define MAX_DEV_NAME 10
 #define MAX_NODE_CNT 40
 #define MAX_DEPTH_CNT 5 

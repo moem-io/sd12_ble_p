@@ -27,35 +27,55 @@ int8_t get_addr_idx(uint8_t *p_data){
         }
     }
     LOG_D("ADDR NOT FOUND!\r\n");
-    return GAP_DISC_ADDR_NOT_FOUND;
+    return NODE_ADDR_NOT_FOUND;
 }
 
 
 int8_t get_id_idx(uint8_t *id) {
     if (*id == 0) { // MAY NOT BE USED.
-        return GAP_DISC_ROOT_FOUND;
+        return NODE_ROOT_FOUND;
     }
     for (int i = 0; i < APP.net.node.cnt; i++) {
         if (!memcmp(&APP.net.node.peer[i].id, id, sizeof(uint8_t))) {
-            LOG_D("ID FOUND!\r\n");
+            LOG_D("ID FOUND! idx :%d \r\n",i);
             return i;
         }
     }
     LOG_D("ID NOT FOUND!\r\n");
-    return GAP_DISC_ID_NOT_FOUND;
+    return NODE_ID_NOT_FOUND;
 }
 
 
 ble_gap_addr_t *get_node(uint8_t *p_data, bool id, bool addr) {
     int idx = (id) ? get_id_idx(p_data): get_addr_idx(p_data);
     
-    if(idx == GAP_DISC_ROOT_FOUND) {
+    if(idx == NODE_ID_NOT_FOUND){
+        return NULL;
+    } else if(idx == NODE_ROOT_FOUND) {
         return &APP.dev.parent;
-    } else if(idx) {
+    } else {
         return &APP.net.node.peer[idx].p_addr;
     }
+}
+
+
+ble_gap_addr_t *retrieve_send(uint8_t *p_data, bool id, bool addr) {
+    gap_data* peer = APP.net.node.peer;
+    int idx = (id) ? get_id_idx(p_data): get_addr_idx(p_data);
     
-    return NULL;
+    if(idx == NODE_ID_NOT_FOUND){
+        return NULL;
+    } else if(idx == NODE_ROOT_FOUND) {
+        return &APP.dev.parent;
+    } else {
+        if (peer[idx].disc){
+            return &peer[idx].p_addr;
+        } else {
+            LOG_I("Not Found Dev! Retrieve Path : %d \r\n", peer[idx].path[0]);
+            int path_idx = get_id_idx(&peer[idx].path[0]);
+            return &peer[path_idx].p_addr;
+        }
+    }
 }
 
 
@@ -64,8 +84,8 @@ bool add_node(uint8_t *n_addr, uint8_t *src_id) {
     gap_data* peer = APP.net.node.peer;
     int8_t conn_idx = 0; 
 
-    LOG_D("Node CNT : %d r\n",APP.net.node.cnt);
-    if(get_addr_idx(n_addr)){
+    LOG_D("Node CNT : %d \r\n",APP.net.node.cnt);
+    if(get_addr_idx(n_addr) != NODE_ADDR_NOT_FOUND){
         LOG_I("Already Found!");
         return false;
     }
@@ -82,7 +102,7 @@ bool add_node(uint8_t *n_addr, uint8_t *src_id) {
     LOG_I("Node ADD!\r\n");
     ble_gap_addr_t new_addr;
     memset(&new_addr,0,sizeof(new_addr));
-    new_addr.addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC; // TODO: MAYBE this might be wrong.
+    new_addr.addr_type = BLE_GAP_ADDR_TYPE_PUBLIC; // TODO: MAYBE this might be wrong.
 
     memcpy(new_addr.addr,n_addr,BLE_GAP_ADDR_LEN);
     peer[APP.net.node.cnt].p_addr = new_addr;
@@ -108,7 +128,7 @@ void update_node(p_pkt *rxp) {
                 LOG_I("ADDR %s ID %d -> %d !!\r\n", STR_PUSH(peer[res].p_addr.addr, 1),
                       peer[res].id, rxp->header.target.node);
                 peer[res].id = rxp->header.target.node;
-            } else if(res == GAP_DISC_ADDR_NOT_FOUND) {
+            } else if(res == NODE_ADDR_NOT_FOUND) {
                 LOG_E("UNDISCOVERED REQUEST\r\n");
             }
             break;

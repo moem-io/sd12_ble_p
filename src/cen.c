@@ -1,4 +1,5 @@
 #include "cen.h"
+#include "ble_advertising.h"
 
 #define NRF_LOG_MODULE_NAME "[cen]"
 
@@ -31,18 +32,21 @@ void pkt_send(cen_t *p_cen) {
     uint32_t err_code;
 
 //    LOG_I("txp, rxp,%d,%d \r\n",APP.tx_p.proc_cnt, APP.rx_p.proc_cnt);
-
     if (APP.tx_p.proc) {
         nrf_delay_ms(100);
 
         p_pkt *txp = &APP.tx_p.pkt[APP.tx_p.proc_cnt];
         ble_gap_addr_t *target_addr;
         if (p_cen->conn_handle == BLE_CONN_HANDLE_INVALID) {
-            nrf_delay_ms(500);
-
-            target_addr = get_node(&txp->header.target.node,1,0);
+            
+            target_addr = retrieve_send(&txp->header.target.node,1,0);
+            
+            if(target_addr) {
+                LOG_I("[] TARGET %s, type: %d\r\n", STR_PUSH(target_addr->addr, 1),target_addr->addr_type);
+            }
             
             if (!target_addr && txp->header.type == PKT_TYPE_NET_SCAN_REQUEST){
+                LOG_I("ID NOT FOUND\r\n");
                 target_addr = get_node(txp->data.p_data,0,1);
             }
 
@@ -116,10 +120,21 @@ void pkt_send(cen_t *p_cen) {
             if (APP.tx_p.tx_que[APP.tx_p.proc_cnt] == CEN_TXP_QUEUE_UNAVAILABLE) {
                 APP.tx_p.proc = false;
             }
+            
+            (void) sd_ble_gap_adv_stop();
+            
+            nrf_delay_ms(100);
+            
+            uint32_t err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
+            APP_ERROR_CHECK(err_code);
 
+            nrf_delay_ms(100);
+            
             LOG_I("CENTRAL CLOSING CONNECTION\r\n");
             err_code = sd_ble_gap_disconnect(p_cen->conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
             APP_ERROR_CHECK(err_code);
+            
+
         }
     }
 
@@ -166,10 +181,12 @@ void pkt_build(uint8_t build_type) {
               VSTR_PUSH((uint8_t *) &txp->data, DATA_LEN, 0));
     } else {
         pkt_base(txp, build_type);
-
+        uint8_t data_len = 0;
+        
         switch (build_type) {
             case PKT_TYPE_NET_SCAN_RESPONSE:
-                txp->header.index.total = (int) ceil((float) APP.net.node.cnt * 8 / DATA_LEN);
+                data_len = (int) ceil((float) APP.net.node.cnt * 8 / DATA_LEN);
+                txp->header.index.total = (data_len == 0) ? 1 : data_len;
                 scan_res_builder(txp->data.p_data);
                 break;
 
@@ -256,6 +273,7 @@ static void on_hvx(cen_t *p_cen, const ble_evt_t *p_ble_evt) {
         if (p_evt_hvx->handle == p_cen->hdlrs.result_hdlr) {
             p_cen->state.send = false;
             APP.tx_p.proc = true;
+            nrf_delay_ms(100);
 
             uint8_t *p_data = (uint8_t *) p_evt_hvx->data;
             if (p_data[0] == PKT_RSLT_IDLE) {

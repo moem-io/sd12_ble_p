@@ -13,14 +13,15 @@
 #define UUID32_SIZE             4                               /**< Size of 32 bit UUID */
 #define UUID128_SIZE            16                              /**< Size of 128 bit UUID */
 
-#define GAP_DISC_ROOT_FOUND        -1
-#define GAP_DISC_ADDR_NOT_FOUND  NULL
-#define GAP_DISC_ID_NOT_FOUND        NULL
+#define NODE_ROOT_FOUND        -2
+#define NODE_ADDR_NOT_FOUND  -1
+#define NODE_ID_NOT_FOUND        -1
 
 int8_t get_id_idx(uint8_t *id);
 int8_t get_addr_idx(uint8_t *p_data);
 
 ble_gap_addr_t *get_node(uint8_t *p_data, bool id, bool addr);
+ble_gap_addr_t *retrieve_send(uint8_t *p_data, bool id, bool addr);
 
 void update_node(p_pkt *rxp);
 
