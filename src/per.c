@@ -3,6 +3,8 @@
 
 #define NRF_LOG_MODULE_NAME "[per]"
 
+extern volatile bool flagLED;
+
 static void  per_value_reset(per_t *p_per);
 static uint32_t per_char_reset(per_t *p_per, ble_gatts_char_handles_t *data_handle, uint8_t *p_string, uint16_t length);
 static void per_result_update(per_t *p_per, uint8_t result_type);
@@ -52,6 +54,11 @@ void pkt_interpret(per_t *p_per) {
                 }
                 scan_start();
                 break;
+                
+                case PKT_TYPE_NODE_LED_REQUEST:
+                    LOG_D("LED Request \r\n");
+                    flagLED = true; // PKT_BUILD -> MAIN LOOP
+                    break;
 
             case PKT_TYPE_NET_PATH_UPDATE:
                 if (!APP.net.discovered) {
@@ -81,7 +88,7 @@ void pkt_interpret(per_t *p_per) {
         per_result_update(p_per, PKT_RSLT_INTERPRET_OK);
         APP.rx_p.proc_cnt++;
         APP.rx_p.proc = false;
-        nrf_delay_ms(100);
+        nrf_delay_ms(500);
     }
 }
 
@@ -101,13 +108,13 @@ static void header_parser(ble_gatts_value_t *rx_data) {
     p_header *pheader = &(APP.rx_p.pkt[APP.rx_p.header_cnt].header);
   
     pheader->type = rx_data->p_value[0];
-    pheader->index.now = rx_data->p_value[1];
+    pheader->index.err = rx_data->p_value[1];
     pheader->index.total = rx_data->p_value[2];
     pheader->source.node = rx_data->p_value[3];
     pheader->source.sensor = rx_data->p_value[4];
     pheader->target.node = rx_data->p_value[5];
     pheader->target.sensor = rx_data->p_value[6];
-    LOG_D("Header TYPE : %02x INDEX : %02x / %02x\r\n", pheader->type, pheader->index.now, pheader->index.total);
+    LOG_D("Header TYPE : %02x INDEX : %02x / %02x\r\n", pheader->type, pheader->index.err, pheader->index.total);
     LOG_D("Header SOURCE : %02x - %02x\r\n", pheader->source.node, pheader->source.sensor);
     LOG_D("Header TARGET : %02x - %02x\r\n", pheader->target.node, pheader->target.sensor);
 
