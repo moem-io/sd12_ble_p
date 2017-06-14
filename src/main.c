@@ -74,6 +74,9 @@
 
 #define DEAD_BEEF                       0xDEADBEEF                                  /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
+
+//#define FINAL 1
+
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                            /**< Handle of the current connection. */
 
 app_condition APP;
@@ -85,6 +88,7 @@ static ble_db_discovery_t m_ble_db_discovery;             /**< Instance of datab
 APP_TIMER_DEF(m_single_timer);
 #define NET_DISC_TIMER_INTERVAL     APP_TIMER_TICKS(10000, APP_TIMER_PRESCALER) // 1000 ms intervals
 
+volatile bool flagLED = false;
 
 const ble_gap_conn_params_t m_connection_param =
     {
@@ -661,7 +665,6 @@ static void ble_evt_dispatch(ble_evt_t *p_ble_evt) {
         app_cen_evt(&m_cen_s, p_ble_evt);
     }
     pkt_interpret(&m_per_s);
-    pkt_send(&m_cen_s);
 
     bsp_btn_ble_on_ble_evt(p_ble_evt);
 }
@@ -871,17 +874,21 @@ static void device_preset() {
     }
 
     sprintf(APP.dev.name, "%s%03d", DEVICE_NAME_PREFIX, rand_number);
-    
+
+#ifdef FINAL
     Fuel_Gauge_Init();
-    
+#endif // FINAL
+
     LED_Init();
-    
+
     Button_Init();
-    
+
 }
 
-void Button_Click_CallBack(){
+void Button_Click_CallBack() {
     LOG_D("Button Pressed\r\n");
+    pkt_build(PKT_TYPE_NODE_BTN_PRESS);
+
 }
 
 
@@ -901,7 +908,7 @@ int main(void) {
     timers_init();
     buttons_leds_init(&erase_bonds);
     ble_stack_init();
-    peer_manager_init(erase_bonds);
+    peer_manager_init(erase_bonds); //fds init.
     if (erase_bonds == true) {
         LOG_I("Bonds erased!\r\n");
     }
@@ -923,16 +930,35 @@ int main(void) {
     advertising_start();
     APP_ERROR_CHECK(err_code);
 
-    
+       
+#ifdef FINAL
     if(Fuel_Gauge_Config()) {
         LOG_D("BQ27441 is Worked!! %s \r\n", LOG_PUSH(Fuel_Gauge_getBatteryStatus()));
     } else{
         LOG_D("BQ27441 isn't Worked!!\r\n");
     }
     
-    LED_Enough();
+    LED_Not_Enough();
+
+    LED_Control("0F0000");
+    nrf_delay_ms(1000);
     
+    LED_Control("0F0F00");
+    nrf_delay_ms(1000);
+    
+    LED_Control("000000");
+#endif // FINAL
+
     for (;;) {
+        if (flagLED) {
+            if (LED_Control(APP.rx_p.pkt[APP.rx_p.proc_cnt - 1].data.p_data)) {
+                //  TODO : IF success
+            }
+            pkt_build(PKT_TYPE_NODE_LED_RESPONSE);
+            flagLED = false;
+        }
+
+        pkt_send(&m_cen_s);
         if (NRF_LOG_PROCESS() == false) {
             power_manage();
         }
