@@ -233,7 +233,7 @@ static uint16_t FG_getVoltage(){
 	return readWord(BQ27441_COMMAND_VOLTAGE);
 }
 static uint16_t FG_getCurrent(){
-	readWord(BQ27441_COMMAND_AVG_CURRENT);
+	return readWord(BQ27441_COMMAND_AVG_CURRENT);
 }
 
 static bool executeControlWord(uint16_t function){
