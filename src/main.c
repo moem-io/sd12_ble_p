@@ -81,6 +81,7 @@ static volatile uint8_t write_flag=0;
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                            /**< Handle of the current connection. */
 
 app_condition APP;
+app_packet PKT;
 
 static per_t m_per_s;
 static cen_t m_cen_s;
@@ -900,7 +901,7 @@ static void app_fds_evt_handler(fds_evt_t const *const p_fds_evt) {
     switch (p_fds_evt->id) {
         case FDS_EVT_INIT:
             if (p_fds_evt->result != FDS_SUCCESS) {
-                LOG_D("FDS Init Failed!!\r\n");
+                LOG_D("FDS Init Failed!!  %d  \r\n",p_fds_evt->result);
             }
             break;
         case FDS_EVT_WRITE:
@@ -991,6 +992,7 @@ static ret_code_t app_fds_init(void) {
     if (ret != FDS_SUCCESS) {
         return ret;
     }
+    
     ret = fds_init();
     if (ret != FDS_SUCCESS) {
         return ret;
@@ -1007,7 +1009,7 @@ int main(void) {
     bool erase_bonds;
 
     memset(&APP, 0, sizeof(APP));
-    memset(&APP.tx_p.tx_que, CEN_TXP_QUEUE_UNAVAILABLE, sizeof(APP.tx_p.tx_que)); //for tx_que index
+    memset(&PKT.tx_p.tx_que, CEN_TXP_QUEUE_UNAVAILABLE, sizeof(PKT.tx_p.tx_que)); //for tx_que index
 
     // Initialize.
     err_code = NRF_LOG_INIT(NULL);
@@ -1042,7 +1044,7 @@ int main(void) {
     while (write_flag==0);
     fds_read();
 
-    LOG_D("Ram Size : %d kb \r\n", sizeof(APP) / 1024);
+    LOG_D("Ram Size : %d byte %d Word \r\n", sizeof(APP), sizeof(APP)/4+1);
     LOG_D("%s Addr : %s\r\n", LOG_PUSH(APP.dev.name), STR_PUSH(APP.dev.my_addr.addr, 1));
 
     advertising_start();
@@ -1069,7 +1071,7 @@ int main(void) {
 
     for (;;) {
         if (flagLED) {
-            if (LED_Control(APP.rx_p.pkt[APP.rx_p.proc_cnt - 1].data.p_data)) {
+            if (LED_Control(PKT.rx_p.pkt[PKT.rx_p.proc_cnt - 1].data.p_data)) {
                 //  TODO : IF success
             }
             pkt_build(PKT_TYPE_NODE_LED_RESPONSE);

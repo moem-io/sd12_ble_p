@@ -31,11 +31,11 @@ uint32_t cen_data_2_update(cen_t *p_cen, p_data *data) {
 void pkt_send(cen_t *p_cen) {
     uint32_t err_code;
 
-//    LOG_I("txp, rxp,%d,%d \r\n",APP.tx_p.proc_cnt, APP.rx_p.proc_cnt);
-    if (APP.tx_p.proc) {
+//    LOG_I("txp, rxp,%d,%d \r\n",PKT.tx_p.proc_cnt, PKT.rx_p.proc_cnt);
+    if (PKT.tx_p.proc) {
         nrf_delay_ms(100);
 
-        p_pkt *txp = &APP.tx_p.pkt[APP.tx_p.proc_cnt];
+        p_pkt *txp = &PKT.tx_p.pkt[PKT.tx_p.proc_cnt];
         ble_gap_addr_t *target_addr;
         if (p_cen->conn_handle == BLE_CONN_HANDLE_INVALID) {
             
@@ -63,7 +63,7 @@ void pkt_send(cen_t *p_cen) {
 
         if (!p_cen->hdlrs.assigned) {
             LOG_I("WAIT FOR HANDLE ASSIGNED\r\n");
-            APP.tx_p.proc = false;
+            PKT.tx_p.proc = false;
             return;
         }
 
@@ -76,13 +76,13 @@ void pkt_send(cen_t *p_cen) {
 
         if (!p_cen->state.idle) {
             LOG_D("Wait For IDLE\r\n");
-            APP.tx_p.proc = false;
+            PKT.tx_p.proc = false;
             return;
         }
 
         if (p_cen->state.send) {
             LOG_D("Wait For Response\r\n");
-            APP.tx_p.proc = false;
+            PKT.tx_p.proc = false;
             return;
         } else if (!p_cen->state.send) {
             p_cen->state.send = true;
@@ -115,10 +115,10 @@ void pkt_send(cen_t *p_cen) {
             LOG_I("WAIT FOR PACKET INTERPRETING\r\n");
             return;
         } else if (p_cen->state.interpret) {
-            APP.tx_p.tx_que[APP.tx_p.proc_cnt] = CEN_TXP_QUEUE_UNAVAILABLE;
-            APP.tx_p.proc_cnt++;
-            if (APP.tx_p.tx_que[APP.tx_p.proc_cnt] == CEN_TXP_QUEUE_UNAVAILABLE) {
-                APP.tx_p.proc = false;
+            PKT.tx_p.tx_que[PKT.tx_p.proc_cnt] = CEN_TXP_QUEUE_UNAVAILABLE;
+            PKT.tx_p.proc_cnt++;
+            if (PKT.tx_p.tx_que[PKT.tx_p.proc_cnt] == CEN_TXP_QUEUE_UNAVAILABLE) {
+                PKT.tx_p.proc = false;
             }
             
             (void) sd_ble_gap_adv_stop();
@@ -167,10 +167,10 @@ void pkt_base(p_pkt *txp, uint8_t build_type) {
 }
 
 void pkt_build(uint8_t build_type) {
-    p_pkt *txp = &APP.tx_p.pkt[APP.tx_p.pkt_cnt];
-    p_pkt *rxp = &APP.rx_p.pkt[APP.rx_p.proc_cnt];
+    p_pkt *txp = &PKT.tx_p.pkt[PKT.tx_p.pkt_cnt];
+    p_pkt *rxp = &PKT.rx_p.pkt[PKT.rx_p.proc_cnt];
 
-    LOG_I("PACKET BUILD TXP : %d, RXP : %d, \r\n", APP.tx_p.pkt_cnt, APP.rx_p.proc_cnt);
+    LOG_I("PACKET BUILD TXP : %d, RXP : %d, \r\n", PKT.tx_p.pkt_cnt, PKT.rx_p.proc_cnt);
 
     if (build_type == CEN_BUILD_PACKET_ROUTE) {
         memcpy(&txp->header, &rxp->header, HEADER_LEN);
@@ -203,10 +203,10 @@ void pkt_build(uint8_t build_type) {
                 break;
         }
     }
-    APP.tx_p.proc = true;
-    APP.tx_p.tx_que[APP.tx_p.que_idx] = APP.tx_p.pkt_cnt;
-    APP.tx_p.pkt_cnt++;
-    APP.tx_p.que_idx++;
+    PKT.tx_p.proc = true;
+    PKT.tx_p.tx_que[PKT.tx_p.que_idx] = PKT.tx_p.pkt_cnt;
+    PKT.tx_p.pkt_cnt++;
+    PKT.tx_p.que_idx++;
 }
 
 void cen_on_db_disc_evt(cen_t *p_cen, ble_db_discovery_evt_t *p_evt) {
@@ -250,7 +250,7 @@ void cen_on_db_disc_evt(cen_t *p_cen, ble_db_discovery_evt_t *p_evt) {
             hdlr->result_cccd_hdlr) {
             LOG_D("ALL HANDLER ASSIGNED\r\n");
             hdlr->assigned = true;
-            APP.tx_p.proc = true;
+            PKT.tx_p.proc = true;
         }
     }
 }
@@ -271,7 +271,7 @@ static void on_hvx(cen_t *p_cen, const ble_evt_t *p_ble_evt) {
     if (p_cen->hdlrs.assigned) {
         if (p_evt_hvx->handle == p_cen->hdlrs.result_hdlr) {
             p_cen->state.send = false;
-            APP.tx_p.proc = true;
+            PKT.tx_p.proc = true;
             nrf_delay_ms(100);
 
             uint8_t *p_data = (uint8_t *) p_evt_hvx->data;

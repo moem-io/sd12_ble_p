@@ -11,8 +11,8 @@ static void per_result_update(per_t *p_per, uint8_t result_type);
 
 
 void pkt_interpret(per_t *p_per) {
-    if (APP.rx_p.proc) {
-        p_pkt *rxp = &(APP.rx_p.pkt[APP.rx_p.proc_cnt]);
+    if (PKT.rx_p.proc) {
+        p_pkt *rxp = &(PKT.rx_p.pkt[PKT.rx_p.proc_cnt]);
 
         uint8_t buff1[HEADER_LEN];
         memcpy(buff1, &rxp->header, sizeof(buff1));
@@ -20,7 +20,7 @@ void pkt_interpret(per_t *p_per) {
         uint8_t buff2[MAX_PKT_DATA_LEN];
         memcpy(buff2, &rxp->data, sizeof(buff2));
 
-        LOG_D("[%d]th PACKET INTERPRET\r\n", APP.rx_p.proc_cnt);
+        LOG_D("[%d]th PACKET INTERPRET\r\n", PKT.rx_p.proc_cnt);
         LOG_D(" Header : %.14s\r\n", STR_PUSH(buff1, 0));
         LOG_D(" DATA : %.28s\r\n", STR_PUSH(buff2, 0));
         
@@ -86,26 +86,26 @@ void pkt_interpret(per_t *p_per) {
         
         per_value_reset(p_per);
         per_result_update(p_per, PKT_RSLT_INTERPRET_OK);
-        APP.rx_p.proc_cnt++;
-        APP.rx_p.proc = false;
+        PKT.rx_p.proc_cnt++;
+        PKT.rx_p.proc = false;
         nrf_delay_ms(500);
     }
 }
 
 static void data_cnt_chk(uint8_t *pkt_type, uint8_t cnt) {
-    p_header *pheader = &(APP.rx_p.pkt[APP.rx_p.header_cnt - 1].header);
+    p_header *pheader = &(PKT.rx_p.pkt[PKT.rx_p.header_cnt - 1].header);
     LOG_D("PACKET DATA CHAR TOTAL : %d NOW : %d \r\n", pheader->index.total, cnt);
 
     if (pheader->index.total == cnt) {
-        APP.rx_p.data_cnt++;
-        APP.rx_p.pkt_cnt++;
-        APP.rx_p.proc = true;
+        PKT.rx_p.data_cnt++;
+        PKT.rx_p.pkt_cnt++;
+        PKT.rx_p.proc = true;
     }
 }
 
 
 static void header_parser(ble_gatts_value_t *rx_data) {
-    p_header *pheader = &(APP.rx_p.pkt[APP.rx_p.header_cnt].header);
+    p_header *pheader = &(PKT.rx_p.pkt[PKT.rx_p.header_cnt].header);
   
     pheader->type = rx_data->p_value[0];
     pheader->index.err = rx_data->p_value[1];
@@ -118,32 +118,32 @@ static void header_parser(ble_gatts_value_t *rx_data) {
     LOG_D("Header SOURCE : %02x - %02x\r\n", pheader->source.node, pheader->source.sensor);
     LOG_D("Header TARGET : %02x - %02x\r\n", pheader->target.node, pheader->target.sensor);
 
-    APP.rx_p.header_cnt++;
+    PKT.rx_p.header_cnt++;
 }
 
 static void data_1_parser(ble_gatts_value_t *rx_data) {
-    uint8_t *pdata = APP.rx_p.pkt[APP.rx_p.data_cnt].data.p_data;
+    uint8_t *pdata = PKT.rx_p.pkt[PKT.rx_p.data_cnt].data.p_data;
     memcpy(&pdata[0], rx_data->p_value, rx_data->len);
 
     LOG_D("Data 1: %s\r\n", VSTR_PUSH(pdata, 20, 0));
 
-    data_cnt_chk(&APP.rx_p.data_cnt, 1);
+    data_cnt_chk(&PKT.rx_p.data_cnt, 1);
 }
 
 
 static void data_2_parser(ble_gatts_value_t *rx_data) {
-    uint8_t *pdata = APP.rx_p.pkt[APP.rx_p.data_cnt].data.p_data;
+    uint8_t *pdata = PKT.rx_p.pkt[PKT.rx_p.data_cnt].data.p_data;
     memcpy(&pdata[20], rx_data->p_value, rx_data->len);
 
     LOG_D("Data 2: %s\r\n", VSTR_PUSH(pdata, 40, 0));
 
-    data_cnt_chk(&APP.rx_p.data_cnt, 2);
+    data_cnt_chk(&PKT.rx_p.data_cnt, 2);
 }
 
 
 static void gatts_value_get(per_t *p_per, uint16_t handle, ble_gatts_value_t *rx_data) {
     sd_ble_gatts_value_get(p_per->conn_handle, handle, rx_data);
-    LOG_I("[rxP %d]th Handle %#06x Value : %s \r\n", APP.rx_p.data_cnt, handle, VSTR_PUSH(rx_data->p_value, rx_data->len, 0));
+    LOG_I("[rxP %d]th Handle %#06x Value : %s \r\n", PKT.rx_p.data_cnt, handle, VSTR_PUSH(rx_data->p_value, rx_data->len, 0));
 }
 
 

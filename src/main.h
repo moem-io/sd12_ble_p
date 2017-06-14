@@ -9,7 +9,7 @@
 #define MIN_DISC_REG_CNT 5
 #define MAX_DISC_QUEUE 5  /** Max Discovery Queue **/
 #define MAX_RSSI_CNT 255  /** Max RSSI NORMALIZE COUNT **/
-#define MAX_PKT_CNT 20
+#define MAX_PKT_CNT 100
 #define MAX_PKT_DATA_LEN 40
 #define MAX_DEV_NAME 10
 #define MAX_NODE_CNT 40
@@ -99,6 +99,12 @@ typedef struct {
 } app_net_condition;
 
 typedef struct {
+    app_dev_condition dev;
+    app_net_condition net;
+    app_timer_condition timer;
+} app_condition;
+
+typedef struct {
     uint8_t pkt_cnt;
     uint8_t header_cnt;
     uint8_t data_cnt;
@@ -120,14 +126,12 @@ typedef struct {
 } app_pkt_tx;
 
 typedef struct {
-    app_dev_condition dev;
-    app_net_condition net;
-    app_timer_condition timer;
     app_pkt_rx rx_p;
     app_pkt_tx tx_p;
-} app_condition;
+} app_packet;
 
 extern app_condition APP;
+extern app_packet PKT;
 
 extern void scan_start(void);
 
