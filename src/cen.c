@@ -156,9 +156,10 @@ void scan_res_builder(uint8_t *p_data) {
     LOG_I("SCAN_RESPONSE BUILD %s, \r\n", VSTR_PUSH(p_data, APP.net.node.cnt * unit, 0));
 }
 
+// TODO: err type to Type Struct
 void pkt_base(p_pkt *txp, uint8_t build_type) {
     txp->header.type = build_type;
-    txp->header.index.now = 1;
+    txp->header.index.err = 0;
     txp->header.source.node = APP.dev.my_id;
     txp->header.source.sensor = 0;
     txp->header.target.node = APP.dev.root_id;
@@ -189,12 +190,10 @@ void pkt_build(uint8_t build_type) {
                 txp->header.index.total = (data_len == 0) ? 1 : data_len;
                 scan_res_builder(txp->data.p_data);
                 break;
-
+            
+            case PKT_TYPE_NODE_LED_RESPONSE:
+            case PKT_TYPE_NODE_BTN_PRESS:
             case PKT_TYPE_NET_PATH_UPDATE_RESPONSE:
-                txp->header.index.total = 1;
-                txp->data.p_data[0] = PKT_DATA_SUCCESS;
-                break;
-
             case PKT_TYPE_NET_ACK_RESPONSE:
                 txp->header.index.total = 1;
                 txp->data.p_data[0] = PKT_DATA_SUCCESS;

@@ -36,10 +36,11 @@ typedef struct {
 } p_address;
 
 typedef struct {
-    uint8_t now;
+    uint8_t err;
     uint8_t total;
 } p_index;
 
+// TODO: err type to Type Struct
 typedef struct {
     uint8_t type;
     p_index index;
