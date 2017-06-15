@@ -6,6 +6,9 @@
 #include "cen.h"
 #include <stdint.h>
 
+#define APP_FILE_ID     0x1111
+#define APP_REC_KEY     0x2222
+
 #define MIN_DISC_REG_CNT 5
 #define MAX_DISC_QUEUE 5  /** Max Discovery Queue **/
 #define MAX_RSSI_CNT 255  /** Max RSSI NORMALIZE COUNT **/

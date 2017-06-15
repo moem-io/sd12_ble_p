@@ -8,6 +8,8 @@
 #include <stdbool.h>
 
 #include "main.h"
+#include "fstorage.h"
+#include "fds.h"
 
 #define UUID16_SIZE             2                               /**< Size of 16 bit UUID */
 #define UUID32_SIZE             4                               /**< Size of 32 bit UUID */
@@ -29,4 +31,6 @@ void app_dev_parent_set(ble_gap_addr_t *addr);
 
 bool is_uuid_present(const ble_uuid_t *p_target_uuid, const ble_gap_evt_adv_report_t *adv_report);
 
+ret_code_t app_fds_read(void);
+void app_fds_save(void);
 #endif

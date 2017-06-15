@@ -220,3 +220,83 @@ bool is_uuid_present(const ble_uuid_t *p_target_uuid, const ble_gap_evt_adv_repo
     return false;
 }
 
+
+
+static ret_code_t app_fds_write(void) {
+    fds_record_t record;
+    fds_record_desc_t record_desc;
+    fds_record_chunk_t record_chunk;
+    // Set up data.
+    record_chunk.p_data = &APP;
+    record_chunk.length_words = sizeof(APP)/4+1;
+    // Set up record.
+    record.file_id = APP_FILE_ID;
+    record.key = APP_REC_KEY;
+    record.data.p_chunks = &record_chunk;
+    record.data.num_chunks = 1;
+
+    ret_code_t ret = fds_record_write(&record_desc, &record);
+    if (ret != FDS_SUCCESS) {
+        return ret;
+    }
+    LOG_D("Writing Record ID = %d \r\n", record_desc.record_id);
+    return NRF_SUCCESS;
+}
+
+ret_code_t app_fds_read(void) {
+    fds_flash_record_t flash_record;
+    fds_record_desc_t record_desc;
+    fds_find_token_t ftok = {0};//Important, make sure you zero init the ftok token
+    uint32_t * data;
+    uint32_t err_code;
+    
+    while (fds_record_find(APP_FILE_ID, APP_REC_KEY, &record_desc, &ftok) == FDS_SUCCESS) {
+        err_code = fds_record_open(&record_desc, &flash_record);
+        if (err_code != FDS_SUCCESS) {
+            return err_code;
+        }
+
+        LOG_D("Found Record ID = %d. Copying...\r\n", record_desc.record_id);
+        data = (uint32_t *) flash_record.p_data;
+        memcpy(&APP, data, sizeof(APP));
+
+        LOG_D("[Saved] %s Addr : %s\r\n", LOG_PUSH(APP.dev.name), STR_PUSH(APP.dev.my_addr.addr, 1));
+        // Access the record through the flash_record structure.
+        // Close the record when done.
+        err_code = fds_record_close(&record_desc);
+        if (err_code != FDS_SUCCESS) {
+            return err_code;
+        }
+    }
+        
+    return NRF_SUCCESS;
+}
+
+static ret_code_t app_fds_find_and_delete(void) {
+    fds_record_desc_t record_desc;
+    fds_find_token_t ftok;
+
+    ftok.page = 0;
+    ftok.p_addr = NULL;
+    // Loop and find records with same ID and rec key and mark them as deleted.
+    while (fds_record_find(APP_FILE_ID, APP_REC_KEY, &record_desc, &ftok) == FDS_SUCCESS) {
+        fds_record_delete(&record_desc);
+        LOG_D("Deleted record ID: %d \r\n", record_desc.record_id);
+    }
+    // call the garbage collector to empty them, don't need to do this all the time, this is just for demonstration
+    ret_code_t ret = fds_gc();
+    if (ret != FDS_SUCCESS) {
+        return ret;
+    }
+    return NRF_SUCCESS;
+}
+
+
+void app_fds_save(void) {
+    uint32_t err_code;
+
+    err_code = app_fds_find_and_delete();
+    ERR_CHK("APP FIND & DEL FAILED\r\n");
+    err_code =app_fds_write();
+    ERR_CHK("APP WRITE FAILED\r\n");
+}
