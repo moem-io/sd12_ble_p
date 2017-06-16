@@ -498,7 +498,7 @@ static void nrf_cen_evt(const ble_evt_t *const p_ble_evt) {
                 LOG_I("NET Discovery Checked! -- %d FOUND!!\r\n", APP.net.node.cnt);
                 APP.net.discovered = APP_NET_DISCOVERED_TRUE;
 
-                pkt_build(PKT_TYPE_NET_SCAN_RESPONSE);
+                pkt_build(PKT_TYPE_NET_SCAN_RESPONSE,0);
             } else if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_CONN) {
                 LOG_I("Connection Request timed out.\r\n");
             }
@@ -876,17 +876,16 @@ static void device_preset() {
 
 #ifdef FINAL
     Fuel_Gauge_Init();
-#endif // FINAL
 
     LED_Init();
 
     Button_Init();
-
+#endif // FINAL
 }
 
 void Button_Click_CallBack() {
     LOG_D("Button Pressed\r\n");
-    pkt_build(PKT_TYPE_NODE_BTN_PRESS);
+    pkt_build(PKT_TYPE_NODE_BTN_PRESS,0);
 
 }
 
@@ -964,9 +963,10 @@ int main(void) {
     LOG_D("Ram Size : %d byte %d Word \r\n", sizeof(APP), sizeof(APP)/4+1);
     LOG_D("%s Addr : %s\r\n", LOG_PUSH(APP.dev.name), STR_PUSH(APP.dev.my_addr.addr, 1));
     
+    nrf_delay_ms(100);
+
     advertising_start();
     APP_ERROR_CHECK(err_code);
-    
        
 #ifdef FINAL
     if(Fuel_Gauge_Config()) {
@@ -991,14 +991,14 @@ int main(void) {
             if (LED_Control(PKT.rx_p.pkt[PKT.rx_p.proc_cnt - 1].data.p_data)) {
                 //  TODO : IF success
             }
-            pkt_build(PKT_TYPE_NODE_LED_RESPONSE);
+            pkt_build(PKT_TYPE_NODE_LED_RESPONSE,0);
             flagLED = false;
         }
 
         pkt_send(&m_cen_s);
         if (NRF_LOG_PROCESS() == false) {
-            sleep_mode_enter();
-//            power_manage();
+//            sleep_mode_enter();
+            power_manage();
         }
     }
 }

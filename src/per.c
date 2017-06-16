@@ -32,63 +32,65 @@ void pkt_interpret(per_t *p_per) {
                 LOG_E("Network not discovered\r\n");
                 return;
             }
-            pkt_build(CEN_BUILD_PACKET_ROUTE);
-        }
-                
-        switch (rxp->header.type) {
-            case PKT_TYPE_NET_SCAN_REQUEST:
-                if (APP.dev.my_id == 0) {
-                    LOG_D("Device ID not set!\r\n");
-                    app_dev_parent_set(&APP.dev.conn_cen);
-                    if (memcmp(APP.dev.my_addr.addr, rxp->data.p_data, BLE_GAP_ADDR_LEN)) {
-                        LOG_E("WRONG Device ADDR!!\r\n");
-                        break;
-                    } else {
-                        APP.dev.my_id = rxp->header.target.node; //ID SETTING
-                        LOG_I("Device ID SET : %d !!\r\n", APP.dev.my_id);
-                        LOG_I("Network Not Discovered.\r\n");
+            pkt_build(CEN_BUILD_PACKET_ROUTE,0);
+        } else {
+            switch (rxp->header.type) {
+                case PKT_TYPE_NET_SCAN_REQUEST:
+                    if (APP.dev.my_id == 0) {
+                        LOG_D("Device ID not set!\r\n");
+                        app_dev_parent_set(&APP.dev.conn_cen);
+                        if (memcmp(APP.dev.my_addr.addr, rxp->data.p_data, BLE_GAP_ADDR_LEN)) {
+                            LOG_E("WRONG Device ADDR!!\r\n");
+                            break;
+                        } else {
+                            APP.dev.my_id = rxp->header.target.node; //ID SETTING
+                            LOG_I("Device ID SET : %d !!\r\n", APP.dev.my_id);
+                            LOG_I("Network Not Discovered.\r\n");
+                        }
+                    } else if (APP.dev.my_id == rxp->header.target.node) {
+                        APP.net.discovered = APP_NET_DISCOVERED_FALSE;
+                        LOG_I("Network Re-Scan Initialized.\r\n");
                     }
-                } else if (APP.dev.my_id == rxp->header.target.node) {
-                    APP.net.discovered = APP_NET_DISCOVERED_FALSE;
-                    LOG_I("Network Re-Scan Initialized.\r\n");
-                }
-                scan_start();
-                break;
-                
-                case PKT_TYPE_NODE_LED_REQUEST:
-                    LOG_D("LED Request \r\n");
-                    flagLED = true; // PKT_BUILD -> MAIN LOOP
+                    scan_start();
+                    break;
+                    
+                    case PKT_TYPE_NODE_LED_REQUEST:
+                        LOG_D("LED Request \r\n");
+                        flagLED = true; // PKT_BUILD -> MAIN LOOP
+                        break;
+
+                case PKT_TYPE_NET_PATH_UPDATE:
+                    if (!APP.net.discovered) {
+                        LOG_E("Network not discovered\r\n");
+                        break;
+                    }
+    ///////////////////////////////////////////////////////////
+                    LOG_D("PATH UPDATING!\r\n");
+                    pkt_build(PKT_TYPE_NET_PATH_UPDATE_RESPONSE,0);
                     break;
 
-            case PKT_TYPE_NET_PATH_UPDATE:
-                if (!APP.net.discovered) {
-                    LOG_E("Network not discovered\r\n");
+                case PKT_TYPE_NET_ACK_REQUEST:
+                    if (!APP.net.discovered) {
+                        LOG_E("Network not discovered\r\n");
+                        break;
+                    }
+    ///////////////////////////////////////////////////////////
+                    LOG_D("ACK REQUEST!\r\n");
+                    pkt_build(PKT_TYPE_NET_ACK_RESPONSE,0);
                     break;
-                }
-///////////////////////////////////////////////////////////
-                LOG_D("PATH UPDATING!\r\n");
-                pkt_build(PKT_TYPE_NET_PATH_UPDATE_RESPONSE);
-                break;
 
-            case PKT_TYPE_NET_ACK_REQUEST:
-                if (!APP.net.discovered) {
-                    LOG_E("Network not discovered\r\n");
+                default:
                     break;
-                }
-///////////////////////////////////////////////////////////
-                LOG_D("ACK REQUEST!\r\n");
-                pkt_build(PKT_TYPE_NET_ACK_RESPONSE);
-                break;
-
-            default:
-                break;
+            }
         }
-        
+        app_fds_save();
         per_value_reset(p_per);
         per_result_update(p_per, PKT_RSLT_INTERPRET_OK);
         PKT.rx_p.proc_cnt++;
         PKT.rx_p.proc = false;
-        nrf_delay_ms(500);
+        
+        nrf_delay_ms(100);
+        
     }
 }
 
@@ -114,9 +116,9 @@ static void header_parser(ble_gatts_value_t *rx_data) {
     pheader->source.sensor = rx_data->p_value[4];
     pheader->target.node = rx_data->p_value[5];
     pheader->target.sensor = rx_data->p_value[6];
-    LOG_D("Header TYPE : %02x INDEX : %02x / %02x\r\n", pheader->type, pheader->index.err, pheader->index.total);
-    LOG_D("Header SOURCE : %02x - %02x\r\n", pheader->source.node, pheader->source.sensor);
-    LOG_D("Header TARGET : %02x - %02x\r\n", pheader->target.node, pheader->target.sensor);
+//    LOG_D("Header TYPE : %02x INDEX : %02x / %02x\r\n", pheader->type, pheader->index.err, pheader->index.total);
+//    LOG_D("Header SOURCE : %02x - %02x\r\n", pheader->source.node, pheader->source.sensor);
+//    LOG_D("Header TARGET : %02x - %02x\r\n", pheader->target.node, pheader->target.sensor);
 
     PKT.rx_p.header_cnt++;
 }
@@ -125,7 +127,7 @@ static void data_1_parser(ble_gatts_value_t *rx_data) {
     uint8_t *pdata = PKT.rx_p.pkt[PKT.rx_p.data_cnt].data.p_data;
     memcpy(&pdata[0], rx_data->p_value, rx_data->len);
 
-    LOG_D("Data 1: %s\r\n", VSTR_PUSH(pdata, 20, 0));
+//    LOG_D("Data 1: %s\r\n", VSTR_PUSH(pdata, 20, 0));
 
     data_cnt_chk(&PKT.rx_p.data_cnt, 1);
 }
@@ -135,7 +137,7 @@ static void data_2_parser(ble_gatts_value_t *rx_data) {
     uint8_t *pdata = PKT.rx_p.pkt[PKT.rx_p.data_cnt].data.p_data;
     memcpy(&pdata[20], rx_data->p_value, rx_data->len);
 
-    LOG_D("Data 2: %s\r\n", VSTR_PUSH(pdata, 40, 0));
+//    LOG_D("Data 2: %s\r\n", VSTR_PUSH(pdata, 40, 0));
 
     data_cnt_chk(&PKT.rx_p.data_cnt, 2);
 }
@@ -200,7 +202,7 @@ static void on_write(per_t *p_per, ble_evt_t *p_ble_evt) {
     } else if (p_evt_write->handle == p_per->result_hdlrs.cccd_handle) {
         gatts_value_get(p_per, p_per->result_hdlrs.cccd_handle, &rx_data);
         p_per->notification = true;
-        LOG_D("NOTIFICATION ENABLED BY CENTRAL!!\r\n");
+//        LOG_D("NOTIFICATION ENABLED BY CENTRAL!!\r\n");
 
         per_result_update(p_per, PKT_RSLT_IDLE);
     }
@@ -214,7 +216,7 @@ void app_per_evt(per_t *p_per, ble_evt_t *p_ble_evt) {
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
-          LOG_D("RESETTING Peripheral\r\n");
+            LOG_D("RESETTING Peripheral\r\n");
             memset(&APP.dev.conn_cen, 0, sizeof(ble_gap_addr_t));
             p_per->notification = false;
             p_per->conn_handle = BLE_CONN_HANDLE_INVALID;
@@ -304,8 +306,8 @@ uint32_t per_init(per_t *p_per) {
     err_code = per_char_add(p_per, CMDS_RESULT_UUID, RESULT_LEN, &p_per->result_hdlrs);
     ERR_CHK("Result Char init");
 
-    LOG_D("BEF - HEADER :%02x, DATA_1 :%02x, DATA_2 :%02x\r\n",p_per->header_hdlrs.value_handle, p_per->data_1_hdlrs.value_handle,p_per->data_2_hdlrs.value_handle);
-    LOG_D("RESULT :%02x , CCCD : %02x\r\n", p_per->result_hdlrs.value_handle, p_per->result_hdlrs.cccd_handle);
+//    LOG_D("HEADER :%02x, DATA_1 :%02x, DATA_2 :%02x\r\n",p_per->header_hdlrs.value_handle, p_per->data_1_hdlrs.value_handle,p_per->data_2_hdlrs.value_handle);
+//    LOG_D("RESULT :%02x , CCCD : %02x\r\n", p_per->result_hdlrs.value_handle, p_per->result_hdlrs.cccd_handle);
 
     return NRF_SUCCESS;
 }

@@ -17,7 +17,6 @@ uint32_t cen_header_update(cen_t *p_cen, p_header *header) {
 
 uint32_t cen_data_1_update(cen_t *p_cen, p_data *data) {
     uint8_t buff[20];
-  
     memcpy(buff, &data->p_data[0], sizeof(buff));
     return cen_value_update(p_cen, &p_cen->hdlrs.data_1_hdlr, buff, sizeof(buff));
 }
@@ -28,7 +27,35 @@ uint32_t cen_data_2_update(cen_t *p_cen, p_data *data) {
     return cen_value_update(p_cen, &p_cen->hdlrs.data_2_hdlr, buff, sizeof(buff));
 }
 
+static void next_pkt_chk(void) {
+    PKT.tx_p.tx_que[PKT.tx_p.proc_cnt] = CEN_TXP_QUEUE_UNAVAILABLE;
+    PKT.tx_p.proc_cnt++;
+    if (PKT.tx_p.tx_que[PKT.tx_p.proc_cnt] == CEN_TXP_QUEUE_UNAVAILABLE) {
+        PKT.tx_p.proc = false;
+    }
+}
+
+static void pkt_send_err(p_pkt *txp, ble_gap_addr_t *target_addr) {
+    ble_gap_addr_t *cmp_addr = get_node(&txp->header.target.node,1,0);
+    if (!memcmp(cmp_addr->addr, target_addr->addr, BLE_GAP_ADDR_LEN)) {
+        pkt_build(CEN_SEND_TARGET_ERROR,0);
+    } else {
+        pkt_build(CEN_SEND_ROUTE_ERROR,target_addr->addr);
+    }
+}
+
+ble_gap_addr_t* retrieve_send_addr(p_pkt *txp) {
+    ble_gap_addr_t *target_addr = retrieve_send(&txp->header.target.node,1,0);
+    
+    if (!target_addr && txp->header.type == PKT_TYPE_NET_SCAN_REQUEST){
+        target_addr = get_node(txp->data.p_data,0,1);
+    }
+    
+    return target_addr;
+}
+
 void pkt_send(cen_t *p_cen) {
+    static uint32_t req_cnt=0;
     uint32_t err_code;
 
 //    LOG_I("txp, rxp,%d,%d \r\n",PKT.tx_p.proc_cnt, PKT.rx_p.proc_cnt);
@@ -37,23 +64,28 @@ void pkt_send(cen_t *p_cen) {
 
         p_pkt *txp = &PKT.tx_p.pkt[PKT.tx_p.proc_cnt];
         ble_gap_addr_t *target_addr;
+        
+        LOG_D("PACKET TXPh : %s, \r\n", VSTR_PUSH((uint8_t *) &txp->header, HEADER_LEN, 0));
+        LOG_D("PACKET TXPd : %s, \r\n", VSTR_PUSH((uint8_t *) &txp->data, DATA_LEN, 0));
+        
         if (p_cen->conn_handle == BLE_CONN_HANDLE_INVALID) {
-            
-            target_addr = retrieve_send(&txp->header.target.node,1,0);
-            
-            if(target_addr) {
-                LOG_I("[] TARGET %s, type: %d\r\n", STR_PUSH(target_addr->addr, 1),target_addr->addr_type);
-            }
-            
-            if (!target_addr && txp->header.type == PKT_TYPE_NET_SCAN_REQUEST){
-                LOG_I("ID NOT FOUND\r\n");
-                target_addr = get_node(txp->data.p_data,0,1);
-            }
+            target_addr = retrieve_send_addr(txp);
 
+            if(req_cnt >= 3) {
+                req_cnt=0;
+                err_code = sd_ble_gap_connect_cancel();
+                ERR_CHK("Connection Request Failed");
+                nrf_delay_ms(100);
+                pkt_send_err(txp,target_addr);
+                return;
+            }
+            
             if (target_addr) {
-                LOG_I("WAIT FOR PERIPHERAL - TARGET %s, type: %d\r\n", STR_PUSH(target_addr->addr, 1),target_addr->addr_type);
+                LOG_I("WAIT FOR PER - TARGET %s TRIAL %dth\r\n", STR_PUSH(target_addr->addr, 1),req_cnt);
                 err_code = sd_ble_gap_connect(target_addr, &m_scan_params, &m_connection_param);
                 ERR_CHK("Connection Request Failed");
+                req_cnt++;
+                nrf_delay_ms(400);
                 return;
             }
 
@@ -115,11 +147,7 @@ void pkt_send(cen_t *p_cen) {
             LOG_I("WAIT FOR PACKET INTERPRETING\r\n");
             return;
         } else if (p_cen->state.interpret) {
-            PKT.tx_p.tx_que[PKT.tx_p.proc_cnt] = CEN_TXP_QUEUE_UNAVAILABLE;
-            PKT.tx_p.proc_cnt++;
-            if (PKT.tx_p.tx_que[PKT.tx_p.proc_cnt] == CEN_TXP_QUEUE_UNAVAILABLE) {
-                PKT.tx_p.proc = false;
-            }
+            next_pkt_chk();
             
             (void) sd_ble_gap_adv_stop();
             
@@ -127,6 +155,8 @@ void pkt_send(cen_t *p_cen) {
             
             uint32_t err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
             APP_ERROR_CHECK(err_code);
+            
+            app_fds_save();
 
             nrf_delay_ms(100);
             
@@ -140,7 +170,6 @@ void pkt_send(cen_t *p_cen) {
 
 }
 
-//Function name Rename
 void scan_res_builder(uint8_t *p_data) {
     uint8_t p_idx = 0;
     uint8_t unit = BLE_GAP_ADDR_LEN + sizeof(uint8_t);
@@ -166,42 +195,67 @@ void pkt_base(p_pkt *txp, uint8_t build_type) {
     txp->header.target.sensor = 0;
 }
 
-void pkt_build(uint8_t build_type) {
+void pkt_err_base(p_pkt *txp, uint8_t build_type) {
+    txp->header.type ++; // Req => Res Packet
+    txp->header.index.err = build_type;
+    txp->header.source = txp->header.target;
+    txp->header.target.node = APP.dev.root_id;
+    txp->header.target.sensor = 0;
+}
+
+void pkt_build(uint8_t build_type, uint8_t *p_data) {
     p_pkt *txp = &PKT.tx_p.pkt[PKT.tx_p.pkt_cnt];
     p_pkt *rxp = &PKT.rx_p.pkt[PKT.rx_p.proc_cnt];
 
     LOG_I("PACKET BUILD TXP : %d, RXP : %d, \r\n", PKT.tx_p.pkt_cnt, PKT.rx_p.proc_cnt);
-
-    if (build_type == CEN_BUILD_PACKET_ROUTE) {
-        memcpy(&txp->header, &rxp->header, HEADER_LEN);
-        memcpy(&txp->data, &rxp->data, MAX_PKT_DATA_LEN);
-
-        LOG_I("PACKET Route RXPh : %s, TXPh : %s, \r\n", VSTR_PUSH((uint8_t *) &rxp->header, HEADER_LEN, 0),
-              VSTR_PUSH((uint8_t *) &txp->header, HEADER_LEN, 0));
-        LOG_I("PACKET Route RXPd : %s, TXPd : %s, \r\n", VSTR_PUSH((uint8_t *) &rxp->data, DATA_LEN, 0),
-              VSTR_PUSH((uint8_t *) &txp->data, DATA_LEN, 0));
-    } else {
-        pkt_base(txp, build_type);
-        uint8_t data_len = 0;
+    
+    switch(build_type){
+        case CEN_BUILD_PACKET_ROUTE:
+            memcpy(&txp->header, &rxp->header, HEADER_LEN);
+            memcpy(&txp->data, &rxp->data, MAX_PKT_DATA_LEN);
+            break;
         
-        switch (build_type) {
-            case PKT_TYPE_NET_SCAN_RESPONSE:
-                data_len = (int) ceil((float) APP.net.node.cnt * 8 / DATA_LEN);
-                txp->header.index.total = (data_len == 0) ? 1 : data_len;
-                scan_res_builder(txp->data.p_data);
-                break;
-            
-            case PKT_TYPE_NODE_LED_RESPONSE:
-            case PKT_TYPE_NODE_BTN_PRESS:
-            case PKT_TYPE_NET_PATH_UPDATE_RESPONSE:
-            case PKT_TYPE_NET_ACK_RESPONSE:
-                txp->header.index.total = 1;
-                txp->data.p_data[0] = PKT_DATA_SUCCESS;
-                break;
+        case CEN_SEND_TARGET_ERROR:
+            memcpy(&txp->header, &(rxp-1)->header, HEADER_LEN); //Prev RxP Packet
+            pkt_err_base(txp, build_type);
+            return; // Must Return for Overwritng Idx
+                
+        case CEN_SEND_ROUTE_ERROR:
+            memcpy(&txp->header, &(rxp-1)->header, HEADER_LEN); //Prev RxP Packet
+            pkt_err_base(txp, build_type);
+            memcpy(&txp->data.p_data, p_data, BLE_GAP_ADDR_LEN);
 
-            default:
-                break;
-        }
+            LOG_D("PACKET Route ERR RXPh : %s, TXPh : %s, \r\n", VSTR_PUSH((uint8_t *) &(rxp-1)->header, HEADER_LEN, 0),
+                  VSTR_PUSH((uint8_t *) &txp->header, HEADER_LEN, 0));
+            LOG_D("PACKET Route ERR RXPd : %s, TXPd : %s, \r\n", VSTR_PUSH((uint8_t *) &(rxp-1)->data, DATA_LEN, 0),
+                  VSTR_PUSH((uint8_t *) &txp->data, DATA_LEN, 0));
+            return; // Must Return for Overwritng Idx
+        
+
+        default:
+            pkt_base(txp, build_type);
+            uint8_t data_len = 0;
+            
+            switch (build_type) {
+                case PKT_TYPE_NET_SCAN_RESPONSE:
+                    data_len = (int) ceil((float) APP.net.node.cnt * 8 / DATA_LEN);
+                    txp->header.index.total = (data_len == 0) ? 1 : data_len;
+                    scan_res_builder(txp->data.p_data);
+                    break;
+                
+                case PKT_TYPE_NODE_LED_RESPONSE:
+                case PKT_TYPE_NODE_BTN_PRESS:
+                case PKT_TYPE_NET_PATH_UPDATE_RESPONSE:
+                case PKT_TYPE_NET_ACK_RESPONSE:
+                    txp->header.index.total = 1;
+                    txp->data.p_data[0] = PKT_DATA_SUCCESS;
+                    break;
+
+                default:
+                    break;
+            }
+            break;
+                
     }
     PKT.tx_p.proc = true;
     PKT.tx_p.tx_que[PKT.tx_p.que_idx] = PKT.tx_p.pkt_cnt;

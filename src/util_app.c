@@ -37,11 +37,11 @@ int8_t get_id_idx(uint8_t *id) {
     }
     for (int i = 0; i < APP.net.node.cnt; i++) {
         if (!memcmp(&APP.net.node.peer[i].id, id, sizeof(uint8_t))) {
-            LOG_D("ID FOUND! idx :%d \r\n",i);
+//            LOG_D("ID FOUND! idx :%d \r\n",i);
             return i;
         }
     }
-    LOG_D("ID NOT FOUND!\r\n");
+    LOG_D("[GET ID] %d NOT FOUND!\r\n",*id);
     return NODE_ID_NOT_FOUND;
 }
 
@@ -71,9 +71,7 @@ ble_gap_addr_t *retrieve_send(uint8_t *p_data, bool id, bool addr) {
         if (peer[idx].disc){
             return &peer[idx].p_addr;
         } else {
-            LOG_I("Not Found Dev! Retrieve Path : %d \r\n", peer[idx].path[0]);
-            int path_idx = get_id_idx(&peer[idx].path[0]);
-            return &peer[path_idx].p_addr;
+            return retrieve_send(&peer[idx].path[0],1,0);
         }
     }
 }
@@ -239,7 +237,7 @@ static ret_code_t app_fds_write(void) {
     if (ret != FDS_SUCCESS) {
         return ret;
     }
-    LOG_D("Writing Record ID = %d \r\n", record_desc.record_id);
+//    LOG_D("Writing Record ID = %d \r\n", record_desc.record_id);
     return NRF_SUCCESS;
 }
 
@@ -260,7 +258,7 @@ ret_code_t app_fds_read(void) {
         data = (uint32_t *) flash_record.p_data;
         memcpy(&APP, data, sizeof(APP));
 
-        LOG_D("[Saved] %s Addr : %s\r\n", LOG_PUSH(APP.dev.name), STR_PUSH(APP.dev.my_addr.addr, 1));
+        LOG_D("[NET : %d] %s Addr : %s\r\n", APP.net.established ,LOG_PUSH(APP.dev.name), STR_PUSH(APP.dev.my_addr.addr, 1));
         // Access the record through the flash_record structure.
         // Close the record when done.
         err_code = fds_record_close(&record_desc);
@@ -281,7 +279,7 @@ static ret_code_t app_fds_find_and_delete(void) {
     // Loop and find records with same ID and rec key and mark them as deleted.
     while (fds_record_find(APP_FILE_ID, APP_REC_KEY, &record_desc, &ftok) == FDS_SUCCESS) {
         fds_record_delete(&record_desc);
-        LOG_D("Deleted record ID: %d \r\n", record_desc.record_id);
+//        LOG_D("Deleted record ID: %d \r\n", record_desc.record_id);
     }
     // call the garbage collector to empty them, don't need to do this all the time, this is just for demonstration
     ret_code_t ret = fds_gc();

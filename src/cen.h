@@ -11,7 +11,13 @@
 #include "app_error.h"
 #include "util.h"
 
+#define CEN_MAX_REQ_CNT 50
+
+#define CEN_SEND_TARGET_ERROR 240
+#define CEN_SEND_ROUTE_ERROR 241
 #define CEN_BUILD_PACKET_ROUTE 3
+
+
 
 #define CEN_TXP_QUEUE_UNAVAILABLE -1
 
@@ -45,7 +51,7 @@ void cen_on_db_disc_evt(cen_t *p_cen, ble_db_discovery_evt_t *p_evt);
 
 void app_cen_evt(cen_t *p_cen, const ble_evt_t *p_ble_evt);
 
-void pkt_build(uint8_t build_cmd);
+void pkt_build(uint8_t build_type, uint8_t *p_data);
 
 void pkt_send(cen_t *p_cen);
 
