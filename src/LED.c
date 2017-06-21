@@ -17,11 +17,11 @@ void pwm_ready_callback(uint32_t pwm_id)    // PWM callback function
 }
 
 ret_code_t LED_Init(){
-	
-		ret_code_t err_code;
-	
+    
+        ret_code_t err_code;
+    
 
-		/* 2-channel PWM, 200Hz, output on DK LED pins. */
+        /* 2-channel PWM, 200Hz, output on DK LED pins. */
     app_pwm_config_t pwm1_cfg = APP_PWM_DEFAULT_CONFIG_2CH(5000L, Red, Green);
 
     /* Switch the polarity of the second channel. */
@@ -34,7 +34,7 @@ ret_code_t LED_Init(){
         return err_code;
     }
 
-	 /* 2-channel PWM, 200Hz, output on DK LED pins. */
+     /* 2-channel PWM, 200Hz, output on DK LED pins. */
     app_pwm_config_t pwm2_cfg = APP_PWM_DEFAULT_CONFIG_1CH(5000L, Blue);
 
     /* Switch the polarity of the second channel. */
@@ -46,40 +46,40 @@ ret_code_t LED_Init(){
         return err_code;
     }
 
-		return err_code;
+        return err_code;
 }
 
 void LED_Not_Enough(void){
-	app_pwm_enable(&battery);
-	while (app_pwm_channel_duty_set(&battery, 0, 25) == NRF_ERROR_BUSY);
-	while (!ready_flag);
-	nrf_delay_ms(500);
-	app_pwm_disable(&battery);
+    app_pwm_enable(&battery);
+    while (app_pwm_channel_duty_set(&battery, 0, 25) == NRF_ERROR_BUSY);
+    while (!ready_flag);
+    nrf_delay_ms(500);
+    app_pwm_disable(&battery);
 }
 void LED_Charging(void){
-	LED_Not_Enough();
+    LED_Not_Enough();
 }
 void LED_Enough(void){
-	app_pwm_enable(&battery);
-	while (app_pwm_channel_duty_set(&battery, 1, 25) == NRF_ERROR_BUSY);
-	while (!ready_flag);
-	nrf_delay_ms(1000);
-	app_pwm_disable(&battery);
+    app_pwm_enable(&battery);
+    while (app_pwm_channel_duty_set(&battery, 1, 25) == NRF_ERROR_BUSY);
+    while (!ready_flag);
+    nrf_delay_ms(1000);
+    app_pwm_disable(&battery);
 }
 
 void LED_Not_Connect(void){
-	app_pwm_enable(&connect);
-	while (app_pwm_channel_duty_set(&connect, 0, 25) == NRF_ERROR_BUSY);
-	while (!ready_flag);
-	nrf_delay_ms(500);
-	app_pwm_disable(&connect);
+    app_pwm_enable(&connect);
+    while (app_pwm_channel_duty_set(&connect, 0, 25) == NRF_ERROR_BUSY);
+    while (!ready_flag);
+    nrf_delay_ms(500);
+    app_pwm_disable(&connect);
 }
 void LED_Connect(void){
-	app_pwm_enable(&battery);
-	while (app_pwm_channel_duty_set(&battery, 1, 25) == NRF_ERROR_BUSY);
-	while (!ready_flag);
-	nrf_delay_ms(500);
-	app_pwm_disable(&battery);
+    app_pwm_enable(&battery);
+    while (app_pwm_channel_duty_set(&battery, 1, 25) == NRF_ERROR_BUSY);
+    while (!ready_flag);
+    nrf_delay_ms(500);
+    app_pwm_disable(&battery);
 }
 
 bool LED_Control(char* string){

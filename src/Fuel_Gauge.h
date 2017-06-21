@@ -8,7 +8,7 @@
 #include "nrf_delay.h"
 #include "nrf_drv_gpiote.h"
 
-#define GPOUT_PIN 28
+
 
 #define BQ72441_I2C_ADDRESS 0x55 // Default I2C address of the BQ27441-G1A
 #define BQ72441_I2C_TIMEOUT 2000
@@ -176,6 +176,10 @@ typedef enum {
 	SOC_INIT = 0,
 	BAT_LOW
 }gpout_function;
+
+
+//bool checkLowPower(void);
+//bool checkCharger(void);
 
 ret_code_t Fuel_Gauge_Init(void);
 bool Fuel_Gauge_Config(void);

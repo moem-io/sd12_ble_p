@@ -13,6 +13,28 @@ static const unsigned int BATTERY_CAPACITY = 400; // e.g. 400mAh battery
 static const uint8_t SOCI_SET = 15; // Interrupt set threshold at 20%
 static const uint8_t SOCI_CLR = 20; // Interrupt clear threshold at 25%
 
+//static void in_pin_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action){
+//	if(pin == pinGPOUT){
+//		if(action == GPIOTE_CONFIG_POLARITY_Toggle){
+//			Low_Battery_CallBack();
+//		}
+//	}else if(pin == pinCHG){
+//		if(action == GPIOTE_CONFIG_POLARITY_Toggle){
+//			Charger_Battery_CallBack();
+//		}
+//	}
+//}
+
+//bool checkLowPower(void){
+//	nrf_delay_ms(10);
+//	return nrf_gpio_pin_read(pinGPOUT);
+//}
+
+//bool checkCharger(void){
+//	nrf_delay_ms(10);
+//	return nrf_gpio_pin_read(pinCHG);
+//}
+
 /**
  * @brief I2C events handler.
  */
@@ -32,7 +54,7 @@ void twi_handler(nrf_drv_twi_evt_t const * p_event, void * p_context){
 }
 
 ret_code_t Fuel_Gauge_Init(void){
-	ret_code_t error_code;
+	ret_code_t err_code;
 
 	const nrf_drv_twi_config_t twi_bq27441_config = {
 		 .scl                = ARDUINO_SCL_PIN,
@@ -42,11 +64,41 @@ ret_code_t Fuel_Gauge_Init(void){
 		 .clear_bus_init     = false
 	};
 
-	error_code = nrf_drv_twi_init(&m_twi, &twi_bq27441_config, twi_handler, NULL);
+	err_code = nrf_drv_twi_init(&m_twi, &twi_bq27441_config, twi_handler, NULL);
+	if(err_code != NRF_SUCCESS){
+		return err_code;
+	}
 
 	nrf_drv_twi_enable(&m_twi);
 	
-	return error_code;
+	if(!nrf_drv_gpiote_is_init()){
+		err_code = nrf_drv_gpiote_init();
+		if(err_code != NRF_SUCCESS){
+			return err_code;
+		}
+	}
+	
+//	nrf_drv_gpiote_in_config_t in_config_gpout = GPIOTE_CONFIG_IN_SENSE_TOGGLE(true);
+//	in_config_gpout.pull = NRF_GPIO_PIN_PULLUP;
+
+//	err_code = nrf_drv_gpiote_in_init(pinGPOUT, &in_config_gpout, in_pin_handler);
+//	if(err_code != NRF_SUCCESS){
+//		return err_code;
+//	}
+
+//	nrf_drv_gpiote_in_config_t in_config_chg = GPIOTE_CONFIG_IN_SENSE_TOGGLE(true);
+//	in_config_chg.pull = NRF_GPIO_PIN_PULLUP;
+
+//	err_code = nrf_drv_gpiote_in_init(pinCHG, &in_config_chg, in_pin_handler);
+//	if(err_code != NRF_SUCCESS){
+//		return err_code;
+//	}
+
+//	nrf_drv_gpiote_in_event_enable(pinGPOUT, true);
+//	
+//	nrf_drv_gpiote_in_event_enable(pinCHG, true);
+//	
+	return err_code;
 
 }
 
@@ -128,16 +180,6 @@ static bool FG_setGPOUT_Polarity(signal sig){
 	ret_code_t error_code;
 	
 	uint16_t oldOpConfig = opConfig();
-	
-	nrf_drv_gpiote_in_config_t in_config = GPIOTE_CONFIG_IN_SENSE_HITOLO(true);
-	in_config.pull = NRF_GPIO_PIN_PULLUP;
-
-	error_code = nrf_drv_gpiote_in_init(GPOUT_PIN, &in_config, NULL);
-	if(error_code != NRF_SUCCESS){
-		return false;
-	}
-
-	nrf_drv_gpiote_in_event_enable(GPOUT_PIN, true);
 	
 	// Check to see if we need to update opConfig:
 	if ((sig && (oldOpConfig & BQ27441_OPCONFIG_GPIOPOL)) ||
