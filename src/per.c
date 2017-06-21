@@ -3,7 +3,10 @@
 
 #define NRF_LOG_MODULE_NAME "[per]"
 
+extern uint8_t tmp_addr[BLE_GAP_ADDR_LEN];
+
 extern volatile bool flagLED;
+extern volatile bool tgt_scan;
 
 static void  per_value_reset(per_t *p_per);
 static uint32_t per_char_reset(per_t *p_per, ble_gatts_char_handles_t *data_handle, uint8_t *p_string, uint16_t length);
@@ -21,11 +24,12 @@ void pkt_interpret(per_t *p_per) {
         memcpy(buff2, &rxp->data, sizeof(buff2));
 
         LOG_D("[%d]th PACKET INTERPRET\r\n", PKT.rx_p.proc_cnt);
-        LOG_D(" Header : %.14s\r\n", STR_PUSH(buff1, 0));
+        LOG_D(" Header : %.24s\r\n", STR_PUSH(buff1, 0));
         LOG_D(" DATA : %.28s\r\n", STR_PUSH(buff2, 0));
         
         update_node(rxp);
-
+        LOG_D("PACKET %d!\r\n",rxp->header.target.node);
+        
         if(APP.dev.my_id != 0 && APP.dev.my_id != rxp->header.target.node) {
             LOG_D("PACKET ROUTE!\r\n");
             if (!APP.net.discovered) {
@@ -34,51 +38,73 @@ void pkt_interpret(per_t *p_per) {
             }
             pkt_build(CEN_BUILD_PACKET_ROUTE,0);
         } else {
+            app_dev_parent_set(&APP.dev.conn_cen);
+
             switch (rxp->header.type) {
-                case PKT_TYPE_NET_SCAN_REQUEST:
+                case PKT_TYPE_NET_SCAN_REQ:{
                     if (APP.dev.my_id == 0) {
-                        LOG_D("Device ID not set!\r\n");
-                        app_dev_parent_set(&APP.dev.conn_cen);
                         if (memcmp(APP.dev.my_addr.addr, rxp->data.p_data, BLE_GAP_ADDR_LEN)) {
                             LOG_E("WRONG Device ADDR!!\r\n");
                             break;
                         } else {
                             APP.dev.my_id = rxp->header.target.node; //ID SETTING
                             LOG_I("Device ID SET : %d !!\r\n", APP.dev.my_id);
-                            LOG_I("Network Not Discovered.\r\n");
                         }
                     } else if (APP.dev.my_id == rxp->header.target.node) {
                         APP.net.discovered = APP_NET_DISCOVERED_FALSE;
                         LOG_I("Network Re-Scan Initialized.\r\n");
                     }
                     scan_start();
-                    break;
+                }break;
                     
-                    case PKT_TYPE_NODE_LED_REQUEST:
-                        LOG_D("LED Request \r\n");
-                        flagLED = true; // PKT_BUILD -> MAIN LOOP
-                        break;
+                case PKT_TYPE_SNSR_STATE_RES:{
+                    
+                }break;
+                    
+                case PKT_TYPE_SNSR_DATA_REQ:{
+                }break;
 
-                case PKT_TYPE_NET_PATH_UPDATE:
+                case PKT_TYPE_SNSR_ACT_RES:{
+                }break;
+                case PKT_TYPE_SNSR_CMD_REQ:{
+                }break;
+                case PKT_TYPE_NODE_STAT_REQ:{
+                }break;                   
+                case PKT_TYPE_NODE_LED_REQ:{
+                    LOG_D("LED Request \r\n");
+                    flagLED = true; // PKT_BUILD -> MAIN LOOP
+                    pkt_build(PKT_TYPE_NODE_LED_RES,0);
+                }break;
+                case PKT_TYPE_NODE_BTN_PRESS_RES:{
+                    LOG_D("OK\r\n");
+                } break;
+                case PKT_TYPE_NET_PATH_UPDATE_REQ:{
                     if (!APP.net.discovered) {
                         LOG_E("Network not discovered\r\n");
                         break;
                     }
     ///////////////////////////////////////////////////////////
                     LOG_D("PATH UPDATING!\r\n");
-                    pkt_build(PKT_TYPE_NET_PATH_UPDATE_RESPONSE,0);
-                    break;
+                    pkt_build(PKT_TYPE_NET_PATH_UPDATE_RES,0);
+                }break;
 
-                case PKT_TYPE_NET_ACK_REQUEST:
+                case PKT_TYPE_NET_ACK_REQ:{
                     if (!APP.net.discovered) {
                         LOG_E("Network not discovered\r\n");
                         break;
                     }
     ///////////////////////////////////////////////////////////
                     LOG_D("ACK REQUEST!\r\n");
-                    pkt_build(PKT_TYPE_NET_ACK_RESPONSE,0);
-                    break;
-
+                    pkt_build(PKT_TYPE_NET_ACK_RES,0);
+                }break;
+                
+                case PKT_TYPE_NET_JOIN_RES:{
+                }break;
+                case PKT_TYPE_SCAN_TGT_REQ:{
+                    memcpy(tmp_addr, rxp->data.p_data, BLE_GAP_ADDR_LEN);
+                    tgt_scan = true;
+                    scan_start();
+                }break;
                 default:
                     break;
             }
@@ -96,9 +122,9 @@ void pkt_interpret(per_t *p_per) {
 
 static void data_cnt_chk(uint8_t *pkt_type, uint8_t cnt) {
     p_header *pheader = &(PKT.rx_p.pkt[PKT.rx_p.header_cnt - 1].header);
-    LOG_D("PACKET DATA CHAR TOTAL : %d NOW : %d \r\n", pheader->index.total, cnt);
+    LOG_D("PACKET DATA CHAR TOTAL : %d NOW : %d \r\n", pheader->idx_tot, cnt);
 
-    if (pheader->index.total == cnt) {
+    if (pheader->idx_tot == cnt) {
         PKT.rx_p.data_cnt++;
         PKT.rx_p.pkt_cnt++;
         PKT.rx_p.proc = true;
@@ -110,13 +136,14 @@ static void header_parser(ble_gatts_value_t *rx_data) {
     p_header *pheader = &(PKT.rx_p.pkt[PKT.rx_p.header_cnt].header);
   
     pheader->type = rx_data->p_value[0];
-    pheader->index.err = rx_data->p_value[1];
-    pheader->index.total = rx_data->p_value[2];
+    pheader->err_type = rx_data->p_value[1];
+    pheader->idx_tot = rx_data->p_value[2];
     pheader->source.node = rx_data->p_value[3];
     pheader->source.sensor = rx_data->p_value[4];
     pheader->target.node = rx_data->p_value[5];
     pheader->target.sensor = rx_data->p_value[6];
-//    LOG_D("Header TYPE : %02x INDEX : %02x / %02x\r\n", pheader->type, pheader->index.err, pheader->index.total);
+    memcpy(&pheader->path,&rx_data->p_value[7],MAX_DEPTH_CNT);
+//    LOG_D("Header TYPE : %02x INDEX : %02x / %02x\r\n", pheader->type, pheader->err_type, pheader->idx_tot);
 //    LOG_D("Header SOURCE : %02x - %02x\r\n", pheader->source.node, pheader->source.sensor);
 //    LOG_D("Header TARGET : %02x - %02x\r\n", pheader->target.node, pheader->target.sensor);
 

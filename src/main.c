@@ -80,6 +80,9 @@ static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                        
 app_condition APP;
 app_packet PKT;
 
+gap_disc tmp_disc; //for SCAN TARGET
+uint8_t tmp_addr[BLE_GAP_ADDR_LEN];
+
 static per_t m_per_s;
 static cen_t m_cen_s;
 static ble_db_discovery_t m_ble_db_discovery;             /**< Instance of database discovery module. Must be passed to all db_discovert API calls */
@@ -88,6 +91,7 @@ APP_TIMER_DEF(m_single_timer);
 #define NET_DISC_TIMER_INTERVAL     APP_TIMER_TICKS(10000, APP_TIMER_PRESCALER) // 1000 ms intervals
 
 volatile bool flagLED = false;
+volatile bool tgt_scan = false;
 
 const ble_gap_conn_params_t m_connection_param =
     {
@@ -244,12 +248,6 @@ static void timers_init(void) {
     APP_ERROR_CHECK(err_code);
 }
 
-
-/**@brief Function for the GAP initialization.
- *
- * @details This function sets up all the necessary GAP (Generic Access Profile) parameters of the
- *          device including the device name, appearance, and the preferred connection parameters.
- */
 static void gap_params_init(void) {
     uint32_t err_code;
     ble_gap_conn_params_t gap_conn_params;
@@ -273,8 +271,6 @@ static void gap_params_init(void) {
     APP_ERROR_CHECK(err_code);
 }
 
-/**@brief Function for initializing services that will be used by the application.
- */
 static void services_init(void) {
     uint32_t err_code;
 
@@ -302,18 +298,10 @@ static void on_conn_params_evt(ble_conn_params_evt_t *p_evt) {
     }
 }
 
-
-/**@brief Function for handling a Connection Parameters error.
- *
- * @param[in] nrf_error  Error code containing information about what went wrong.
- */
 static void conn_params_error_handler(uint32_t nrf_error) {
     APP_ERROR_HANDLER(nrf_error);
 }
 
-
-/**@brief Function for initializing the Connection Parameters module.
- */
 static void conn_params_init(void) {
     uint32_t err_code;
     ble_conn_params_init_t cp_init;
@@ -333,31 +321,15 @@ static void conn_params_init(void) {
     APP_ERROR_CHECK(err_code);
 }
 
-
-/**@brief Function for handling database discovery events.
- *
- * @details This function is callback function to handle events from the database discovery module.
- *          Depending on the UUIDs that are discovered, this function should forward the events
- *          to their respective services.
- *
- * @param[in] p_event  Pointer to the database discovery event.
- */
 static void db_disc_handler(ble_db_discovery_evt_t *p_evt) {
     cen_on_db_disc_evt(&m_cen_s, p_evt);
 }
 
-
-/**
- * @brief Database discovery initialization.
- */
 static void db_discovery_init(void) {
     ret_code_t err_code = ble_db_discovery_init(db_disc_handler);
     APP_ERROR_CHECK(err_code);
 }
 
-
-/**@brief Function for starting scanning.
- */
 void scan_start(void) {
     ret_code_t err_code;
 
@@ -371,9 +343,6 @@ void scan_start(void) {
     LOG_I("Start Scanning\r\n");
 }
 
-
-/**@brief Function for starting advertising.
- */
 static void advertising_start(void) {
     uint32_t err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
     APP_ERROR_CHECK(err_code);
@@ -401,14 +370,12 @@ static void sleep_mode_enter(void) {
 
 //170228 [TODO] : IF NO NODE FOUND??
 // TODO: More Structured. Check if Duplicate Exists.
-void net_disc(const ble_evt_t *const p_ble_evt) {
-    gap_disc *node = &APP.net.node;
+void net_disc(gap_disc *node, const ble_evt_t *const p_ble_evt) {
     static int base_rssi[MAX_DISC_QUEUE];
 
     if (node->cnt < MAX_DISC_QUEUE) {
         const ble_gap_evt_adv_report_t *p_adv_report = &p_ble_evt->evt.gap_evt.params.adv_report;
         if (is_uuid_present(&m_cmds_uuid, p_adv_report)) {
-//      LOG_I("CMD SVC FOUND!!\r\n");
 
             for (int i = 0; i < node->cnt; i++) {
                 if (!memcmp(node->peer[i].p_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)) {
@@ -451,7 +418,6 @@ void node_disc_chk() {
     }
 }
 
-
 /**@brief Function for handling BLE Stack events concerning central applications.
  *
  * @details This function keeps the connection handles of central applications up-to-date. It
@@ -486,19 +452,40 @@ static void nrf_cen_evt(const ble_evt_t *const p_ble_evt) {
         }
             break; // BLE_GAP_EVT_DISCONNECTED
 
-        case BLE_GAP_EVT_ADV_REPORT: {
-            net_disc(p_ble_evt);
-        }
+        case BLE_GAP_EVT_ADV_REPORT: 
+            if(!tgt_scan){
+                net_disc(&APP.net.node, p_ble_evt);
+            } else {
+                memset(&tmp_disc,0,sizeof(tmp_disc));
+                net_disc(&tmp_disc,p_ble_evt);
+            }
             break; // BLE_GAP_ADV_REPORT
 
         case BLE_GAP_EVT_TIMEOUT: {
             if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_SCAN) {
-//                LOG_I("NET SCANNING TIMEOUT -- %d FOUND!!\r\n", APP.net.node.cnt);
-//                node_disc_chk();                    
-                LOG_I("NET Discovery Checked! -- %d FOUND!!\r\n", APP.net.node.cnt);
-                APP.net.discovered = APP_NET_DISCOVERED_TRUE;
+                if(!tgt_scan){
+//                    LOG_I("NET SCANNING TIMEOUT -- %d FOUND!!\r\n", APP.net.node.cnt);
+//                    node_disc_chk();
+                    LOG_I("NET Discovery Checked! -- %d FOUND!!\r\n", APP.net.node.cnt);
+                    APP.net.discovered = APP_NET_DISCOVERED_TRUE;
 
-                pkt_build(PKT_TYPE_NET_SCAN_RESPONSE,0);
+                    pkt_build(PKT_TYPE_NET_SCAN_RES,0);
+                    } else { //TGT SCAN SEQ. (DISC)? RSSI :0;
+
+                    tgt_scan = false;
+                    uint8_t tmp_res[BLE_GAP_ADDR_LEN + 1] = {0,}; //1 for RSSI
+                    memcpy(tmp_res, tmp_addr, BLE_GAP_ADDR_LEN);
+
+                    for(int i=0; i<tmp_disc.cnt;i++){
+                        if (!memcmp(tmp_addr,tmp_disc.peer[i].p_addr.addr, BLE_GAP_ADDR_LEN)) {
+                            tmp_res[6] = - tmp_disc.peer[i].rssi;
+                            break; 
+                        }
+                    }
+                    
+                    pkt_build(PKT_TYPE_SCAN_TGT_RES,tmp_res);
+                }
+                
             } else if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_CONN) {
                 LOG_I("Connection Request timed out.\r\n");
             }
@@ -885,7 +872,7 @@ static void device_preset() {
 
 void Button_Click_CallBack() {
     LOG_D("Button Pressed\r\n");
-    pkt_build(PKT_TYPE_NODE_BTN_PRESS,0);
+    pkt_build(PKT_TYPE_NODE_BTN_PRESS_REQ,0);
 
 }
 

@@ -38,17 +38,14 @@ typedef struct {
     uint8_t sensor;
 } p_address;
 
-typedef struct {
-    uint8_t err;
-    uint8_t total;
-} p_index;
-
 // TODO: err type to Type Struct
 typedef struct {
     uint8_t type;
-    p_index index;
+    uint8_t err_type;
+    uint8_t idx_tot;
     p_address source;
     p_address target;
+    uint8_t path[5];
 } p_header;
 
 typedef struct {

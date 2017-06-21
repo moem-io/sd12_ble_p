@@ -11,14 +11,6 @@
 #include "app_error.h"
 #include "util.h"
 
-#define CEN_MAX_REQ_CNT 50
-
-#define CEN_SEND_TARGET_ERROR 240
-#define CEN_SEND_ROUTE_ERROR 241
-#define CEN_BUILD_PACKET_ROUTE 3
-
-
-
 #define CEN_TXP_QUEUE_UNAVAILABLE -1
 
 typedef struct {
