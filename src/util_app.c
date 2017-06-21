@@ -22,7 +22,7 @@ uint8_t analyze_data(uint8_t *p_data, uint8_t size) {
 int8_t get_addr_idx(uint8_t *p_data){
     for (int8_t i = 0; i < APP.net.node.cnt; i++) {
         if (!memcmp(APP.net.node.peer[i].p_addr.addr, p_data, BLE_GAP_ADDR_LEN)) {
-            LOG_D("ADDR FOUND!\r\n");
+//            LOG_D("ADDR FOUND!\r\n");
             return i;
         }
     }
@@ -100,7 +100,7 @@ bool add_node(uint8_t *n_addr, uint8_t *src_id) {
     LOG_I("Node ADD!\r\n");
     ble_gap_addr_t new_addr;
     memset(&new_addr,0,sizeof(new_addr));
-    new_addr.addr_type = BLE_GAP_ADDR_TYPE_PUBLIC; // TODO: MAYBE this might be wrong.
+    new_addr.addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC; // TODO: MAYBE this might be wrong.
 
     memcpy(new_addr.addr,n_addr,BLE_GAP_ADDR_LEN);
     peer[APP.net.node.cnt].p_addr = new_addr;
@@ -120,7 +120,7 @@ void update_node(p_pkt *rxp) {
     
     int8_t res = 0;
     switch (rxp->header.type) {
-        case PKT_TYPE_NET_SCAN_REQUEST:
+        case PKT_TYPE_NET_SCAN_REQ:
             res = get_addr_idx(rxp->data.p_data);
             if (res >= 0) {
                 LOG_I("ADDR %s ID %d -> %d !!\r\n", STR_PUSH(peer[res].p_addr.addr, 1),
@@ -131,7 +131,7 @@ void update_node(p_pkt *rxp) {
             }
             break;
         
-        case PKT_TYPE_NET_SCAN_RESPONSE:
+        case PKT_TYPE_NET_SCAN_RES:
              res = analyze_data(rxp->data.p_data,7);
             
             for(int i=0; i<res; i++){
@@ -150,7 +150,6 @@ void app_dev_parent_set(ble_gap_addr_t *addr) {
         memcpy(&APP.dev.parent, addr, sizeof(ble_gap_addr_t));
 
         LOG_D("Parent Addr set : %s\r\n", STR_PUSH(APP.dev.parent.addr, 1));
-        APP.dev.parent_set = true;
     }
 }
 
@@ -258,7 +257,7 @@ ret_code_t app_fds_read(void) {
         data = (uint32_t *) flash_record.p_data;
         memcpy(&APP, data, sizeof(APP));
 
-        LOG_D("[NET : %d] %s Addr : %s\r\n", APP.net.established ,LOG_PUSH(APP.dev.name), STR_PUSH(APP.dev.my_addr.addr, 1));
+        LOG_D("[ID: %d NET : %d] %s\r\n", APP.dev.my_id ,APP.net.established ,LOG_PUSH(APP.dev.name));
         // Access the record through the flash_record structure.
         // Close the record when done.
         err_code = fds_record_close(&record_desc);
