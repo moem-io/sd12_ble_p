@@ -16,19 +16,16 @@ static void per_result_update(per_t *p_per, uint8_t result_type);
 void pkt_interpret(per_t *p_per) {
     if (PKT.rx_p.proc) {
         p_pkt *rxp = &(PKT.rx_p.pkt[PKT.rx_p.proc_cnt]);
-
-        uint8_t buff1[HEADER_LEN];
-        memcpy(buff1, &rxp->header, sizeof(buff1));
-
-        uint8_t buff2[MAX_PKT_DATA_LEN];
-        memcpy(buff2, &rxp->data, sizeof(buff2));
+        p_header *rxph = &rxp->header;
+        p_data *rxpd = &rxp->data;
+        int8_t res = 0;
 
         LOG_D("[%d]th PACKET INTERPRET\r\n", PKT.rx_p.proc_cnt);
-        LOG_D(" Header : %.24s\r\n", STR_PUSH(buff1, 0));
-        LOG_D(" DATA : %.28s\r\n", STR_PUSH(buff2, 0));
+        LOG_D(" %d/%d - %d/%d - %s\r\n", rxph->type, rxph->err_type, rxph->target.node, rxph->target.sensor,
+                                                                                STR_PUSH(rxph->path,0) );
+        LOG_D(" DATA : %.80s\r\n", STR_PUSH(rxpd->p_data, 0));
         
         update_node(rxp);
-        LOG_D("PACKET %d!\r\n",rxp->header.target.node);
         
         if(APP.dev.my_id != 0 && APP.dev.my_id != rxp->header.target.node) {
             LOG_D("PACKET ROUTE!\r\n");
@@ -72,20 +69,25 @@ void pkt_interpret(per_t *p_per) {
                 }break;                   
                 case PKT_TYPE_NODE_LED_REQ:{
                     LOG_D("LED Request \r\n");
+                    #ifdef FINAL
                     flagLED = true; // PKT_BUILD -> MAIN LOOP
+                    #else
                     pkt_build(PKT_TYPE_NODE_LED_RES,0);
+                    #endif // FINAL
+
                 }break;
                 case PKT_TYPE_NODE_BTN_PRESS_RES:{
                     LOG_D("OK\r\n");
                 } break;
-                case PKT_TYPE_NET_PATH_UPDATE_REQ:{
-                    if (!APP.net.discovered) {
-                        LOG_E("Network not discovered\r\n");
-                        break;
-                    }
-    ///////////////////////////////////////////////////////////
-                    LOG_D("PATH UPDATING!\r\n");
-                    pkt_build(PKT_TYPE_NET_PATH_UPDATE_RES,0);
+                case PKT_TYPE_NET_UPDATE_REQ:{
+                     res = analyze_data(rxp->data.p_data,7);
+            
+                        for(int i=0; i<res; i++){
+                            update_node_id(&rxp->data.p_data[i*7], &rxp->data.p_data[(i+1)*7 - 1]);
+                        }
+
+                    LOG_D("Network ID UPDATED!\r\n");
+                    pkt_build(PKT_TYPE_NET_UPDATE_RES,0);
                 }break;
 
                 case PKT_TYPE_NET_ACK_REQ:{
@@ -172,7 +174,7 @@ static void data_2_parser(ble_gatts_value_t *rx_data) {
 
 static void gatts_value_get(per_t *p_per, uint16_t handle, ble_gatts_value_t *rx_data) {
     sd_ble_gatts_value_get(p_per->conn_handle, handle, rx_data);
-    LOG_I("[rxP %d]th Handle %#06x Value : %s \r\n", PKT.rx_p.data_cnt, handle, VSTR_PUSH(rx_data->p_value, rx_data->len, 0));
+    LOG_I("[rxP %d]th %#06x : %s \r\n", PKT.rx_p.data_cnt, handle, VSTR_PUSH(rx_data->p_value, rx_data->len, 0));
 }
 
 
@@ -243,7 +245,7 @@ void app_per_evt(per_t *p_per, ble_evt_t *p_ble_evt) {
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
-            LOG_D("RESETTING Peripheral\r\n");
+//            LOG_D("RESETTING Peripheral\r\n");
             memset(&APP.dev.conn_cen, 0, sizeof(ble_gap_addr_t));
             p_per->notification = false;
             p_per->conn_handle = BLE_CONN_HANDLE_INVALID;
