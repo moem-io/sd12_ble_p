@@ -112,6 +112,7 @@ void pkt_send(cen_t *p_cen) {
             LOG_D("ENABLING NOTIFICATION \r\n");
             err_code = cen_noti_enable(p_cen, &p_cen->hdlrs.result_cccd_hdlr);
             ERR_CHK("Noti Enable Failed");
+            PKT.tx_p.proc = false;
             return;
         }
 
@@ -164,7 +165,7 @@ void pkt_send(cen_t *p_cen) {
             
             uint32_t err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
             APP_ERROR_CHECK(err_code);
-            
+            PKT.tx_p.proc_done = true;
             app_fds_save();
 
             nrf_delay_ms(100);
@@ -231,7 +232,8 @@ void pkt_build(uint8_t build_type, uint8_t *p_data) {
             (txp-1)->data.p_data[1]=47; //Ascii-Seperator '/'
             (txp-1)->data.p_data[2]=p_data[0];
             (txp-1)->data.p_data[3]=47; //Ascii-Seperator '/'
-
+            LOG_D("BUILD TXPh : %s, \r\n", VSTR_PUSH((uint8_t *) &(txp-1)->header, HEADER_LEN, 0));
+            LOG_D("BUILD TXPd : %s, \r\n", VSTR_PUSH((uint8_t *) &(txp-1)->data, DATA_LEN, 0));
             return; // Must Return (stop seq.) for Overwritng Idx
         
         default:
@@ -261,7 +263,7 @@ void pkt_build(uint8_t build_type, uint8_t *p_data) {
                 case PKT_TYPE_SNSR_CMD_RES:
                 case PKT_TYPE_NODE_LED_RES:
                 case PKT_TYPE_NODE_BTN_PRESS_REQ:
-                case PKT_TYPE_NET_PATH_UPDATE_RES:
+                case PKT_TYPE_NET_UPDATE_RES:
                 case PKT_TYPE_NET_ACK_RES:
                     txp->data.p_data[0] = PKT_DATA_SUCCESS;
                     break;
@@ -318,7 +320,7 @@ void cen_on_db_disc_evt(cen_t *p_cen, ble_db_discovery_evt_t *p_evt) {
         LOG_D("RESULT :%02x , CCCD : %02x\r\n", hdlr->result_hdlr, hdlr->result_cccd_hdlr);
         if (hdlr->header_hdlr && hdlr->data_1_hdlr && hdlr->data_2_hdlr && hdlr->result_hdlr &&
             hdlr->result_cccd_hdlr) {
-            LOG_D("ALL HANDLER ASSIGNED\r\n");
+//            LOG_D("ALL HANDLER ASSIGNED\r\n");
             hdlr->assigned = true;
             PKT.tx_p.proc = true;
         }
@@ -330,6 +332,7 @@ static void on_write_rsp(cen_t *p_cen, const ble_evt_t *p_ble_evt) {
     if (p_ble_evt->evt.gattc_evt.gatt_status == BLE_GATT_STATUS_SUCCESS &&
         p_ble_evt->evt.gattc_evt.params.write_rsp.handle == p_cen->hdlrs.result_cccd_hdlr) {
         p_cen->notification = true;
+        PKT.tx_p.proc = true;           
         LOG_D("PERIPHERAL's NOTIFICATION ENABLED!!\r\n");
     }
 }
@@ -372,8 +375,8 @@ void app_cen_evt(cen_t *p_cen, const ble_evt_t *p_ble_evt) {
             break;
 
         case BLE_GATTC_EVT_WRITE_RSP:
-            LOG_D("PERIPHERAL's Write RSP %02x %d!!\r\n", p_ble_evt->evt.gattc_evt.params.write_rsp.handle,
-                  p_ble_evt->evt.gattc_evt.gatt_status);
+//            LOG_D("PERIPHERAL's Write RSP %02x %d!!\r\n", p_ble_evt->evt.gattc_evt.params.write_rsp.handle,
+//                  p_ble_evt->evt.gattc_evt.gatt_status);
             on_write_rsp(p_cen, p_ble_evt);
             break;
 
@@ -382,9 +385,13 @@ void app_cen_evt(cen_t *p_cen, const ble_evt_t *p_ble_evt) {
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
-            LOG_D("RESETTING CENTRAL\r\n");
+            if(PKT.tx_p.proc_done == false) { //Packet Send Error Recovery..
+                PKT.tx_p.proc = true;
+            }
+//            LOG_D("RESETTING CENTRAL\r\n");
             memset(&p_cen->state, 0, sizeof(cen_state_t));
             memset(&p_cen->hdlrs, 0, sizeof(cen_handlers_t));
+            PKT.tx_p.proc_done = false;
             p_cen->notification = false;
             p_cen->conn_handle = BLE_CONN_HANDLE_INVALID;
             break;
