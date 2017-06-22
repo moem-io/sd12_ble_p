@@ -54,10 +54,6 @@ void pkt_interpret(per_t *p_per) {
                     scan_start();
                 }break;
                     
-                case PKT_TYPE_SNSR_STATE_RES:{
-                    
-                }break;
-                    
                 case PKT_TYPE_SNSR_DATA_REQ:{
                 }break;
 
@@ -76,9 +72,12 @@ void pkt_interpret(per_t *p_per) {
                     #endif // FINAL
 
                 }break;
-                case PKT_TYPE_NODE_BTN_PRESS_RES:{
+                
+                case PKT_TYPE_SNSR_STATE_RES:
+                case PKT_TYPE_NODE_BTN_PRESS_RES:
                     LOG_D("OK\r\n");
-                } break;
+                 break;
+                
                 case PKT_TYPE_NET_UPDATE_REQ:{
                      res = analyze_data(rxp->data.p_data,7);
             

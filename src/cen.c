@@ -249,6 +249,8 @@ void pkt_build(uint8_t build_type, uint8_t *p_data) {
                 
                 
                 case PKT_TYPE_SNSR_STATE_REQ:{
+                    txp->data.p_data[0] = PKT_DATA_SUCCESS;
+
                 }break;
                 case PKT_TYPE_SNSR_DATA_RES: {
                 }break;
