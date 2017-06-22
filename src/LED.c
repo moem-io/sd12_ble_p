@@ -173,7 +173,7 @@ uint8_t* str_to_int(uint8_t * string){
         
         bufferRGB[i] = (ten << 4) | one;
     }    
-    LOG_D("R : %d, G : %d, B : %d\r\n",bufferRGB[0], bufferRGB[1], bufferRGB[2]);
+    // LOG_D("R : %d, G : %d, B : %d\r\n",bufferRGB[0], bufferRGB[1], bufferRGB[2]);
     
     return bufferRGB;
 }

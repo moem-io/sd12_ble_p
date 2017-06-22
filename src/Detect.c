@@ -39,6 +39,10 @@ uint32_t Detect_Init(void){
 		}
 	}
 	
+	for(id = ID1; id <= ID5; id++){
+		setSensor_Channel(id, 0);
+	}
+	
 	return  err_code;
 }
 
@@ -55,11 +59,18 @@ void setState_Channel(uint8_t id, uint8_t state){
 	}
 }
 
+uint8_t getSensor_Channel(uint8_t id){
+	return channel_Type[id];
+}
+void		setSensor_Channel(uint8_t id, uint8_t type){
+	channel_Type[id] = type;
+}
+
 bool checkChannel(uint8_t pin){
 	
 	uint32_t pinState;
 	
-	nrf_delay_ms(10);
+	nrf_delay_ms(100);
 	
 	switch(pinState){
 		case ID1: 							return nrf_gpio_pin_read(pinID1) > 0;
@@ -88,11 +99,14 @@ void checkEdge(__IO flagDetect* flag){
 		if(flag->rising & mask[id]){
 			flag->pin = id;
 			flag->state = Rising;
+			break;
 		}else if(flag->falling & mask[id]){
 			flag->pin = id;
 			flag->state = Falling;
+			break;
 		}
 	}
+	nrf_delay_ms(10);
 }
 
 void InitalizeQueue(void){
@@ -161,4 +175,24 @@ bool removeItem(uint8_t id){
 	}
 	
 	return true;
+}
+
+void setState_Set_Address(uint8_t id){
+	fsmSensor[id] = Set_Address;
+}
+void setState_Request(uint8_t id){
+	fsmSensor[id] = Request;
+}
+void setState_Command(uint8_t id){
+	fsmSensor[id] = Command;
+}
+void setState_ACK(uint8_t id){
+	fsmSensor[id] = Ack;
+}
+void setState_Response(uint8_t id){
+	fsmSensor[id] = Response;
+}
+
+uint8_t getState_Sensor(uint8_t id){
+	return fsmSensor[id];
 }

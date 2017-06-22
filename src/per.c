@@ -23,7 +23,7 @@ void pkt_interpret(per_t *p_per) {
         LOG_D("[%d]th PACKET INTERPRET\r\n", PKT.rx_p.proc_cnt);
         LOG_D(" %d/%d - %d/%d - %s\r\n", rxph->type, rxph->err_type, rxph->target.node, rxph->target.sensor,
                                                                                 STR_PUSH(rxph->path,0) );
-        LOG_D(" DATA : %.80s\r\n", STR_PUSH(rxpd->p_data, 0));
+        LOG_D(" DATA : %.40s\r\n", STR_PUSH(rxpd->p_data, 0));
         
         update_node(rxp);
         
@@ -33,7 +33,7 @@ void pkt_interpret(per_t *p_per) {
                 LOG_E("Network not discovered\r\n");
                 return;
             }
-            pkt_build(CEN_BUILD_PACKET_ROUTE,0);
+            pkt_build(CEN_BUILD_PACKET_ROUTE,0,0);
         } else {
             app_dev_parent_set(&APP.dev.conn_cen);
 
@@ -68,7 +68,7 @@ void pkt_interpret(per_t *p_per) {
                     #ifdef FINAL
                     flagLED = true; // PKT_BUILD -> MAIN LOOP
                     #else
-                    pkt_build(PKT_TYPE_NODE_LED_RES,0);
+                    pkt_build(PKT_TYPE_NODE_LED_RES,0,0);
                     #endif // FINAL
 
                 }break;
@@ -86,7 +86,7 @@ void pkt_interpret(per_t *p_per) {
                         }
 
                     LOG_D("Network ID UPDATED!\r\n");
-                    pkt_build(PKT_TYPE_NET_UPDATE_RES,0);
+                    pkt_build(PKT_TYPE_NET_UPDATE_RES,0,0);
                 }break;
 
                 case PKT_TYPE_NET_ACK_REQ:{
@@ -96,7 +96,7 @@ void pkt_interpret(per_t *p_per) {
                     }
     ///////////////////////////////////////////////////////////
                     LOG_D("ACK REQUEST!\r\n");
-                    pkt_build(PKT_TYPE_NET_ACK_RES,0);
+                    pkt_build(PKT_TYPE_NET_ACK_RES,0,0);
                 }break;
                 
                 case PKT_TYPE_NET_JOIN_RES:{

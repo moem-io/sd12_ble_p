@@ -13,28 +13,6 @@ static const unsigned int BATTERY_CAPACITY = 400; // e.g. 400mAh battery
 static const uint8_t SOCI_SET = 15; // Interrupt set threshold at 20%
 static const uint8_t SOCI_CLR = 20; // Interrupt clear threshold at 25%
 
-//static void in_pin_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action){
-//	if(pin == pinGPOUT){
-//		if(action == GPIOTE_CONFIG_POLARITY_Toggle){
-//			Low_Battery_CallBack();
-//		}
-//	}else if(pin == pinCHG){
-//		if(action == GPIOTE_CONFIG_POLARITY_Toggle){
-//			Charger_Battery_CallBack();
-//		}
-//	}
-//}
-
-//bool checkLowPower(void){
-//	nrf_delay_ms(10);
-//	return nrf_gpio_pin_read(pinGPOUT);
-//}
-
-//bool checkCharger(void){
-//	nrf_delay_ms(10);
-//	return nrf_gpio_pin_read(pinCHG);
-//}
-
 /**
  * @brief I2C events handler.
  */

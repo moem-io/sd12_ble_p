@@ -11,8 +11,8 @@
 #include "softdevice_handler.h"
 #include "app_timer.h"
 #include "peer_manager.h"
-#include "bsp.h"
-#include "bsp_btn_ble.h"
+//#include "bsp.h"
+//#include "bsp_btn_ble.h"
 
 #include "ble_conn_state.h"
 
@@ -24,6 +24,9 @@
 
 #include "Detect.h"
 
+#include "Sensor_Communication.h"
+
+#define DEBUG
 
 #define NRF_LOG_MODULE_NAME "APP"
 
@@ -74,6 +77,8 @@
 
 #define DEAD_BEEF                       0xDEADBEEF                                  /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
+#define FINAL
+
 uint8_t flagLED;
 uint8_t file_flag;
 
@@ -93,10 +98,11 @@ static ble_db_discovery_t m_ble_db_discovery;             /**< Instance of datab
 APP_TIMER_DEF(m_single_timer);
 #define NET_DISC_TIMER_INTERVAL     APP_TIMER_TICKS(10000, APP_TIMER_PRESCALER) // 1000 ms intervals
 
-__IO flagDetect flagButton = {.flag = false };
-__IO flagDetect flagCharger = {.flag = false };
+__IO flagDetect flagButton 				= {.flag = false };
+__IO flagDetect flagCharger 			= {.flag = false };
 __IO flagDetect flagLowBattery = {.flag = false };
-__IO flagDetect flagSensor = {.flag = false };
+__IO flagDetect flagSensor 			= {.flag = false };
+__IO flagUART	flagCommunication 					= { .flag = false };
 
 volatile bool tgt_scan = false;
 
@@ -238,7 +244,7 @@ static void pm_evt_handler(pm_evt_t const *p_evt) {
 
 
 static void timer_timeout_handler(void *p_context) {
-    LOG_D("Timer Timeout!!\r\n");
+    // // // LOG_D("Timer Timeout!!\r\n");
     APP.timer.status = APP_TIMER_STATUS_DISABLED;
     APP.timer.timeout = APP_TIMER_TIMEOUT_TRUE;
 }
@@ -363,19 +369,19 @@ static void advertising_start(void) {
  *
  * @note This function will not return.
  */
-static void sleep_mode_enter(void) {
-    uint32_t err_code = bsp_indication_set(BSP_INDICATE_IDLE);
+//static void sleep_mode_enter(void) {
+//    uint32_t err_code = bsp_indication_set(BSP_INDICATE_IDLE);
 
-    APP_ERROR_CHECK(err_code);
+//    APP_ERROR_CHECK(err_code);
 
-    // Prepare wakeup buttons.
-    err_code = bsp_btn_ble_sleep_mode_prepare();
-    APP_ERROR_CHECK(err_code);
+//    // Prepare wakeup buttons.
+//    err_code = bsp_btn_ble_sleep_mode_prepare();
+//    APP_ERROR_CHECK(err_code);
 
-    // Go to system-off mode (this function will not return; wakeup will cause a reset).
-    err_code = sd_power_system_off();
-    APP_ERROR_CHECK(err_code);
-}
+//    // Go to system-off mode (this function will not return; wakeup will cause a reset).
+//    err_code = sd_power_system_off();
+//    APP_ERROR_CHECK(err_code);
+//}
 
 
 //170228 [TODO] : IF NO NODE FOUND??
@@ -446,7 +452,7 @@ static void nrf_cen_evt(const ble_evt_t *const p_ble_evt) {
         case BLE_GAP_EVT_CONNECTED: {
             LOG_I("Central Connected \r\n");
 
-            bsp_board_led_on(CENTRAL_CONNECTED_LED);
+//            bsp_board_led_on(CENTRAL_CONNECTED_LED);
             memset(&m_ble_db_discovery, 0, sizeof(m_ble_db_discovery));
             err_code = ble_db_discovery_start(&m_ble_db_discovery, p_gap_evt->conn_handle);
             APP_ERROR_CHECK(err_code);
@@ -456,7 +462,7 @@ static void nrf_cen_evt(const ble_evt_t *const p_ble_evt) {
         case BLE_GAP_EVT_DISCONNECTED: {
             LOG_I("CENTRAL DISCONNECTED (reason: %d)\r\n", p_gap_evt->params.disconnected.reason);
 
-            bsp_board_led_off(CENTRAL_CONNECTED_LED);
+//            bsp_board_led_off(CENTRAL_CONNECTED_LED);
         }
             break; // BLE_GAP_EVT_DISCONNECTED
 
@@ -476,7 +482,7 @@ static void nrf_cen_evt(const ble_evt_t *const p_ble_evt) {
                     LOG_I("NET Discovery Checked! -- %d FOUND!!\r\n", APP.net.node.cnt);
                     APP.net.discovered = APP_NET_DISCOVERED_TRUE;
 
-                    pkt_build(PKT_TYPE_NET_SCAN_RES,0);
+                    pkt_build(PKT_TYPE_NET_SCAN_RES,0,0);
                     } else { //TGT SCAN SEQ. (DISC)? RSSI :0;
 
                     tgt_scan = false;
@@ -491,7 +497,7 @@ static void nrf_cen_evt(const ble_evt_t *const p_ble_evt) {
                         }
                     }
                     
-                    pkt_build(PKT_TYPE_SCAN_TGT_RES,tmp_res);
+                    pkt_build(PKT_TYPE_SCAN_TGT_RES,tmp_res,0);
                 }
                 
             } else if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_CONN) {
@@ -622,12 +628,12 @@ static void on_adv_evt(ble_adv_evt_t ble_adv_evt) {
     switch (ble_adv_evt) {
         case BLE_ADV_EVT_FAST:
             LOG_I("Fast advertising\r\n");
-            err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
-            APP_ERROR_CHECK(err_code);
+//            err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
+//            APP_ERROR_CHECK(err_code);
             break;
 
         case BLE_ADV_EVT_IDLE:
-            sleep_mode_enter();
+            //sleep_mode_enter();
             break;
 
         default:
@@ -661,7 +667,7 @@ static void ble_evt_dispatch(ble_evt_t *p_ble_evt) {
     }
     pkt_interpret(&m_per_s);
 
-    bsp_btn_ble_on_ble_evt(p_ble_evt);
+//    bsp_btn_ble_on_ble_evt(p_ble_evt);
 }
 
 
@@ -819,31 +825,25 @@ static void device_preset() {
 		
 		err_code = LED_Init();
 		if(err_code != NRF_SUCCESS){
-			LOG_D("LED_Init() Error Code : %d\r\n", err_code);
+			printf("LED_Init() Error Code : %d\r\n", err_code);
 		}
 		
 		err_code = Button_Init();
 		if(err_code != NRF_SUCCESS){
-			LOG_D("Button_Init() Error Code : %d\r\n", err_code);
+			printf("Button_Init() Error Code : %d\r\n", err_code);
 		}
 
 		err_code = Fuel_Gauge_Init();
 		if(err_code != NRF_SUCCESS){
-			LOG_D("Fuel_Gauge_Init() Error Code : %d\r\n", err_code);
+			printf("Fuel_Gauge_Init() Error Code : %d\r\n", err_code);
 		}
 		
 		err_code = Detect_Init();
 		if(err_code != NRF_SUCCESS){
-			LOG_D("Detect_Init() Error Code : %d\r\n", err_code);
+			printf("Detect_Init() Error Code : %d\r\n", err_code);
 		}
 	#endif // FINAL
     
-}
-
-void Button_Click_CallBack() {
-    LOG_D("Button Pressed\r\n");
-    pkt_build(PKT_TYPE_NODE_BTN_PRESS_REQ,0); //Move Seq. to Main FSM
-	flagButton.flag = true;
 }
 
 
@@ -851,7 +851,7 @@ static void app_fds_evt_handler(fds_evt_t const *const p_fds_evt) {
     switch (p_fds_evt->id) {
         case FDS_EVT_INIT:
             if (p_fds_evt->result != FDS_SUCCESS) {
-                LOG_D("FDS Init Failed!!  %d  \r\n",p_fds_evt->result);
+                // // LOG_D("FDS Init Failed!!  %d  \r\n",p_fds_evt->result);
             }
             break;
         case FDS_EVT_WRITE:
@@ -879,32 +879,120 @@ static ret_code_t app_fds_init(void) {
     return NRF_SUCCESS;
 }
 
+void Button_Click_CallBack() {
+    // // LOG_D("Button Pressed\r\n");
+
+  //pkt_build(PKT_TYPE_NODE_BTN_PRESS_REQ,0,0); //Move Seq. to Main FSM
+	flagButton.flag = true;
+}
+
+
 void Detect_CallBack(uint32_t rising, uint32_t falling){
 	flagSensor.flag = true;
 	flagSensor.rising = rising;
 	flagSensor.falling = falling;
 }
 
+ void UART_Receive_CallBack(char* messages){
+	flagCommunication.flag = true;
+	strcpy(flagCommunication.bufferPacket, messages);
+}
 
 void sensor_check(){
-    if(flagSensor.state == Falling){
-        LOG_D("ID %d is Falling\r\n", flagSensor.pin);
-        if(checkItem(flagSensor.pin)){
-            removeItem(flagSensor.pin);
-        }
-    }else{
-        LOG_D("ID %d is Rising\r\n", flagSensor.pin);
-        if(checkItem(flagSensor.pin)){
-            push(flagSensor.pin);
-        }
-    }
+	Packet* packet;
+	char data[2];
+	Packet_Status err_code;
+	
+	if(flagSensor.state == Falling){
+		if( getState_Channel(flagSensor.pin) == Rising || !checkChannel(flagSensor.pin) ){
+			printf("ID %d is Falling\r\n", flagSensor.pin);
+			setState_Channel(flagSensor.pin, Falling);
+			setSensor_Channel(flagSensor.pin, 0);
+            
+            uint8_t null_buf[1] = {0x00};
+            pkt_build(PKT_TYPE_SNSR_STATE_REQ,null_buf,flagSensor.pin);
+
+            //Sensor detect 
+		}
+	}else{
+		if( getState_Channel(flagSensor.pin) == Falling || checkChannel(flagSensor.pin) ){
+			//printf("ID %d is Rising\r\n", flagSensor.pin);
+			setState_Channel(flagSensor.pin, Rising);
+			
+			LED_Control((uint8_t *)(uint8_t *)"0000FF");
+			setState_Set_Address(flagSensor.pin);
+			
+			nrf_delay_ms(1000);
+			printf("ID %d is Rising\r\n", flagSensor.pin);
+			
+			while( !flagCommunication.flag );
+			flagCommunication.flag = false;
+			
+			#ifdef DEBUG
+			printf("flagCommunication.bufferPacket : %s\r\n", flagCommunication.bufferPacket);
+			#endif
+			
+			#ifdef DEBUG
+			switch( releasePacket( flagCommunication.bufferPacket ) ){
+				case Packet_Ok:
+					printf("Packet_Ok\r\n");
+				
+					packet = getReceivePacket();
+					sprintf(data, "%c", flagSensor.pin + 'A');
+					Send_Packet_Polling(Set_Address, packet->sensor, packet->id, data);
+					
+					setSensor_Channel(flagSensor.pin, packet->sensor);
+				break;
+				case Packet_NULL:
+					printf("Packet_NULL\r\n");
+				break;
+				case Packet_Length_ERROR:
+					printf("Packet_Length_ERROR\r\n");
+				break;
+				case Packet_Mode_ERROR:
+					printf("Packet_Mode_ERROR\r\n");
+				break;
+				case Packet_Sensor_ERROR:
+					printf("Packet_Sensor_ERROR\r\n");
+				break;
+				case Packet_Id_ERROR:
+					printf("Packet_Id_ERROR\r\n");
+				break;
+				case Packet_Data_ERROR:
+					printf("Packet_Data_ERROR\r\n");
+				break;
+				case Packet_Dropout:
+					printf("Packet_Dropout\r\n");
+				break;
+			}
+			#else
+			err_code = releasePacket( flagCommunication.bufferPacket );
+			
+			if(err_code == Packet_Ok){
+				packet = getReceivePacket();
+				sprintf(data, "%c", flagSensor.pin + 'A');
+				Send_Packet_Polling(Set_Address, packet->sensor, packet->id, data);
+				
+				setSensor_Channel(flagSensor.pin, packet->sensor);
+			}
+			#endif
+            
+            pkt_build(PKT_TYPE_SNSR_STATE_REQ, &packet->sensor,flagSensor.pin);
+            
+            // Type : packet->sensor ID: flagSensor.pin            
+            // Sensor Type Packet Build
+
+			LED_Control((uint8_t *)"000000");
+		}
+	}
 }
 
 /**@brief Function for application main entry.
  */
 int main(void) {
     uint32_t err_code;
-//    bool erase_bonds;
+		Packet* packet;
+		char data[10];
 
     memset(&APP, 0, sizeof(APP));
     memset(&PKT.tx_p.tx_que, CEN_TXP_QUEUE_UNAVAILABLE, sizeof(PKT.tx_p.tx_que)); //for tx_que index
@@ -941,59 +1029,64 @@ int main(void) {
     advertising_init();
     conn_params_init();
     
-    LOG_D("FDS: %d Wd  %s Addr : %s \r\n", sizeof(APP)/4+1, LOG_PUSH(APP.dev.name), 
-                                                                        STR_PUSH(APP.dev.my_addr.addr, 1));
-    
+
     nrf_delay_ms(100);
 
     advertising_start();
     APP_ERROR_CHECK(err_code);
        
 #ifdef FINAL
-    if(Fuel_Gauge_Config()) {
-        LOG_D("BQ27441 is Worked!! %s \r\n", LOG_PUSH(Fuel_Gauge_getBatteryStatus()));
-    } else{
-        LOG_D("BQ27441 isn't Worked!!\r\n");
-    }
 
-    LED_Control("0F0000");
+		#ifdef DEBUG
+    if(Fuel_Gauge_Config()) {
+        printf("BQ27441 is Worked!! %s \r\n", Fuel_Gauge_getBatteryStatus());
+    } else{
+        printf("BQ27441 isn't Worked!!\r\n");
+    }
+		#endif
+
+    LED_Control((uint8_t *)"00FF00");
     nrf_delay_ms(1000);
         
-    LED_Control("000000");
+    LED_Control((uint8_t *)"000000");
+
+        LOG_D("FDS: %d Wd  %s Addr : %s \r\n", sizeof(APP)/4+1, LOG_PUSH(APP.dev.name), 
+                                                                        STR_PUSH(APP.dev.my_addr.addr, 1));
+    
 #endif // FINAL
 
     for (;;) {
         if (flagLED) {
-            if (LED_Control(PKT.rx_p.pkt[PKT.rx_p.proc_cnt - 1].data.p_data)) {
+            if (LED_Control((uint8_t *)PKT.rx_p.pkt[PKT.rx_p.proc_cnt - 1].data.p_data)) {
                 //  TODO : IF success
             }
-            pkt_build(PKT_TYPE_NODE_LED_RES,0);
+            pkt_build(PKT_TYPE_NODE_LED_RES,0,0);
             flagLED = false;
         }
         
         if(flagButton.flag){
             if(checkButton() == Falling){
-                LOG_D("flagButton is Falling\r\n");
+                printf("flagButton is Falling\r\n");
             }else{
-                LOG_D("flagButton is Rising\r\n");
+                printf("flagButton is Rising\r\n");
             }
             flagButton.flag = false;
         }
         
         if(flagLowBattery.flag){
             if(checkChannel(ID_GPOUT) == Falling){
-                LOG_D("flagLowBattery is Falling\r\n");
+                printf("flagLowBattery is Falling\r\n");
             }else{
-                LOG_D("flagLowBattery is Rising\r\n");
+                printf("flagLowBattery is Rising\r\n");
             }
             flagLowBattery.flag = false;
         }
         
         if(flagCharger.flag){
             if(checkChannel(ID_CHG) == Falling){
-                LOG_D("flagCharger is Falling\r\n");
+                printf("flagCharger is Falling\r\n");
             }else{
-                LOG_D("flagCharger is Rising\r\n");
+                printf("flagCharger is Rising\r\n");
             }
             flagCharger.flag = false;
         }
@@ -1002,32 +1095,91 @@ int main(void) {
             checkEdge(&flagSensor);
             
             switch(flagSensor.pin){
-                case ID1:
-                case ID2:
-                case ID3:
-                case ID4:
-                case ID5:
+                case ID1: case ID2: case ID3: case ID4: case ID5:
                 sensor_check();
                 break;
                     
                 case ID_GPOUT:
                     if(flagSensor.state == Falling){
-                        LOG_D("ID_GPOUT is Falling\r\n");
+                        printf("ID_GPOUT is Falling\r\n");
                     }else{
-                        LOG_D("ID_GPOUT is Rising\r\n");
+                        printf("ID_GPOUT is Rising\r\n");
                     }
                 break;
                 case ID_CHG:
                     if(flagSensor.state == Falling){
-                        LOG_D("ID_CHG is Falling\r\n");
+                        printf("ID_CHG is Falling\r\n");
                     }else{
-                        LOG_D("ID_CHG is Rising\r\n");
+                        printf("ID_CHG is Rising\r\n");
                     }
                 break;
             }
             
             flagSensor.flag = false;
         }
+				
+				if( flagCommunication.flag){
+					
+					#ifdef DEBUG
+					printf("flagCommunication.bufferPacket : %s\r\n", flagCommunication.bufferPacket);
+					#endif
+					
+					#ifdef DEBUG
+					switch( releasePacket( flagCommunication.bufferPacket ) ){
+						case Packet_Ok:
+							printf("Packet_Ok\r\n");
+						
+							packet = getReceivePacket();
+							printPacket(packet);
+						            
+                        pkt_build(PKT_TYPE_SNSR_ACT_REQ, packet->data,flagSensor.pin);
+
+                               
+                        /*
+                        packet.data
+                        
+                        packet.sensor
+                        
+                        typedef enum{
+                         Th = 'T',
+                         Pressure = 'P',
+                         Light = 'L',
+                         Button = 'B',
+                         Human = 'H',
+                         Sound = 'S',
+                         Rgb = 'R',
+                         Ir = 'I',
+                         Buzzer = 'Z',
+                        }Sensor_Type;
+
+                        */
+						break;
+						case Packet_NULL:
+							printf("Packet_NULL\r\n");
+						break;
+						case Packet_Length_ERROR:
+							printf("Packet_Length_ERROR\r\n");
+						break;
+						case Packet_Mode_ERROR:
+							printf("Packet_Mode_ERROR\r\n");
+						break;
+						case Packet_Sensor_ERROR:
+							printf("Packet_Sensor_ERROR\r\n");
+						break;
+						case Packet_Id_ERROR:
+							printf("Packet_Id_ERROR\r\n");
+						break;
+						case Packet_Data_ERROR:
+							printf("Packet_Data_ERROR\r\n");
+						break;
+						case Packet_Dropout:
+							printf("Packet_Dropout\r\n");
+						break;
+					}
+					#endif
+					
+					flagCommunication.flag = false;
+				}
         
         pkt_send(&m_cen_s);
         if (NRF_LOG_PROCESS() == false) {

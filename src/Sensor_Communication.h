@@ -2,6 +2,10 @@
 #define __SENSOR_COMMUNICATION_H__
 
 #include <stdbool.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "Sensor_Config.h"
 #include "app_uart.h"
 #include "app_error.h"
 #include "nrf_delay.h"
@@ -12,7 +16,9 @@
 #define UART_RX_BUF_SIZE 256                         /**< UART RX buffer size. */
 
 #define BUFFER_SIZE  20
+#define BUFFER_RX_TX_SIZE 128
 #define MAX_DATA 10
+
 
 #define START '['
 #define END ']'
@@ -25,26 +31,6 @@ typedef enum{
 	Id,
 	Data
 }Packet_Structure;
-
-typedef enum{
-	Request = '1',
-	Command,
-	Reponse,
-	Ack,
-	Set_Address,
-}Packet_Mode;
-
-typedef enum{
- Th = 'T',
- Pressure = 'P',
- Light = 'L',
- Button = 'B',
- Human = 'H',
- Sound = 'S',
- Rgb = 'R',
- Ir = 'I',
- Buzzer = 'Z',
-}Sensor_Type;
 
 typedef enum{
 	Packet_Ok = 0,
@@ -60,8 +46,15 @@ typedef enum{
 
 typedef struct {
 	bool flag;
-	uint16_t bufferPacket[BUFFER_SIZE];
+	uint8_t bufferPacket[BUFFER_SIZE];
 }flagUART;
+
+//typedef struct{
+//	uint8_t queueBuffer[BUFFER_QUEUE_SIZE];
+//	
+//	uint8_t start;
+//	uint8_t end;
+//}Queue;
 
 typedef struct {
 	uint8_t length;
@@ -73,14 +66,16 @@ typedef struct {
 static Packet transmitPacket;
 static Packet receivePacket;
 
+static char packet_transmit_buffer[BUFFER_RX_TX_SIZE];
+static char packet_receive_buffer[BUFFER_RX_TX_SIZE];
 
-uint8_t data[UART_RX_BUF_SIZE];
+//static Queue queue;
 
-__WEAK void UART_Receive_CallBack(void);
+__WEAK void UART_Receive_CallBack(char* messages);
 
 ret_code_t Sensor_Communication_Init(void);
 
-ret_code_t Send_Packet_Polling(void);
+uint32_t Send_Packet_Polling(char mode, uint8_t sensor, uint8_t id, char* data);
 
 Packet_Status makePacket(char mode, uint8_t sensor, uint8_t id, char* data);
 Packet_Status releasePacket(char* message);
@@ -96,7 +91,14 @@ char getPacket_Id(Packet *);
 char* getPacket_Data(Packet *);
 
 void printPacket(Packet* packet);
-bool checkPacket(Packet* packet, char mode, char sensor, uint8_t state);
+bool checkPacket(Packet* packet, char mode, char sensor, uint8_t id, uint8_t state);
 static void initializePacket(Packet* packet);
 
+
+
+//bool 	checkItem(uint8_t pin);
+//bool 	push(uint8_t pin);
+//void 		removeItem(uint8_t pin);
+//uint8_t pop(void);
+//void		initializeQueue(void);
 #endif

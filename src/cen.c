@@ -35,13 +35,13 @@ static void next_pkt_chk(void) {
     }
 }
 
-static void pkt_send_err(p_pkt *txp, ble_gap_addr_t *target_addr) {
+static void pkt_send_err(p_pkt *txp, ble_gap_addr_t *target_addr) { // if Sensor Node
     ble_gap_addr_t *cmp_addr = get_node(&txp->header.target.node,1,0);
     uint8_t tgt_idx = get_addr_idx(target_addr->addr);
     if (!memcmp(cmp_addr->addr, target_addr->addr, BLE_GAP_ADDR_LEN)) {
-        pkt_build(CEN_SEND_TARGET_ERROR,&APP.net.node.peer[tgt_idx].id);
+        pkt_build(CEN_SEND_TARGET_ERROR,&APP.net.node.peer[tgt_idx].id,0);
     } else {
-        pkt_build(CEN_SEND_ROUTE_ERROR,&APP.net.node.peer[tgt_idx].id);
+        pkt_build(CEN_SEND_ROUTE_ERROR,&APP.net.node.peer[tgt_idx].id,0);
     }
 }
 
@@ -211,7 +211,7 @@ void pkt_err_base(p_pkt *txp, uint8_t build_type) {
     txp->header.target.sensor = 0;
 }
 
-void pkt_build(uint8_t build_type, uint8_t *p_data) {
+void pkt_build(uint8_t build_type, uint8_t *p_data, uint8_t sensor) {
     p_pkt *txp = &PKT.tx_p.pkt[PKT.tx_p.pkt_cnt];
     p_pkt *rxp = &PKT.rx_p.pkt[PKT.rx_p.proc_cnt];
 
@@ -247,21 +247,21 @@ void pkt_build(uint8_t build_type, uint8_t *p_data) {
                     scan_res_builder(txp->data.p_data);
                 }break;
                 
-                
-                case PKT_TYPE_SNSR_STATE_REQ:{
-                    txp->data.p_data[0] = PKT_DATA_SUCCESS;
-
-                }break;
+                case PKT_TYPE_SNSR_ACT_REQ:
+                case PKT_TYPE_SNSR_STATE_REQ:
+                    txp->header.source.sensor = sensor;
+                    memcpy(&txp->data.p_data,p_data,1);
+                break;
+              
                 case PKT_TYPE_SNSR_DATA_RES: {
                 }break;
-                case PKT_TYPE_SNSR_ACT_REQ: {
-                }break;
-                
+                                
                 case PKT_TYPE_NODE_STAT_REQ:{
                 }break;
                 
                 case PKT_TYPE_NET_JOIN_REQ:{
                 }break;
+                
                 case PKT_TYPE_SNSR_CMD_RES:
                 case PKT_TYPE_NODE_LED_RES:
                 case PKT_TYPE_NODE_BTN_PRESS_REQ:
