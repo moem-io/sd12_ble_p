@@ -5,10 +5,10 @@
 
 uint8_t analyze_data(uint8_t *p_data, uint8_t size) {
     uint8_t end_data[DATA_LEN] = {0x00,};
-    int unit_size = MAX_PKT_DATA_LEN /  size;
+    int unit_cnt = MAX_PKT_DATA_LEN /  size;
     int i =0;
 
-    for(i=0; i < unit_size; i++){
+    for(i=0; i < unit_cnt; i++){
         if(!memcmp(&p_data[i*size],end_data,size)){
             break;
         }
@@ -22,7 +22,6 @@ uint8_t analyze_data(uint8_t *p_data, uint8_t size) {
 int8_t get_addr_idx(uint8_t *p_data){
     for (int8_t i = 0; i < APP.net.node.cnt; i++) {
         if (!memcmp(APP.net.node.peer[i].p_addr.addr, p_data, BLE_GAP_ADDR_LEN)) {
-//            LOG_D("ADDR FOUND!\r\n");
             return i;
         }
     }
@@ -75,6 +74,22 @@ ble_gap_addr_t *retrieve_send(uint8_t *p_data, bool id, bool addr) {
         }
     }
 }
+
+bool update_node_id(uint8_t *n_addr, uint8_t *id) {
+    gap_data* peer = APP.net.node.peer;
+    int8_t addr_idx = get_addr_idx(n_addr);
+    
+    if(addr_idx == NODE_ADDR_NOT_FOUND){
+        return false;
+    }
+
+    peer[addr_idx].id = *id;
+
+    LOG_I("ADDR %s / %d / %d !!\r\n", STR_PUSH(peer[addr_idx].p_addr.addr, 1),peer[addr_idx].id,*id);
+
+    return true;
+}
+
 
 
 //just for scan response
@@ -253,11 +268,11 @@ ret_code_t app_fds_read(void) {
             return err_code;
         }
 
-        LOG_D("Found Record ID = %d. Copying...\r\n", record_desc.record_id);
         data = (uint32_t *) flash_record.p_data;
         memcpy(&APP, data, sizeof(APP));
 
-        LOG_D("[ID: %d NET : %d] %s\r\n", APP.dev.my_id ,APP.net.established ,LOG_PUSH(APP.dev.name));
+        LOG_D("[ID: %d NET : %d] %s %d\r\n", APP.dev.my_id ,APP.net.established ,
+                                                                            LOG_PUSH(APP.dev.name),record_desc.record_id);
         // Access the record through the flash_record structure.
         // Close the record when done.
         err_code = fds_record_close(&record_desc);
