@@ -1,6 +1,6 @@
 #include "Fuel_Gauge.h"
 
-static volatile char buffer[100] = {0,};
+static char bufferFG[100] = {0,};
 
 static volatile bool m_xfer_done = false;																																/* Indicates if operation on TWI has ended. */
 static const nrf_drv_twi_t m_twi = NRF_DRV_TWI_INSTANCE(APP_TWI_DRIVER_INSTANCE);					/* TWI instance. */
@@ -177,8 +177,6 @@ static bool FG_setCapacity(uint16_t capacity){
 }
 static bool FG_setGPOUT_Polarity(signal sig){
 	
-	ret_code_t error_code;
-	
 	uint16_t oldOpConfig = opConfig();
 	
 	// Check to see if we need to update opConfig:
@@ -255,9 +253,9 @@ char* Fuel_Gauge_getBatteryStatus(void){
 	
 	clearBuffer();
 	
-	sprintf(buffer, "%d%%, %dmV\n", capacity, voltage);
+	sprintf(bufferFG, "%d%%, %dmV\n", capacity, voltage);
 	
-	return buffer;
+	return bufferFG;
 }
 
 static uint16_t FG_getStatus(void){
@@ -448,5 +446,5 @@ static bool writeOpConfig(uint16_t value){
 }
 
 static void clearBuffer(void){
-	buffer[0] = '\0';
+	bufferFG[0] = '\0';
 }
