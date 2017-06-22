@@ -19,8 +19,11 @@
 #include "util.h"
 
 #include "Fuel_Gauge.h"
-#include "Button.h"
 #include "LED.h"
+#include "Button.h"
+
+#include "Detect.h"
+
 
 #define NRF_LOG_MODULE_NAME "APP"
 
@@ -71,9 +74,8 @@
 
 #define DEAD_BEEF                       0xDEADBEEF                                  /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
-//#define FINAL 1
-
-static volatile uint8_t file_flag=0;
+uint8_t flagLED;
+uint8_t file_flag;
 
 static uint16_t m_conn_handle = BLE_CONN_HANDLE_INVALID;                            /**< Handle of the current connection. */
 
@@ -82,6 +84,7 @@ app_packet PKT;
 
 gap_disc tmp_disc; //for SCAN TARGET
 uint8_t tmp_addr[BLE_GAP_ADDR_LEN];
+int tmp_base_rssi[MAX_DISC_QUEUE];
 
 static per_t m_per_s;
 static cen_t m_cen_s;
@@ -90,7 +93,11 @@ static ble_db_discovery_t m_ble_db_discovery;             /**< Instance of datab
 APP_TIMER_DEF(m_single_timer);
 #define NET_DISC_TIMER_INTERVAL     APP_TIMER_TICKS(10000, APP_TIMER_PRESCALER) // 1000 ms intervals
 
-volatile bool flagLED = false;
+__IO flagDetect flagButton = {.flag = false };
+__IO flagDetect flagCharger = {.flag = false };
+__IO flagDetect flagLowBattery = {.flag = false };
+__IO flagDetect flagSensor = {.flag = false };
+
 volatile bool tgt_scan = false;
 
 const ble_gap_conn_params_t m_connection_param =
@@ -332,7 +339,10 @@ static void db_discovery_init(void) {
 
 void scan_start(void) {
     ret_code_t err_code;
-
+    
+    memset(&tmp_disc,0,sizeof(tmp_disc));
+    memset(tmp_base_rssi,0,sizeof(tmp_base_rssi));
+    
     (void) sd_ble_gap_scan_stop();
 
     err_code = sd_ble_gap_scan_start(&m_scan_params);
@@ -370,36 +380,34 @@ static void sleep_mode_enter(void) {
 
 //170228 [TODO] : IF NO NODE FOUND??
 // TODO: More Structured. Check if Duplicate Exists.
-void net_disc(gap_disc *node, const ble_evt_t *const p_ble_evt) {
-    static int base_rssi[MAX_DISC_QUEUE];
+void net_disc(gap_disc *disc, const ble_evt_t *const p_ble_evt) {
+    const ble_gap_evt_adv_report_t *p_adv_report = &p_ble_evt->evt.gap_evt.params.adv_report;
 
-    if (node->cnt < MAX_DISC_QUEUE) {
-        const ble_gap_evt_adv_report_t *p_adv_report = &p_ble_evt->evt.gap_evt.params.adv_report;
+    if (disc->cnt < MAX_DISC_QUEUE) {
         if (is_uuid_present(&m_cmds_uuid, p_adv_report)) {
-
-            for (int i = 0; i < node->cnt; i++) {
-                if (!memcmp(node->peer[i].p_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)) {
-                    if (node->peer[i].rssi_cnt < MAX_RSSI_CNT) {
-                        base_rssi[i] += p_adv_report->rssi;
-                        node->peer[i].rssi_cnt++;
-                        node->peer[i].rssi = base_rssi[i] / node->peer[i].rssi_cnt;
+            for (int i = 0; i < disc->cnt; i++) {
+                if (!memcmp(disc->peer[i].p_addr.addr, p_adv_report->peer_addr.addr, BLE_GAP_ADDR_LEN)) {
+                    if (disc->peer[i].rssi_cnt < MAX_RSSI_CNT) {
+                        tmp_base_rssi[i] += p_adv_report->rssi;
+                        disc->peer[i].rssi_cnt++;
+                        disc->peer[i].rssi = tmp_base_rssi[i] / disc->peer[i].rssi_cnt;
                         LOG_D("count %d : Addr : %s Rssi : %d \r\n",
-                              node->peer[i].rssi_cnt, STR_PUSH(node->peer[i].p_addr.addr, 1), node->peer[i].rssi);
+                              disc->peer[i].rssi_cnt, STR_PUSH(disc->peer[i].p_addr.addr, 1), disc->peer[i].rssi);
                     }
                     return;
                 }
             }
 
-            node->peer[node->cnt].p_addr = p_adv_report->peer_addr;
-            node->peer[node->cnt].rssi = p_adv_report->rssi;
-            node->peer[node->cnt].rssi_cnt = 1;
-            node->peer[node->cnt].disc = true;
-            base_rssi[node->cnt] = p_adv_report->rssi;
-            node->cnt += 1;
+            disc->peer[disc->cnt].p_addr = p_adv_report->peer_addr;
+            disc->peer[disc->cnt].rssi = p_adv_report->rssi;
+            disc->peer[disc->cnt].rssi_cnt = 1;
+            disc->peer[disc->cnt].disc = true;
+            tmp_base_rssi[disc->cnt] = p_adv_report->rssi;
+            disc->cnt += 1;
 
-            for (int i = 0; i < node->cnt; i++) {
-                LOG_I("No %d : Addr : %s Rssi : %d \r\n", i, STR_PUSH(node->peer[i].p_addr.addr, 1),
-                      node->peer[i].rssi);
+            for (int i = 0; i < disc->cnt; i++) {
+                LOG_I("No %d : Addr : %s Rssi : %d \r\n", i, STR_PUSH(disc->peer[i].p_addr.addr, 1),
+                      disc->peer[i].rssi);
             }
         }
     } else {
@@ -446,7 +454,7 @@ static void nrf_cen_evt(const ble_evt_t *const p_ble_evt) {
             break; // BLE_GAP_EVT_CONNECTED
 
         case BLE_GAP_EVT_DISCONNECTED: {
-            LOG_I("Central disconnected (reason: %d)\r\n", p_gap_evt->params.disconnected.reason);
+            LOG_I("CENTRAL DISCONNECTED (reason: %d)\r\n", p_gap_evt->params.disconnected.reason);
 
             bsp_board_led_off(CENTRAL_CONNECTED_LED);
         }
@@ -456,7 +464,6 @@ static void nrf_cen_evt(const ble_evt_t *const p_ble_evt) {
             if(!tgt_scan){
                 net_disc(&APP.net.node, p_ble_evt);
             } else {
-                memset(&tmp_disc,0,sizeof(tmp_disc));
                 net_disc(&tmp_disc,p_ble_evt);
             }
             break; // BLE_GAP_ADV_REPORT
@@ -478,6 +485,7 @@ static void nrf_cen_evt(const ble_evt_t *const p_ble_evt) {
 
                     for(int i=0; i<tmp_disc.cnt;i++){
                         if (!memcmp(tmp_addr,tmp_disc.peer[i].p_addr.addr, BLE_GAP_ADDR_LEN)) {
+                            LOG_D("rssi VAlue %d\r\n",tmp_disc.peer[i].rssi);
                             tmp_res[6] = - tmp_disc.peer[i].rssi;
                             break; 
                         }
@@ -537,6 +545,7 @@ static void nrf_cen_evt(const ble_evt_t *const p_ble_evt) {
  * @param[in] p_ble_evt  Bluetooth stack event.
  */
 static void nrf_per_evt(ble_evt_t *p_ble_evt) {
+    const ble_gap_evt_t *const p_gap_evt = &p_ble_evt->evt.gap_evt;
     ret_code_t err_code;
     switch (p_ble_evt->header.evt_id) {
         case BLE_GAP_EVT_CONNECTED:
@@ -544,7 +553,7 @@ static void nrf_per_evt(ble_evt_t *p_ble_evt) {
             break; //BLE_GAP_EVT_CONNECTED
 
         case BLE_GAP_EVT_DISCONNECTED:
-            LOG_I("Peripheral disconnected\r\n");
+            LOG_I("PERIPHERAL DISCONNECTED  (reason: %d)\r\n", p_gap_evt->params.disconnected.reason);
             break;//BLE_GAP_EVT_DISCONNECTED
 
         case BLE_GATTC_EVT_TIMEOUT:
@@ -746,41 +755,6 @@ static void peer_manager_init(bool erase_bonds) {
 }
 
 
-/**@brief Function for handling events from the BSP module.
- *
- * @param[in]   event   Event generated when button is pressed.
- */
-static void bsp_event_handler(bsp_event_t event) {
-    uint32_t err_code;
-
-    switch (event) {
-        case BSP_EVENT_SLEEP:
-            sleep_mode_enter();
-            break; // BSP_EVENT_SLEEP
-
-        case BSP_EVENT_DISCONNECT:
-            err_code = sd_ble_gap_disconnect(m_conn_handle,
-                                             BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
-            if (err_code != NRF_ERROR_INVALID_STATE) {
-                APP_ERROR_CHECK(err_code);
-            }
-            break; // BSP_EVENT_DISCONNECT
-
-        case BSP_EVENT_WHITELIST_OFF:
-            if (m_conn_handle == BLE_CONN_HANDLE_INVALID) {
-                err_code = ble_advertising_restart_without_whitelist();
-                if (err_code != NRF_ERROR_INVALID_STATE) {
-                    APP_ERROR_CHECK(err_code);
-                }
-            }
-            break; // BSP_EVENT_KEY_0
-
-        default:
-            break;
-    }
-}
-
-
 /**@brief Function for initializing the Advertising functionality.
  */
 static void advertising_init(void) {
@@ -813,26 +787,6 @@ static void advertising_init(void) {
 }
 
 
-/**@brief Function for initializing buttons and leds.
- *
- * @param[out] p_erase_bonds  Will be true if the clear bonding button was pressed to wake the application up.
- */
-static void buttons_leds_init(bool *p_erase_bonds) {
-    bsp_event_t startup_event;
-
-    uint32_t err_code = bsp_init(BSP_INIT_LED | BSP_INIT_BUTTONS,
-                                 APP_TIMER_TICKS(100, APP_TIMER_PRESCALER),
-                                 bsp_event_handler);
-
-    APP_ERROR_CHECK(err_code);
-
-    err_code = bsp_btn_ble_init(NULL, &startup_event);
-    APP_ERROR_CHECK(err_code);
-
-    *p_erase_bonds = (startup_event == BSP_EVENT_CLEAR_BONDING_DATA);
-}
-
-
 /**@brief Function for the Power manager.
  */
 static void power_manage(void) {
@@ -860,20 +814,36 @@ static void device_preset() {
     }
 
     sprintf(APP.dev.name, "%s%03d", DEVICE_NAME_PREFIX, rand_number);
+    
+    #ifdef FINAL
+		
+		err_code = LED_Init();
+		if(err_code != NRF_SUCCESS){
+			LOG_D("LED_Init() Error Code : %d\r\n", err_code);
+		}
+		
+		err_code = Button_Init();
+		if(err_code != NRF_SUCCESS){
+			LOG_D("Button_Init() Error Code : %d\r\n", err_code);
+		}
 
-#ifdef FINAL
-    Fuel_Gauge_Init();
-
-    LED_Init();
-
-    Button_Init();
-#endif // FINAL
+		err_code = Fuel_Gauge_Init();
+		if(err_code != NRF_SUCCESS){
+			LOG_D("Fuel_Gauge_Init() Error Code : %d\r\n", err_code);
+		}
+		
+		err_code = Detect_Init();
+		if(err_code != NRF_SUCCESS){
+			LOG_D("Detect_Init() Error Code : %d\r\n", err_code);
+		}
+	#endif // FINAL
+    
 }
 
 void Button_Click_CallBack() {
     LOG_D("Button Pressed\r\n");
-    pkt_build(PKT_TYPE_NODE_BTN_PRESS_REQ,0);
-
+    pkt_build(PKT_TYPE_NODE_BTN_PRESS_REQ,0); //Move Seq. to Main FSM
+	flagButton.flag = true;
 }
 
 
@@ -909,32 +879,56 @@ static ret_code_t app_fds_init(void) {
     return NRF_SUCCESS;
 }
 
+void Detect_CallBack(uint32_t rising, uint32_t falling){
+	flagSensor.flag = true;
+	flagSensor.rising = rising;
+	flagSensor.falling = falling;
+}
+
+
+void sensor_check(){
+    if(flagSensor.state == Falling){
+        LOG_D("ID %d is Falling\r\n", flagSensor.pin);
+        if(checkItem(flagSensor.pin)){
+            removeItem(flagSensor.pin);
+        }
+    }else{
+        LOG_D("ID %d is Rising\r\n", flagSensor.pin);
+        if(checkItem(flagSensor.pin)){
+            push(flagSensor.pin);
+        }
+    }
+}
 
 /**@brief Function for application main entry.
  */
 int main(void) {
     uint32_t err_code;
-    bool erase_bonds;
+//    bool erase_bonds;
 
     memset(&APP, 0, sizeof(APP));
     memset(&PKT.tx_p.tx_que, CEN_TXP_QUEUE_UNAVAILABLE, sizeof(PKT.tx_p.tx_que)); //for tx_que index
 
     // Initialize.
+		#if NRF_LOG_ENABLED
     err_code = NRF_LOG_INIT(NULL);
     APP_ERROR_CHECK(err_code);
-
+		#else
+		err_code = Sensor_Communication_Init();
+		if(err_code != NRF_SUCCESS){
+			
+		}
+		#endif
+	
     timers_init();
-    buttons_leds_init(&erase_bonds);
+
     ble_stack_init();
-    peer_manager_init(erase_bonds); //fds init.
-    if (erase_bonds == true) {
-        LOG_I("Bonds erased!\r\n");
-    }
-    
-    err_code =app_fds_init();
-    APP_ERROR_CHECK(err_code);
-    app_fds_read();
-    
+    peer_manager_init(false); //fds init.
+
+    err_code =app_fds_init(); 
+    APP_ERROR_CHECK(err_code); 
+    app_fds_read(); 
+
     device_preset();
     app_fds_save();
 
@@ -947,8 +941,8 @@ int main(void) {
     advertising_init();
     conn_params_init();
     
-    LOG_D("Ram Size : %d byte %d Word \r\n", sizeof(APP), sizeof(APP)/4+1);
-    LOG_D("%s Addr : %s\r\n", LOG_PUSH(APP.dev.name), STR_PUSH(APP.dev.my_addr.addr, 1));
+    LOG_D("FDS: %d Wd  %s Addr : %s \r\n", sizeof(APP)/4+1, LOG_PUSH(APP.dev.name), 
+                                                                        STR_PUSH(APP.dev.my_addr.addr, 1));
     
     nrf_delay_ms(100);
 
@@ -961,15 +955,10 @@ int main(void) {
     } else{
         LOG_D("BQ27441 isn't Worked!!\r\n");
     }
-    
-    LED_Not_Enough();
 
     LED_Control("0F0000");
     nrf_delay_ms(1000);
-    
-    LED_Control("0F0F00");
-    nrf_delay_ms(1000);
-    
+        
     LED_Control("000000");
 #endif // FINAL
 
@@ -978,13 +967,70 @@ int main(void) {
             if (LED_Control(PKT.rx_p.pkt[PKT.rx_p.proc_cnt - 1].data.p_data)) {
                 //  TODO : IF success
             }
-            pkt_build(PKT_TYPE_NODE_LED_RESPONSE,0);
+            pkt_build(PKT_TYPE_NODE_LED_RES,0);
             flagLED = false;
         }
-
+        
+        if(flagButton.flag){
+            if(checkButton() == Falling){
+                LOG_D("flagButton is Falling\r\n");
+            }else{
+                LOG_D("flagButton is Rising\r\n");
+            }
+            flagButton.flag = false;
+        }
+        
+        if(flagLowBattery.flag){
+            if(checkChannel(ID_GPOUT) == Falling){
+                LOG_D("flagLowBattery is Falling\r\n");
+            }else{
+                LOG_D("flagLowBattery is Rising\r\n");
+            }
+            flagLowBattery.flag = false;
+        }
+        
+        if(flagCharger.flag){
+            if(checkChannel(ID_CHG) == Falling){
+                LOG_D("flagCharger is Falling\r\n");
+            }else{
+                LOG_D("flagCharger is Rising\r\n");
+            }
+            flagCharger.flag = false;
+        }
+        
+        if(flagSensor.flag){
+            checkEdge(&flagSensor);
+            
+            switch(flagSensor.pin){
+                case ID1:
+                case ID2:
+                case ID3:
+                case ID4:
+                case ID5:
+                sensor_check();
+                break;
+                    
+                case ID_GPOUT:
+                    if(flagSensor.state == Falling){
+                        LOG_D("ID_GPOUT is Falling\r\n");
+                    }else{
+                        LOG_D("ID_GPOUT is Rising\r\n");
+                    }
+                break;
+                case ID_CHG:
+                    if(flagSensor.state == Falling){
+                        LOG_D("ID_CHG is Falling\r\n");
+                    }else{
+                        LOG_D("ID_CHG is Rising\r\n");
+                    }
+                break;
+            }
+            
+            flagSensor.flag = false;
+        }
+        
         pkt_send(&m_cen_s);
         if (NRF_LOG_PROCESS() == false) {
-//            sleep_mode_enter();
             power_manage();
         }
     }
