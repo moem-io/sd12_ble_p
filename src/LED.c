@@ -82,7 +82,7 @@ void LED_Connect(void){
     app_pwm_disable(&battery);
 }
 
-bool LED_Control(char* string){
+bool LED_Control(uint8_t* string){
     
     if(str_to_int(string) != NULL){
         LED_Red(bufferRGB[0]);

@@ -33,7 +33,7 @@ void LED_Enough(void);
 void LED_Not_Connect(void);
 void LED_Connect(void);
 
-bool LED_Control(char *);
+bool LED_Control(uint8_t *);
 
 static void LED_Red(uint8_t);
 static void LED_Green( uint8_t value, bool flag);
