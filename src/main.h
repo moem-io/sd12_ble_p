@@ -16,7 +16,7 @@
 #define MAX_PKT_DATA_LEN 40
 #define MAX_DEV_NAME 10
 #define MAX_NODE_CNT 40
-#define MAX_DEPTH_CNT 5 
+#define MAX_DEPTH_CNT 5
 
 #define APP_STATUS_SUCCESS              0x0000
 #define APP_STATUS_UNKNOWN              0x0001

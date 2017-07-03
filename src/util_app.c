@@ -5,21 +5,21 @@
 
 uint8_t analyze_data(uint8_t *p_data, uint8_t size) {
     uint8_t end_data[DATA_LEN] = {0x00,};
-    int unit_cnt = MAX_PKT_DATA_LEN /  size;
-    int i =0;
+    int unit_cnt = MAX_PKT_DATA_LEN / size;
+    int i = 0;
 
-    for(i=0; i < unit_cnt; i++){
-        if(!memcmp(&p_data[i*size],end_data,size)){
+    for (i = 0; i < unit_cnt; i++) {
+        if (!memcmp(&p_data[i * size], end_data, size)) {
             break;
         }
     }
-    
+
     return i;
 }
 
 
 //TODO: [BUG] only 128 idx can be retreived. 
-int8_t get_addr_idx(uint8_t *p_data){
+int8_t get_addr_idx(uint8_t *p_data) {
     for (int8_t i = 0; i < APP.net.node.cnt; i++) {
         if (!memcmp(APP.net.node.peer[i].p_addr.addr, p_data, BLE_GAP_ADDR_LEN)) {
             return i;
@@ -40,17 +40,17 @@ int8_t get_id_idx(uint8_t *id) {
             return i;
         }
     }
-    LOG_D("[GET ID] %d NOT FOUND!\r\n",*id);
+    LOG_D("[GET ID] %d NOT FOUND!\r\n", *id);
     return NODE_ID_NOT_FOUND;
 }
 
 
 ble_gap_addr_t *get_node(uint8_t *p_data, bool id, bool addr) {
-    int idx = (id) ? get_id_idx(p_data): get_addr_idx(p_data);
-    
-    if(idx == NODE_ID_NOT_FOUND){
+    int idx = (id) ? get_id_idx(p_data) : get_addr_idx(p_data);
+
+    if (idx == NODE_ID_NOT_FOUND) {
         return NULL;
-    } else if(idx == NODE_ROOT_FOUND) {
+    } else if (idx == NODE_ROOT_FOUND) {
         return &APP.dev.parent;
     } else {
         return &APP.net.node.peer[idx].p_addr;
@@ -59,33 +59,33 @@ ble_gap_addr_t *get_node(uint8_t *p_data, bool id, bool addr) {
 
 
 ble_gap_addr_t *retrieve_send(uint8_t *p_data, bool id, bool addr) {
-    gap_data* peer = APP.net.node.peer;
-    int idx = (id) ? get_id_idx(p_data): get_addr_idx(p_data);
-    
-    if(idx == NODE_ID_NOT_FOUND){
+    gap_data *peer = APP.net.node.peer;
+    int idx = (id) ? get_id_idx(p_data) : get_addr_idx(p_data);
+
+    if (idx == NODE_ID_NOT_FOUND) {
         return NULL;
-    } else if(idx == NODE_ROOT_FOUND) {
+    } else if (idx == NODE_ROOT_FOUND) {
         return &APP.dev.parent;
     } else {
-        if (peer[idx].disc){
+        if (peer[idx].disc) {
             return &peer[idx].p_addr;
         } else {
-            return retrieve_send(&peer[idx].path[0],1,0);
+            return retrieve_send(&peer[idx].path[0], 1, 0);
         }
     }
 }
 
 bool update_node_id(uint8_t *n_addr, uint8_t *id) {
-    gap_data* peer = APP.net.node.peer;
+    gap_data *peer = APP.net.node.peer;
     int8_t addr_idx = get_addr_idx(n_addr);
-    
-    if(addr_idx == NODE_ADDR_NOT_FOUND){
+
+    if (addr_idx == NODE_ADDR_NOT_FOUND) {
         return false;
     }
 
     peer[addr_idx].id = *id;
 
-    LOG_I("ADDR %s / %d / %d !!\r\n", STR_PUSH(peer[addr_idx].p_addr.addr, 1),peer[addr_idx].id,*id);
+    LOG_I("ADDR %s / %d / %d !!\r\n", STR_PUSH(peer[addr_idx].p_addr.addr, 1), peer[addr_idx].id, *id);
 
     return true;
 }
@@ -94,45 +94,45 @@ bool update_node_id(uint8_t *n_addr, uint8_t *id) {
 
 //just for scan response
 bool add_node(uint8_t *n_addr, uint8_t *src_id) {
-    gap_data* peer = APP.net.node.peer;
-    int8_t conn_idx = 0; 
+    gap_data *peer = APP.net.node.peer;
+    int8_t conn_idx = 0;
 
-    LOG_D("Node CNT : %d \r\n",APP.net.node.cnt);
-    if(get_addr_idx(n_addr) != NODE_ADDR_NOT_FOUND){
+    LOG_D("Node CNT : %d \r\n", APP.net.node.cnt);
+    if (get_addr_idx(n_addr) != NODE_ADDR_NOT_FOUND) {
         LOG_I("Already Found!");
         return false;
     }
-    
-    if(!memcmp(n_addr, APP.dev.my_addr.addr, BLE_GAP_ADDR_LEN)){
+
+    if (!memcmp(n_addr, APP.dev.my_addr.addr, BLE_GAP_ADDR_LEN)) {
         int8_t node_idx = get_id_idx(src_id);
-        if(node_idx) {
+        if (node_idx) {
             peer[node_idx].disc = true;
             LOG_I("Found by One-Side. \r\n");
         }
         return false;
-    } 
-    
+    }
+
     LOG_I("Node ADD!\r\n");
     ble_gap_addr_t new_addr;
-    memset(&new_addr,0,sizeof(new_addr));
+    memset(&new_addr, 0, sizeof(new_addr));
     new_addr.addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC; // TODO: MAYBE this might be wrong.
 
-    memcpy(new_addr.addr,n_addr,BLE_GAP_ADDR_LEN);
+    memcpy(new_addr.addr, n_addr, BLE_GAP_ADDR_LEN);
     peer[APP.net.node.cnt].p_addr = new_addr;
 
     conn_idx = get_addr_idx(APP.dev.conn_cen.addr);
-    peer[APP.net.node.cnt].path[0]= peer[conn_idx].id;
-    
+    peer[APP.net.node.cnt].path[0] = peer[conn_idx].id;
+
     LOG_D("Addr set : %s, PATH : %s \r\n", STR_PUSH(peer[APP.net.node.cnt].p_addr.addr, 1), STR_PUSH(peer[APP.net.node.cnt].path, 0));
-    
+
     APP.net.node.cnt++;
     return true;
 }
 
 
 void update_node(p_pkt *rxp) {
-    gap_data* peer = APP.net.node.peer;
-    
+    gap_data *peer = APP.net.node.peer;
+
     int8_t res = 0;
     switch (rxp->header.type) {
         case PKT_TYPE_NET_SCAN_REQ:
@@ -141,23 +141,20 @@ void update_node(p_pkt *rxp) {
                 LOG_I("ADDR %s ID %d -> %d !!\r\n", STR_PUSH(peer[res].p_addr.addr, 1),
                       peer[res].id, rxp->header.target.node);
                 peer[res].id = rxp->header.target.node;
-            } else if(res == NODE_ADDR_NOT_FOUND) {
+            } else if (res == NODE_ADDR_NOT_FOUND) {
                 LOG_E("UNDISCOVERED REQUEST\r\n");
             }
             break;
-        
+
         case PKT_TYPE_NET_SCAN_RES:
-             res = analyze_data(rxp->data.p_data,7);
-            
-            for(int i=0; i<res; i++){
-                add_node(&rxp->data.p_data[i*7], &rxp->header.source.node);
+            res = analyze_data(rxp->data.p_data, 7);
+
+            for (int i = 0; i < res; i++) {
+                add_node(&rxp->data.p_data[i * 7], &rxp->header.source.node);
             }
             break;
     }
 }
-
-
-
 
 
 void app_dev_parent_set(ble_gap_addr_t *addr) {
@@ -233,14 +230,13 @@ bool is_uuid_present(const ble_uuid_t *p_target_uuid, const ble_gap_evt_adv_repo
 }
 
 
-
 static ret_code_t app_fds_write(void) {
     fds_record_t record;
     fds_record_desc_t record_desc;
     fds_record_chunk_t record_chunk;
     // Set up data.
     record_chunk.p_data = &APP;
-    record_chunk.length_words = sizeof(APP)/4+1;
+    record_chunk.length_words = sizeof(APP) / 4 + 1;
     // Set up record.
     record.file_id = APP_FILE_ID;
     record.key = APP_REC_KEY;
@@ -259,9 +255,9 @@ ret_code_t app_fds_read(void) {
     fds_flash_record_t flash_record;
     fds_record_desc_t record_desc;
     fds_find_token_t ftok = {0};//Important, make sure you zero init the ftok token
-    uint32_t * data;
+    uint32_t *data;
     uint32_t err_code;
-    
+
     while (fds_record_find(APP_FILE_ID, APP_REC_KEY, &record_desc, &ftok) == FDS_SUCCESS) {
         err_code = fds_record_open(&record_desc, &flash_record);
         if (err_code != FDS_SUCCESS) {
@@ -271,8 +267,8 @@ ret_code_t app_fds_read(void) {
         data = (uint32_t *) flash_record.p_data;
         memcpy(&APP, data, sizeof(APP));
 
-        LOG_D("[ID: %d NET : %d] %s %d\r\n", APP.dev.my_id ,APP.net.established ,
-                                                                            LOG_PUSH(APP.dev.name),record_desc.record_id);
+        LOG_D("[ID: %d NET : %d] %s %d\r\n", APP.dev.my_id, APP.net.established,
+              LOG_PUSH(APP.dev.name), record_desc.record_id);
         // Access the record through the flash_record structure.
         // Close the record when done.
         err_code = fds_record_close(&record_desc);
@@ -280,7 +276,7 @@ ret_code_t app_fds_read(void) {
             return err_code;
         }
     }
-        
+
     return NRF_SUCCESS;
 }
 
@@ -309,6 +305,6 @@ void app_fds_save(void) {
 
     err_code = app_fds_find_and_delete();
     ERR_CHK("APP FIND & DEL FAILED\r\n");
-    err_code =app_fds_write();
+    err_code = app_fds_write();
     ERR_CHK("APP WRITE FAILED\r\n");
 }

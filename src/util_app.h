@@ -20,13 +20,17 @@
 #define NODE_ID_NOT_FOUND        -1
 
 uint8_t analyze_data(uint8_t *p_data, uint8_t size);
+
 int8_t get_id_idx(uint8_t *id);
+
 int8_t get_addr_idx(uint8_t *p_data);
 
 ble_gap_addr_t *get_node(uint8_t *p_data, bool id, bool addr);
+
 ble_gap_addr_t *retrieve_send(uint8_t *p_data, bool id, bool addr);
 
 void update_node(p_pkt *rxp);
+
 bool update_node_id(uint8_t *n_addr, uint8_t *id);
 
 void app_dev_parent_set(ble_gap_addr_t *addr);
@@ -34,5 +38,7 @@ void app_dev_parent_set(ble_gap_addr_t *addr);
 bool is_uuid_present(const ble_uuid_t *p_target_uuid, const ble_gap_evt_adv_report_t *adv_report);
 
 ret_code_t app_fds_read(void);
+
 void app_fds_save(void);
+
 #endif
