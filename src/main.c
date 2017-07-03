@@ -11,9 +11,6 @@
 #include "softdevice_handler.h"
 #include "app_timer.h"
 #include "peer_manager.h"
-//#include "bsp.h"
-//#include "bsp_btn_ble.h"
-
 #include "ble_conn_state.h"
 
 #include "util.h"
@@ -27,6 +24,13 @@
 #include "Sensor_Communication.h"
 
 #define DEBUG
+
+//#define TEST_LED
+//#define TEST_BUZZER
+//#define TEST_IR
+//#define TEST_TH
+
+//#define NETWORK
 
 #define NRF_LOG_MODULE_NAME "APP"
 
@@ -77,7 +81,7 @@
 
 #define DEAD_BEEF                       0xDEADBEEF                                  /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
-#define FINAL
+//#define FINAL
 
 uint8_t flagLED;
 uint8_t file_flag;
@@ -103,6 +107,7 @@ __IO flagDetect flagCharger 			= {.flag = false };
 __IO flagDetect flagLowBattery = {.flag = false };
 __IO flagDetect flagSensor 			= {.flag = false };
 __IO flagUART	flagCommunication 					= { .flag = false };
+__IO flagPacket flagCommand = {.flag = false};
 
 volatile bool tgt_scan = false;
 
@@ -253,12 +258,10 @@ static void timer_timeout_handler(void *p_context) {
  *
  * @details Initializes the timer module. This creates and starts application timers.
  */
-static void timers_init(void) {
+static uint32_t timers_init(void) {
     APP_TIMER_INIT(APP_TIMER_PRESCALER, APP_TIMER_OP_QUEUE_SIZE, false);
 
-    uint32_t err_code;
-    err_code = app_timer_create(&m_single_timer, APP_TIMER_MODE_SINGLE_SHOT, timer_timeout_handler);
-    APP_ERROR_CHECK(err_code);
+    return app_timer_create(&m_single_timer, APP_TIMER_MODE_SINGLE_SHOT, timer_timeout_handler);
 }
 
 static void gap_params_init(void) {
@@ -345,10 +348,10 @@ static void db_discovery_init(void) {
 
 void scan_start(void) {
     ret_code_t err_code;
-    
-    memset(&tmp_disc,0,sizeof(tmp_disc));
-    memset(tmp_base_rssi,0,sizeof(tmp_base_rssi));
-    
+
+    memset(&tmp_disc, 0, sizeof(tmp_disc));
+    memset(tmp_base_rssi, 0, sizeof(tmp_base_rssi));
+
     (void) sd_ble_gap_scan_stop();
 
     err_code = sd_ble_gap_scan_start(&m_scan_params);
@@ -466,40 +469,40 @@ static void nrf_cen_evt(const ble_evt_t *const p_ble_evt) {
         }
             break; // BLE_GAP_EVT_DISCONNECTED
 
-        case BLE_GAP_EVT_ADV_REPORT: 
-            if(!tgt_scan){
+        case BLE_GAP_EVT_ADV_REPORT:
+            if (!tgt_scan) {
                 net_disc(&APP.net.node, p_ble_evt);
             } else {
-                net_disc(&tmp_disc,p_ble_evt);
+                net_disc(&tmp_disc, p_ble_evt);
             }
             break; // BLE_GAP_ADV_REPORT
 
         case BLE_GAP_EVT_TIMEOUT: {
             if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_SCAN) {
-                if(!tgt_scan){
+                if (!tgt_scan) {
 //                    LOG_I("NET SCANNING TIMEOUT -- %d FOUND!!\r\n", APP.net.node.cnt);
 //                    node_disc_chk();
                     LOG_I("NET Discovery Checked! -- %d FOUND!!\r\n", APP.net.node.cnt);
                     APP.net.discovered = APP_NET_DISCOVERED_TRUE;
 
-                    pkt_build(PKT_TYPE_NET_SCAN_RES,0,0);
-                    } else { //TGT SCAN SEQ. (DISC)? RSSI :0;
+                    pkt_build(PKT_TYPE_NET_SCAN_RES, 0, 0);
+                } else { //TGT SCAN SEQ. (DISC)? RSSI :0;
 
                     tgt_scan = false;
                     uint8_t tmp_res[BLE_GAP_ADDR_LEN + 1] = {0,}; //1 for RSSI
                     memcpy(tmp_res, tmp_addr, BLE_GAP_ADDR_LEN);
 
-                    for(int i=0; i<tmp_disc.cnt;i++){
-                        if (!memcmp(tmp_addr,tmp_disc.peer[i].p_addr.addr, BLE_GAP_ADDR_LEN)) {
-                            LOG_D("rssi VAlue %d\r\n",tmp_disc.peer[i].rssi);
-                            tmp_res[6] = - tmp_disc.peer[i].rssi;
-                            break; 
+                    for (int i = 0; i < tmp_disc.cnt; i++) {
+                        if (!memcmp(tmp_addr, tmp_disc.peer[i].p_addr.addr, BLE_GAP_ADDR_LEN)) {
+                            LOG_D("rssi VAlue %d\r\n", tmp_disc.peer[i].rssi);
+                            tmp_res[6] = -tmp_disc.peer[i].rssi;
+                            break;
                         }
                     }
-                    
-                    pkt_build(PKT_TYPE_SCAN_TGT_RES,tmp_res,0);
+
+                    pkt_build(PKT_TYPE_SCAN_TGT_RES, tmp_res, 0);
                 }
-                
+
             } else if (p_gap_evt->params.timeout.src == BLE_GAP_TIMEOUT_SRC_CONN) {
                 LOG_I("Connection Request timed out.\r\n");
             }
@@ -623,13 +626,9 @@ static void nrf_per_evt(ble_evt_t *p_ble_evt) {
 
 
 static void on_adv_evt(ble_adv_evt_t ble_adv_evt) {
-    uint32_t err_code;
-
     switch (ble_adv_evt) {
         case BLE_ADV_EVT_FAST:
             LOG_I("Fast advertising\r\n");
-//            err_code = bsp_indication_set(BSP_INDICATE_ADVERTISING);
-//            APP_ERROR_CHECK(err_code);
             break;
 
         case BLE_ADV_EVT_IDLE:
@@ -809,41 +808,35 @@ static void device_preset() {
     uint8_t rand_number;
 
     err_code = sd_ble_gap_address_get(&APP.dev.my_addr);
-    APP_ERROR_CHECK(err_code);
+    ERR_CHK("GAP ADDR get Fail");
 
     nrf_delay_ms(100); // wait for random pool to be filled.
     err_code = sd_rand_application_bytes_available_get(&num_rand_bytes_available);
-    APP_ERROR_CHECK(err_code);
+    ERR_CHK("Ramdom init FAIL");
+
     if (num_rand_bytes_available > 0) {
         err_code = sd_rand_application_vector_get(&rand_number, 1);
-        APP_ERROR_CHECK(err_code);
+        ERR_CHK("Ramdom GET FAIL");
     }
 
     sprintf(APP.dev.name, "%s%03d", DEVICE_NAME_PREFIX, rand_number);
-    
-    #ifdef FINAL
-		
-		err_code = LED_Init();
-		if(err_code != NRF_SUCCESS){
-			printf("LED_Init() Error Code : %d\r\n", err_code);
-		}
-		
-		err_code = Button_Init();
-		if(err_code != NRF_SUCCESS){
-			printf("Button_Init() Error Code : %d\r\n", err_code);
-		}
 
-		err_code = Fuel_Gauge_Init();
-		if(err_code != NRF_SUCCESS){
-			printf("Fuel_Gauge_Init() Error Code : %d\r\n", err_code);
-		}
-		
-		err_code = Detect_Init();
-		if(err_code != NRF_SUCCESS){
-			printf("Detect_Init() Error Code : %d\r\n", err_code);
-		}
-	#endif // FINAL
-    
+#ifdef FINAL
+
+    err_code = LED_Init();
+    ERR_CHK("LED init Fail");
+
+    err_code = Button_Init();
+    ERR_CHK("Button init Fail");
+
+    err_code = Fuel_Gauge_Init();
+    ERR_CHK("FG init Fail");
+
+    err_code = Detect_Init();
+    ERR_CHK("Detect init Fail");
+
+#endif // FINAL
+
 }
 
 
@@ -870,7 +863,7 @@ static ret_code_t app_fds_init(void) {
     if (ret != FDS_SUCCESS) {
         return ret;
     }
-    
+
     ret = fds_init();
     if (ret != FDS_SUCCESS) {
         return ret;
@@ -881,178 +874,209 @@ static ret_code_t app_fds_init(void) {
 
 void Button_Click_CallBack() {
     // // LOG_D("Button Pressed\r\n");
-
-  //pkt_build(PKT_TYPE_NODE_BTN_PRESS_REQ,0,0); //Move Seq. to Main FSM
-	flagButton.flag = true;
+//TODO: Sequence must change to NVIC
+#ifdef NETWORK
+    pkt_build(PKT_TYPE_NODE_BTN_PRESS_REQ,0,0); //Move Seq. to Main FSM
+#endif
+    //////////
+    flagButton.flag = true;
 }
 
 
-void Detect_CallBack(uint32_t rising, uint32_t falling){
-	flagSensor.flag = true;
-	flagSensor.rising = rising;
-	flagSensor.falling = falling;
+void Detect_CallBack(uint32_t rising, uint32_t falling) {
+    flagSensor.flag = true;
+    flagSensor.rising = rising;
+    flagSensor.falling = falling;
 }
 
- void UART_Receive_CallBack(char* messages){
-	flagCommunication.flag = true;
-	strcpy(flagCommunication.bufferPacket, messages);
+void UART_Receive_CallBack(char *messages) {
+    flagCommunication.flag = true;
+    strcpy(flagCommunication.bufferPacket, messages);
 }
 
-void sensor_check(){
-	Packet* packet;
-	char data[2];
-	Packet_Status err_code;
-	
-	if(flagSensor.state == Falling){
-		if( getState_Channel(flagSensor.pin) == Rising || !checkChannel(flagSensor.pin) ){
-			printf("ID %d is Falling\r\n", flagSensor.pin);
-			setState_Channel(flagSensor.pin, Falling);
-			setSensor_Channel(flagSensor.pin, 0);
-            
+void sensor_check() {
+    Packet *packet;
+    char data[2];
+    Packet_Status err_code;
+
+    if (flagSensor.state == Falling) {
+        if (getState_Channel(flagSensor.pin) == Rising || !checkChannel(flagSensor.pin)) {
+#ifdef DEBUG
+            LOG_I("ID %d is Falling\r\n", flagSensor.pin); //LOG_P??
+#endif
+
+            setState_Channel(flagSensor.pin, Falling);
+            setSensor_Channel(flagSensor.pin, 0);
+
+#ifdef NETWORK
             uint8_t null_buf[1] = {0x00};
             pkt_build(PKT_TYPE_SNSR_STATE_REQ,null_buf,flagSensor.pin);
+#endif
 
-            //Sensor detect 
-		}
-	}else{
-		if( getState_Channel(flagSensor.pin) == Falling || checkChannel(flagSensor.pin) ){
-			//printf("ID %d is Rising\r\n", flagSensor.pin);
-			setState_Channel(flagSensor.pin, Rising);
-			
-			LED_Control((uint8_t *)(uint8_t *)"0000FF");
-			setState_Set_Address(flagSensor.pin);
-			
-			nrf_delay_ms(1000);
-			printf("ID %d is Rising\r\n", flagSensor.pin);
-			
-			while( !flagCommunication.flag );
-			flagCommunication.flag = false;
-			
-			#ifdef DEBUG
-			printf("flagCommunication.bufferPacket : %s\r\n", flagCommunication.bufferPacket);
-			#endif
-			
-			#ifdef DEBUG
-			switch( releasePacket( flagCommunication.bufferPacket ) ){
-				case Packet_Ok:
-					printf("Packet_Ok\r\n");
-				
-					packet = getReceivePacket();
-					sprintf(data, "%c", flagSensor.pin + 'A');
-					Send_Packet_Polling(Set_Address, packet->sensor, packet->id, data);
-					
-					setSensor_Channel(flagSensor.pin, packet->sensor);
-				break;
-				case Packet_NULL:
-					printf("Packet_NULL\r\n");
-				break;
-				case Packet_Length_ERROR:
-					printf("Packet_Length_ERROR\r\n");
-				break;
-				case Packet_Mode_ERROR:
-					printf("Packet_Mode_ERROR\r\n");
-				break;
-				case Packet_Sensor_ERROR:
-					printf("Packet_Sensor_ERROR\r\n");
-				break;
-				case Packet_Id_ERROR:
-					printf("Packet_Id_ERROR\r\n");
-				break;
-				case Packet_Data_ERROR:
-					printf("Packet_Data_ERROR\r\n");
-				break;
-				case Packet_Dropout:
-					printf("Packet_Dropout\r\n");
-				break;
-			}
-			#else
-			err_code = releasePacket( flagCommunication.bufferPacket );
-			
-			if(err_code == Packet_Ok){
-				packet = getReceivePacket();
-				sprintf(data, "%c", flagSensor.pin + 'A');
-				Send_Packet_Polling(Set_Address, packet->sensor, packet->id, data);
-				
-				setSensor_Channel(flagSensor.pin, packet->sensor);
-			}
-			#endif
-            
-            pkt_build(PKT_TYPE_SNSR_STATE_REQ, &packet->sensor,flagSensor.pin);
-            
-            // Type : packet->sensor ID: flagSensor.pin            
+            //Sensor detect
+        }
+    } else {
+        if (getState_Channel(flagSensor.pin) == Falling || checkChannel(flagSensor.pin)) {
+            setState_Channel(flagSensor.pin, Rising);
+
+            LED_Control("0000FF");
+            setState_Set_Address(flagSensor.pin);
+
+            nrf_delay_ms(1000);
+#ifdef DEBUG
+            LOG_I("ID %d is Rising\r\n", flagSensor.pin);//LOG_P??
+#endif
+
+            while (!flagCommunication.flag);
+            flagCommunication.flag = false;
+
+#ifdef DEBUG
+            LOG_I("flagCommunication.bufferPacket : %s\r\n", LOG_PUSH(flagCommunication.bufferPacket));
+#endif
+
+#ifdef DEBUG
+            switch (releasePacket(flagCommunication.bufferPacket)) {
+                case Packet_Ok:
+
+                    LOG_I("Packet_Ok\r\n");
+
+
+                    packet = getReceivePacket();
+                    sprintf(data, "%c", flagSensor.pin + 'A');
+                    Send_Packet_Polling(Set_Address, packet->sensor, packet->id, data);
+
+                    setSensor_Channel(flagSensor.pin, packet->sensor);
+#ifdef NETWORK
+                    pkt_build(PKT_TYPE_SNSR_STATE_REQ, &packet->sensor,flagSensor.pin);
+#endif
+
+                    break;
+                case Packet_NULL:
+
+                    LOG_I("Packet_NULL\r\n");
+
+                    break;
+                case Packet_Length_ERROR:
+
+                    LOG_I("Packet_Length_ERROR\r\n");
+
+                    break;
+                case Packet_Mode_ERROR:
+
+                    LOG_I("Packet_Mode_ERROR\r\n");
+
+                    break;
+                case Packet_Sensor_ERROR:
+
+                    LOG_I("Packet_Sensor_ERROR\r\n");
+
+                    break;
+                case Packet_Id_ERROR:
+
+                    LOG_I("Packet_Id_ERROR\r\n");
+
+                    break;
+                case Packet_Data_ERROR:
+
+                    LOG_I("Packet_Data_ERROR\r\n");
+
+                    break;
+                case Packet_Dropout:
+
+                    LOG_I("Packet_Dropout\r\n");
+
+                    break;
+            }
+#else
+            err_code = releasePacket( flagCommunication.bufferPacket );
+
+            if(err_code == Packet_Ok){
+                packet = getReceivePacket();
+                sprintf(data, "%c", flagSensor.pin + 'A');
+                Send_Packet_Polling(Set_Address, packet->sensor, packet->id, data);
+
+                setSensor_Channel(flagSensor.pin, packet->sensor);
+#ifdef NETWORK
+                pkt_build(PKT_TYPE_SNSR_STATE_REQ, &packet->sensor,flagSensor.pin);
+#endif
+            }
+#endif
+
+
+            // Type : packet->sensor ID: flagSensor.pin
             // Sensor Type Packet Build
 
-			LED_Control((uint8_t *)"000000");
-		}
-	}
+            LED_Control((uint8_t *) "000000");
+        }
+    }
 }
 
 /**@brief Function for application main entry.
  */
 int main(void) {
     uint32_t err_code;
-		Packet* packet;
-		char data[10];
+
+    Packet *packet;
+    char data[10];
+
+    uint8_t buttonCount = 0;
 
     memset(&APP, 0, sizeof(APP));
     memset(&PKT.tx_p.tx_que, CEN_TXP_QUEUE_UNAVAILABLE, sizeof(PKT.tx_p.tx_que)); //for tx_que index
 
     // Initialize.
-		#if NRF_LOG_ENABLED
     err_code = NRF_LOG_INIT(NULL);
     APP_ERROR_CHECK(err_code);
-		#else
-		err_code = Sensor_Communication_Init();
-		if(err_code != NRF_SUCCESS){
-			
-		}
-		#endif
-	
-    timers_init();
+
+    err_code = Sensor_Communication_Init();
+    ERR_CHK("Sensor Communication Fail");
+
+    err_code = timers_init();
+    ERR_CHK("Timer init Fail");
 
     ble_stack_init();
     peer_manager_init(false); //fds init.
 
-    err_code =app_fds_init(); 
-    APP_ERROR_CHECK(err_code); 
-    app_fds_read(); 
+    err_code = app_fds_init();
+    ERR_CHK("FDS init Fail");
+//    app_fds_read();
 
     device_preset();
     app_fds_save();
 
     db_discovery_init();
     err_code = cen_init(&m_cen_s);
-    APP_ERROR_CHECK(err_code);
+    ERR_CHK("Cen init Fail");
 
     gap_params_init();
     services_init();
     advertising_init();
     conn_params_init();
-    
 
-    nrf_delay_ms(100);
+    nrf_delay_ms(300);
 
+//		#ifdef NETWORK
     advertising_start();
     APP_ERROR_CHECK(err_code);
+//		#endif
        
 #ifdef FINAL
 
-		#ifdef DEBUG
-    if(Fuel_Gauge_Config()) {
-        printf("BQ27441 is Worked!! %s \r\n", Fuel_Gauge_getBatteryStatus());
-    } else{
-        printf("BQ27441 isn't Worked!!\r\n");
+#ifdef DEBUG
+    if (Fuel_Gauge_Config()) {
+        LOG_I("BQ27441 is Worked!! %s \r\n", LOG_PUSH(Fuel_Gauge_getBatteryStatus()));
+    } else {
+        LOG_I("BQ27441 isn't Worked!!\r\n");
     }
-		#endif
+#endif
 
-    LED_Control((uint8_t *)"00FF00");
+    LED_Control((uint8_t *) "00FF00");
     nrf_delay_ms(1000);
-        
-    LED_Control((uint8_t *)"000000");
+    LED_Control((uint8_t *) "000000");
 
-        LOG_D("FDS: %d Wd  %s Addr : %s \r\n", sizeof(APP)/4+1, LOG_PUSH(APP.dev.name), 
-                                                                        STR_PUSH(APP.dev.my_addr.addr, 1));
-    
+    LOG_I("FDS: %d Wd  %s Addr : %s \r\n", sizeof(APP) / 4 + 1, LOG_PUSH(APP.dev.name),
+          STR_PUSH(APP.dev.my_addr.addr, 1));
+
 #endif // FINAL
 
     for (;;) {
@@ -1060,35 +1084,68 @@ int main(void) {
             if (LED_Control((uint8_t *)PKT.rx_p.pkt[PKT.rx_p.proc_cnt - 1].data.p_data)) {
                 //  TODO : IF success
             }
+						#ifdef NETWORK
             pkt_build(PKT_TYPE_NODE_LED_RES,0,0);
+						#endif
             flagLED = false;
         }
         
         if(flagButton.flag){
             if(checkButton() == Falling){
-                printf("flagButton is Falling\r\n");
+							#ifdef TEST_LED
+							buttonCount = (buttonCount + 1) % 8;
+							switch(buttonCount){
+								case 1:
+									sprintf(data, "%s", "0F0000");
+								break;
+								case 2:
+									sprintf(data, "%s", "000F00");
+								break;
+								case 3:
+									sprintf(data, "%s", "00000F");
+								break;
+								case 4:
+									sprintf(data, "%s", "0F0F00");
+								break;
+								case 5:
+									sprintf(data, "%s", "0F000F");
+								break;
+								case 6:
+									sprintf(data, "%s", "000F0F");
+								break;
+								case 7:
+									sprintf(data, "%s", "0F0F0F");
+								break;
+								case 0:
+									sprintf(data, "%s", "000000");
+								break;
+							}
+							#endif
+							
+							#ifdef TEST_BUZZER
+							buttonCount = (buttonCount + 1) % 8;
+							sprintf(data, "%d", buttonCount);
+							#endif
+							
+							#ifdef TEST_IR
+							buttonCount = (buttonCount + 1) % 4;
+							sprintf(data, "%d", buttonCount);
+							#endif
+							
+							#ifdef TEST_TH
+							
+							data[0] = '\0';
+								
+							#endif
+								
+							Send_Packet_Polling(Command, 'R', ID4, data);
             }else{
-                printf("flagButton is Rising\r\n");
+							#ifdef DEBUG
+                LOG_I("flagButton is Rising\r\n");
+							#endif
             }
+						
             flagButton.flag = false;
-        }
-        
-        if(flagLowBattery.flag){
-            if(checkChannel(ID_GPOUT) == Falling){
-                printf("flagLowBattery is Falling\r\n");
-            }else{
-                printf("flagLowBattery is Rising\r\n");
-            }
-            flagLowBattery.flag = false;
-        }
-        
-        if(flagCharger.flag){
-            if(checkChannel(ID_CHG) == Falling){
-                printf("flagCharger is Falling\r\n");
-            }else{
-                printf("flagCharger is Rising\r\n");
-            }
-            flagCharger.flag = false;
         }
         
         if(flagSensor.flag){
@@ -1101,16 +1158,18 @@ int main(void) {
                     
                 case ID_GPOUT:
                     if(flagSensor.state == Falling){
-                        printf("ID_GPOUT is Falling\r\n");
-                    }else{
-                        printf("ID_GPOUT is Rising\r\n");
+                        if( FG_isBattery_Low() ){
+													LED_Control("0F0000");
+												}else{
+													LED_Control("000000");
+												}
                     }
                 break;
                 case ID_CHG:
                     if(flagSensor.state == Falling){
-                        printf("ID_CHG is Falling\r\n");
+                        LED_Control("0F0F00");
                     }else{
-                        printf("ID_CHG is Rising\r\n");
+                        LED_Control("000000");
                     }
                 break;
             }
@@ -1121,69 +1180,59 @@ int main(void) {
 				if( flagCommunication.flag){
 					
 					#ifdef DEBUG
-					printf("flagCommunication.bufferPacket : %s\r\n", flagCommunication.bufferPacket);
+					LOG_I("flagCommunication.bufferPacket : %s\r\n", LOG_PUSH(flagCommunication.bufferPacket));
 					#endif
 					
 					#ifdef DEBUG
 					switch( releasePacket( flagCommunication.bufferPacket ) ){
 						case Packet_Ok:
-							printf("Packet_Ok\r\n");
+							LOG_I("Packet_Ok\r\n");
 						
 							packet = getReceivePacket();
 							printPacket(packet);
-						            
-                        pkt_build(PKT_TYPE_SNSR_ACT_REQ, packet->data,flagSensor.pin);
-
-                               
-                        /*
-                        packet.data
-                        
-                        packet.sensor
-                        
-                        typedef enum{
-                         Th = 'T',
-                         Pressure = 'P',
-                         Light = 'L',
-                         Button = 'B',
-                         Human = 'H',
-                         Sound = 'S',
-                         Rgb = 'R',
-                         Ir = 'I',
-                         Buzzer = 'Z',
-                        }Sensor_Type;
-
-                        */
+                            
+							#ifdef NETWORK
+							pkt_build(PKT_TYPE_SNSR_ACT_REQ,  packet->data, flagSensor.pin);
+							#endif
 						break;
 						case Packet_NULL:
-							printf("Packet_NULL\r\n");
+							LOG_I("Packet_NULL\r\n");
 						break;
 						case Packet_Length_ERROR:
-							printf("Packet_Length_ERROR\r\n");
+							LOG_I("Packet_Length_ERROR\r\n");
 						break;
 						case Packet_Mode_ERROR:
-							printf("Packet_Mode_ERROR\r\n");
+							LOG_I("Packet_Mode_ERROR\r\n");
 						break;
 						case Packet_Sensor_ERROR:
-							printf("Packet_Sensor_ERROR\r\n");
+							LOG_I("Packet_Sensor_ERROR\r\n");
 						break;
 						case Packet_Id_ERROR:
-							printf("Packet_Id_ERROR\r\n");
+							LOG_I("Packet_Id_ERROR\r\n");
 						break;
 						case Packet_Data_ERROR:
-							printf("Packet_Data_ERROR\r\n");
+							LOG_I("Packet_Data_ERROR\r\n");
 						break;
 						case Packet_Dropout:
-							printf("Packet_Dropout\r\n");
+							LOG_I("Packet_Dropout\r\n");
 						break;
 					}
 					#endif
 					
 					flagCommunication.flag = false;
 				}
+				
+				if(flagCommand.flag){
+					
+					Send_Packet_Polling(Command, getSensor_Channel(flagCommand.pin), flagCommand.pin, flagCommand.bufferData);
+					flagCommand.flag = false;
+				}
         
         pkt_send(&m_cen_s);
+				
         if (NRF_LOG_PROCESS() == false) {
             power_manage();
-        }
-    }
+			}
+		}
 }
+
