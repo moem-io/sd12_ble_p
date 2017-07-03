@@ -36,59 +36,60 @@ static void next_pkt_chk(void) {
 }
 
 static void pkt_send_err(p_pkt *txp, ble_gap_addr_t *target_addr) { // if Sensor Node
-    ble_gap_addr_t *cmp_addr = get_node(&txp->header.target.node,1,0);
+    ble_gap_addr_t *cmp_addr = get_node(&txp->header.target.node, 1, 0);
     uint8_t tgt_idx = get_addr_idx(target_addr->addr);
     if (!memcmp(cmp_addr->addr, target_addr->addr, BLE_GAP_ADDR_LEN)) {
-        pkt_build(CEN_SEND_TARGET_ERROR,&APP.net.node.peer[tgt_idx].id,0);
+        pkt_build(CEN_SEND_TARGET_ERROR, &APP.net.node.peer[tgt_idx].id, 0);
     } else {
-        pkt_build(CEN_SEND_ROUTE_ERROR,&APP.net.node.peer[tgt_idx].id,0);
+        pkt_build(CEN_SEND_ROUTE_ERROR, &APP.net.node.peer[tgt_idx].id, 0);
     }
 }
 
-ble_gap_addr_t* retrieve_send_addr(p_pkt *txp) {
-    uint8_t tgt_node = txp->header.target.node;    
-    if(tgt_node !=0 &&txp->header.path[0] != 0){
-        for(int i=0;i<MAX_DEPTH_CNT;i++){
-            if(APP.dev.my_id == txp->header.path[i]){
-                tgt_node = txp->header.path[i+1];
+ble_gap_addr_t *retrieve_send_addr(p_pkt *txp) {
+    uint8_t tgt_node = txp->header.target.node;
+    if (tgt_node != 0 && txp->header.path[0] != 0) {
+        for (int i = 0; i < MAX_DEPTH_CNT; i++) {
+            if (APP.dev.my_id == txp->header.path[i]) {
+                tgt_node = txp->header.path[i + 1];
                 break;
             }
         }
     }
 
-    ble_gap_addr_t *target_addr = retrieve_send(&tgt_node,1,0);
-    
-    if (!target_addr && txp->header.type == PKT_TYPE_NET_SCAN_REQ){
-        target_addr = get_node(txp->data.p_data,0,1);
+    ble_gap_addr_t *target_addr = retrieve_send(&tgt_node, 1, 0);
+
+    if (!target_addr && txp->header.type == PKT_TYPE_NET_SCAN_REQ) {
+        target_addr = get_node(txp->data.p_data, 0, 1);
     }
-    
+
     return target_addr;
 }
 
 void pkt_send(cen_t *p_cen) {
-    static uint32_t req_cnt=0;
+    static uint32_t req_cnt = 0;
     uint32_t err_code;
 
 //    LOG_I("txp, rxp,%d,%d \r\n",PKT.tx_p.proc_cnt, PKT.rx_p.proc_cnt);
     if (PKT.tx_p.proc) {
         nrf_delay_ms(100);
-        
+
         p_pkt *txp = &PKT.tx_p.pkt[PKT.tx_p.proc_cnt];
         ble_gap_addr_t *target_addr;
 
         if (p_cen->conn_handle == BLE_CONN_HANDLE_INVALID) {
             target_addr = retrieve_send_addr(txp);
-            
-            if(req_cnt >= CEN_MAX_REQ_CNT) { //if app.net.set = true
-                req_cnt=0;
+
+            if (req_cnt >= CEN_MAX_REQ_CNT) { //if app.net.set = true
+                req_cnt = 0;
                 err_code = sd_ble_gap_connect_cancel();
                 ERR_CHK("Connection Request Failed");
-                pkt_send_err(txp,target_addr);
+                pkt_send_err(txp, target_addr);
                 return;
             }
-            
+
             if (target_addr) {
-                LOG_I("WAIT FOR PER - TARGET %s Type : %d TRIAL %dth\r\n", STR_PUSH(target_addr->addr, 1),target_addr->addr_type,req_cnt);
+                LOG_I("WAIT FOR PER - TARGET %s Type : %d TRIAL %dth\r\n", STR_PUSH(target_addr->addr, 1),
+                      target_addr->addr_type, req_cnt);
                 err_code = sd_ble_gap_connect(target_addr, &m_scan_params, &m_connection_param);
                 ERR_CHK("Connection Request Failed");
                 req_cnt++;
@@ -158,22 +159,22 @@ void pkt_send(cen_t *p_cen) {
             return;
         } else if (p_cen->state.interpret) {
             next_pkt_chk();
-            
+
             (void) sd_ble_gap_adv_stop();
-            
+
             nrf_delay_ms(100);
-            
+
             uint32_t err_code = ble_advertising_start(BLE_ADV_MODE_FAST);
             APP_ERROR_CHECK(err_code);
             PKT.tx_p.proc_done = true;
             app_fds_save();
 
             nrf_delay_ms(100);
-            
+
             LOG_I("CENTRAL CLOSING CONNECTION\r\n");
             err_code = sd_ble_gap_disconnect(p_cen->conn_handle, BLE_HCI_REMOTE_USER_TERMINATED_CONNECTION);
             APP_ERROR_CHECK(err_code);
-            
+
         }
     }
 }
@@ -204,7 +205,7 @@ void pkt_base(p_pkt *txp, uint8_t build_type) {
 }
 
 void pkt_err_base(p_pkt *txp, uint8_t build_type) {
-    txp->header.type ++; // Req => Res Packet
+    txp->header.type++; // Req => Res Packet
     txp->header.err_type = build_type;
     txp->header.source = txp->header.target;
     txp->header.target.node = APP.dev.root_id;
@@ -216,66 +217,72 @@ void pkt_build(uint8_t build_type, uint8_t *p_data, uint8_t sensor) {
     p_pkt *rxp = &PKT.rx_p.pkt[PKT.rx_p.proc_cnt];
 
     LOG_I("PACKET BUILD TXP : %d, RXP : %d, \r\n", PKT.tx_p.pkt_cnt, PKT.rx_p.proc_cnt);
-    
-    switch(build_type){
+
+    switch (build_type) {
         case CEN_BUILD_PACKET_ROUTE:
             memcpy(&txp->header, &rxp->header, HEADER_LEN);
             memcpy(&txp->data, &rxp->data, MAX_PKT_DATA_LEN);
             break;
-        
+
         case CEN_SEND_TARGET_ERROR:
         case CEN_SEND_ROUTE_ERROR:
-            memcpy(&(txp-1)->header, &(rxp-1)->header, HEADER_LEN); //Prev RxP Packet
-            pkt_err_base(txp-1, build_type);
-            memset(&(txp-1)->data, 0, sizeof(txp->data));
-            (txp-1)->data.p_data[0]=APP.dev.my_id;
-            (txp-1)->data.p_data[1]=47; //Ascii-Seperator '/'
-            (txp-1)->data.p_data[2]=p_data[0];
-            (txp-1)->data.p_data[3]=47; //Ascii-Seperator '/'
-            LOG_D("BUILD TXPh : %s, \r\n", VSTR_PUSH((uint8_t *) &(txp-1)->header, HEADER_LEN, 0));
-            LOG_D("BUILD TXPd : %s, \r\n", VSTR_PUSH((uint8_t *) &(txp-1)->data, DATA_LEN, 0));
+            memcpy(&(txp - 1)->header, &(rxp - 1)->header, HEADER_LEN); //Prev RxP Packet
+            pkt_err_base(txp - 1, build_type);
+            memset(&(txp - 1)->data, 0, sizeof(txp->data));
+            (txp - 1)->data.p_data[0] = APP.dev.my_id;
+            (txp - 1)->data.p_data[1] = 47; //Ascii-Seperator '/'
+            (txp - 1)->data.p_data[2] = p_data[0];
+            (txp - 1)->data.p_data[3] = 47; //Ascii-Seperator '/'
+            LOG_D("BUILD TXPh : %s, \r\n", VSTR_PUSH((uint8_t *) &(txp - 1)->header, HEADER_LEN, 0));
+            LOG_D("BUILD TXPd : %s, \r\n", VSTR_PUSH((uint8_t *) &(txp - 1)->data, DATA_LEN, 0));
             return; // Must Return (stop seq.) for Overwritng Idx
-        
+
         default:
             pkt_base(txp, build_type);
             uint8_t data_len = 0;
-            
+
             switch (build_type) {
-                case PKT_TYPE_NET_SCAN_RES:{
+                case PKT_TYPE_NET_SCAN_RES:
                     data_len = (int) ceil((float) APP.net.node.cnt * 8 / DATA_LEN);
                     txp->header.idx_tot = (data_len == 0) ? 1 : data_len;
                     scan_res_builder(txp->data.p_data);
-                }break;
-                
-                case PKT_TYPE_SNSR_ACT_REQ:
-                case PKT_TYPE_SNSR_STATE_REQ:
-                    txp->header.source.sensor = sensor;
-                    memcpy(&txp->data.p_data,p_data,1);
-                break;
-              
-                case PKT_TYPE_SNSR_DATA_RES: {
-                }break;
-                                
-                case PKT_TYPE_NODE_STAT_REQ:{
-                }break;
-                
-                case PKT_TYPE_NET_JOIN_REQ:{
-                }break;
-                
-                case PKT_TYPE_SNSR_CMD_RES:
-                case PKT_TYPE_NODE_LED_RES:
-                case PKT_TYPE_NODE_BTN_PRESS_REQ:
-                case PKT_TYPE_NET_UPDATE_RES:
+                    break;
+
                 case PKT_TYPE_NET_ACK_RES:
                     txp->data.p_data[0] = PKT_DATA_SUCCESS;
                     break;
+
                 case PKT_TYPE_SCAN_TGT_RES:
-                    memcpy(&txp->data.p_data,p_data,7); //RSSI OR 0
-                default:
+                    memcpy(&txp->data.p_data, p_data, 7); //RSSI OR 0
+
+                case PKT_TYPE_NODE_LED_RES:
+                case PKT_TYPE_NODE_BTN_PRESS_REQ:
+                    txp->data.p_data[0] = PKT_DATA_SUCCESS;
                     break;
+
+                case PKT_TYPE_SNSR_STATE_REQ: // DATA -> TYPE(1 CHAR) - DETACHED -> 0
+                case PKT_TYPE_SNSR_ACT_REQ: //TODO-3: NOT IMPLEMENTED (data -> led, IR, BUZZER)
+                    txp->header.source.sensor = sensor;
+                    memcpy(&txp->data.p_data, p_data, 1);
+                    break;
+
+                case PKT_TYPE_SNSR_DATA_RES: //TODO-1: REQUEST SNSR DATA AND BUILD
+                    break;
+
+                case PKT_TYPE_SNSR_CMD_RES:
+                case PKT_TYPE_NET_UPDATE_RES:
+                    txp->data.p_data[0] = PKT_DATA_SUCCESS;
+                    break;
+
+                case PKT_TYPE_NODE_STAT_REQ:
+                    break;
+
+                case PKT_TYPE_NET_JOIN_REQ:
+                    break;
+
             }
             break;
-                
+
     }
     PKT.tx_p.proc = true;
     PKT.tx_p.tx_que[PKT.tx_p.que_idx] = PKT.tx_p.pkt_cnt;
@@ -334,7 +341,7 @@ static void on_write_rsp(cen_t *p_cen, const ble_evt_t *p_ble_evt) {
     if (p_ble_evt->evt.gattc_evt.gatt_status == BLE_GATT_STATUS_SUCCESS &&
         p_ble_evt->evt.gattc_evt.params.write_rsp.handle == p_cen->hdlrs.result_cccd_hdlr) {
         p_cen->notification = true;
-        PKT.tx_p.proc = true;           
+        PKT.tx_p.proc = true;
         LOG_D("PERIPHERAL's NOTIFICATION ENABLED!!\r\n");
     }
 }
@@ -387,7 +394,7 @@ void app_cen_evt(cen_t *p_cen, const ble_evt_t *p_ble_evt) {
             break;
 
         case BLE_GAP_EVT_DISCONNECTED:
-            if(PKT.tx_p.proc_done == false) { //Packet Send Error Recovery..
+            if (PKT.tx_p.proc_done == false) { //Packet Send Error Recovery..
                 PKT.tx_p.proc = true;
             }
 //            LOG_D("RESETTING CENTRAL\r\n");

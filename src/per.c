@@ -1,5 +1,6 @@
 #include "per.h"
-
+#include "Sensor_Communication.h"
+#include "Detect.h"
 
 #define NRF_LOG_MODULE_NAME "[per]"
 
@@ -8,8 +9,13 @@ extern uint8_t tmp_addr[BLE_GAP_ADDR_LEN];
 extern volatile bool flagLED;
 extern volatile bool tgt_scan;
 
-static void  per_value_reset(per_t *p_per);
-static uint32_t per_char_reset(per_t *p_per, ble_gatts_char_handles_t *data_handle, uint8_t *p_string, uint16_t length);
+extern __IO flagPacket flagCommand;
+
+static void per_value_reset(per_t *p_per);
+
+static uint32_t per_char_reset(per_t *p_per, ble_gatts_char_handles_t *data_handle,
+                               uint8_t *p_string, uint16_t length);
+
 static void per_result_update(per_t *p_per, uint8_t result_type);
 
 
@@ -22,23 +28,23 @@ void pkt_interpret(per_t *p_per) {
 
         LOG_D("[%d]th PACKET INTERPRET\r\n", PKT.rx_p.proc_cnt);
         LOG_D(" %d/%d - %d/%d - %s\r\n", rxph->type, rxph->err_type, rxph->target.node, rxph->target.sensor,
-                                                                                STR_PUSH(rxph->path,0) );
+              STR_PUSH(rxph->path, 0));
         LOG_D(" DATA : %.40s\r\n", STR_PUSH(rxpd->p_data, 0));
-        
+
         update_node(rxp);
-        
-        if(APP.dev.my_id != 0 && APP.dev.my_id != rxp->header.target.node) {
+
+        if (APP.dev.my_id != 0 && APP.dev.my_id != rxp->header.target.node) {
             LOG_D("PACKET ROUTE!\r\n");
             if (!APP.net.discovered) {
                 LOG_E("Network not discovered\r\n");
                 return;
             }
-            pkt_build(CEN_BUILD_PACKET_ROUTE,0,0);
+            pkt_build(CEN_BUILD_PACKET_ROUTE, 0, 0);
         } else {
             app_dev_parent_set(&APP.dev.conn_cen);
 
             switch (rxp->header.type) {
-                case PKT_TYPE_NET_SCAN_REQ:{
+                case PKT_TYPE_NET_SCAN_REQ:
                     if (APP.dev.my_id == 0) {
                         if (memcmp(APP.dev.my_addr.addr, rxp->data.p_data, BLE_GAP_ADDR_LEN)) {
                             LOG_E("WRONG Device ADDR!!\r\n");
@@ -52,61 +58,54 @@ void pkt_interpret(per_t *p_per) {
                         LOG_I("Network Re-Scan Initialized.\r\n");
                     }
                     scan_start();
-                }break;
-                    
-                case PKT_TYPE_SNSR_DATA_REQ:{
-                }break;
+                    break;
 
-                case PKT_TYPE_SNSR_ACT_RES:{
-                }break;
-                case PKT_TYPE_SNSR_CMD_REQ:{
-                }break;
-                case PKT_TYPE_NODE_STAT_REQ:{
-                }break;                   
-                case PKT_TYPE_NODE_LED_REQ:{
-                    LOG_D("LED Request \r\n");
-                    #ifdef FINAL
-                    flagLED = true; // PKT_BUILD -> MAIN LOOP
-                    #else
-                    pkt_build(PKT_TYPE_NODE_LED_RES,0,0);
-                    #endif // FINAL
-
-                }break;
-                
-                case PKT_TYPE_SNSR_STATE_RES:
-                case PKT_TYPE_NODE_BTN_PRESS_RES:
-                    LOG_D("OK\r\n");
-                 break;
-                
-                case PKT_TYPE_NET_UPDATE_REQ:{
-                     res = analyze_data(rxp->data.p_data,7);
-            
-                        for(int i=0; i<res; i++){
-                            update_node_id(&rxp->data.p_data[i*7], &rxp->data.p_data[(i+1)*7 - 1]);
-                        }
-
-                    LOG_D("Network ID UPDATED!\r\n");
-                    pkt_build(PKT_TYPE_NET_UPDATE_RES,0,0);
-                }break;
-
-                case PKT_TYPE_NET_ACK_REQ:{
-                    if (!APP.net.discovered) {
-                        LOG_E("Network not discovered\r\n");
-                        break;
-                    }
-    ///////////////////////////////////////////////////////////
+                case PKT_TYPE_NET_ACK_REQ: //TODO2: IF NO NET SET?
                     LOG_D("ACK REQUEST!\r\n");
-                    pkt_build(PKT_TYPE_NET_ACK_RES,0,0);
-                }break;
-                
-                case PKT_TYPE_NET_JOIN_RES:{
-                }break;
-                case PKT_TYPE_SCAN_TGT_REQ:{
+                    pkt_build(PKT_TYPE_NET_ACK_RES, 0, 0);
+                    break;
+
+                case PKT_TYPE_SCAN_TGT_REQ:
                     memcpy(tmp_addr, rxp->data.p_data, BLE_GAP_ADDR_LEN);
                     tgt_scan = true;
                     scan_start();
-                }break;
-                default:
+                    break;
+
+                case PKT_TYPE_NODE_LED_REQ:
+                    LOG_D("LED Request \r\n");
+                    flagLED = true; // PKT_BUILD -> MAIN LOOP
+                    break;
+
+                case PKT_TYPE_NODE_BTN_PRESS_RES:
+                case PKT_TYPE_SNSR_STATE_RES:
+                case PKT_TYPE_SNSR_ACT_RES:
+                    LOG_D("OK\r\n");
+                    break;
+
+                case PKT_TYPE_SNSR_DATA_REQ: //TODO-1: REQUEST SNSR DATA AND BUILD
+                    break;
+
+                case PKT_TYPE_SNSR_CMD_REQ: //TODO2 : SEND COMMAND TO SNSR
+//									rxp->header.target.node;
+//								  getSensor_Channel(rxp->header.target.sensor);
+								
+                    break;
+
+                case PKT_TYPE_NET_UPDATE_REQ:
+                    res = analyze_data(rxp->data.p_data, 7);
+
+                    for (int i = 0; i < res; i++) {
+                        update_node_id(&rxp->data.p_data[i * 7], &rxp->data.p_data[(i + 1) * 7 - 1]);
+                    }
+
+                    LOG_D("Network ID UPDATED!\r\n");
+                    pkt_build(PKT_TYPE_NET_UPDATE_RES, 0, 0);
+                    break;
+
+                case PKT_TYPE_NODE_STAT_REQ: // TODO2 : NOT IMPLEMENTED
+                    break;
+
+                case PKT_TYPE_NET_JOIN_RES:
                     break;
             }
         }
@@ -115,9 +114,9 @@ void pkt_interpret(per_t *p_per) {
         per_result_update(p_per, PKT_RSLT_INTERPRET_OK);
         PKT.rx_p.proc_cnt++;
         PKT.rx_p.proc = false;
-        
+
         nrf_delay_ms(100);
-        
+
     }
 }
 
@@ -135,7 +134,7 @@ static void data_cnt_chk(uint8_t *pkt_type, uint8_t cnt) {
 
 static void header_parser(ble_gatts_value_t *rx_data) {
     p_header *pheader = &(PKT.rx_p.pkt[PKT.rx_p.header_cnt].header);
-  
+
     pheader->type = rx_data->p_value[0];
     pheader->err_type = rx_data->p_value[1];
     pheader->idx_tot = rx_data->p_value[2];
@@ -143,7 +142,7 @@ static void header_parser(ble_gatts_value_t *rx_data) {
     pheader->source.sensor = rx_data->p_value[4];
     pheader->target.node = rx_data->p_value[5];
     pheader->target.sensor = rx_data->p_value[6];
-    memcpy(&pheader->path,&rx_data->p_value[7],MAX_DEPTH_CNT);
+    memcpy(&pheader->path, &rx_data->p_value[7], MAX_DEPTH_CNT);
 //    LOG_D("Header TYPE : %02x INDEX : %02x / %02x\r\n", pheader->type, pheader->err_type, pheader->idx_tot);
 //    LOG_D("Header SOURCE : %02x - %02x\r\n", pheader->source.node, pheader->source.sensor);
 //    LOG_D("Header TARGET : %02x - %02x\r\n", pheader->target.node, pheader->target.sensor);
@@ -177,9 +176,9 @@ static void gatts_value_get(per_t *p_per, uint16_t handle, ble_gatts_value_t *rx
 }
 
 
-static void per_value_reset(per_t *p_per){
+static void per_value_reset(per_t *p_per) {
     uint32_t err_code;
-    
+
     uint8_t data[DATA_LEN] = {0,};
     err_code = per_char_reset(p_per, &p_per->data_1_hdlrs, data, sizeof(data));
     ERR_CHK("Data 1 Char reset");
@@ -261,7 +260,7 @@ void app_per_evt(per_t *p_per, ble_evt_t *p_ble_evt) {
 }
 
 
-static uint32_t per_char_add(per_t *p_per,int uuid, int len, ble_gatts_char_handles_t *hdlr) {
+static uint32_t per_char_add(per_t *p_per, int uuid, int len, ble_gatts_char_handles_t *hdlr) {
     ble_gatts_char_md_t char_md;
     ble_gatts_attr_t attr_char_value;
     ble_gatts_attr_md_t attr_md;
@@ -284,7 +283,7 @@ static uint32_t per_char_add(per_t *p_per,int uuid, int len, ble_gatts_char_hand
         char_md.p_cccd_md = &cccd_md;
         char_md.char_props.notify = 1;
     }
-    
+
     memset(&attr_md, 0, sizeof(attr_md));
     attr_md.vloc = BLE_GATTS_VLOC_STACK;
     BLE_GAP_CONN_SEC_MODE_SET_OPEN(&attr_md.read_perm);
@@ -322,15 +321,15 @@ uint32_t per_init(per_t *p_per) {
     err_code = sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY, &per_uuid, &p_per->service_handle);
     ERR_CHK("Service init");
 
-    err_code = per_char_add(p_per,CMDS_HEADER_UUID,HEADER_LEN,&p_per->header_hdlrs);
+    err_code = per_char_add(p_per, CMDS_HEADER_UUID, HEADER_LEN, &p_per->header_hdlrs);
     ERR_CHK("Header Char init");
-    
-    err_code = per_char_add(p_per,CMDS_DATA_1_UUID,DATA_LEN,&p_per->data_1_hdlrs);
+
+    err_code = per_char_add(p_per, CMDS_DATA_1_UUID, DATA_LEN, &p_per->data_1_hdlrs);
     ERR_CHK("Data 1 Char init");
 
-    err_code = per_char_add(p_per,CMDS_DATA_2_UUID,DATA_LEN,&p_per->data_2_hdlrs);
+    err_code = per_char_add(p_per, CMDS_DATA_2_UUID, DATA_LEN, &p_per->data_2_hdlrs);
     ERR_CHK("Data 2 Char init");
-    
+
     err_code = per_char_add(p_per, CMDS_RESULT_UUID, RESULT_LEN, &p_per->result_hdlrs);
     ERR_CHK("Result Char init");
 
@@ -341,15 +340,15 @@ uint32_t per_init(per_t *p_per) {
 }
 
 
-uint32_t per_char_reset(per_t *p_per, ble_gatts_char_handles_t *data_handle, uint8_t *p_string, uint16_t length){
+uint32_t per_char_reset(per_t *p_per, ble_gatts_char_handles_t *data_handle, uint8_t *p_string, uint16_t length) {
     ble_gatts_value_t p_val;
     memset(&p_val, 0, sizeof(p_val));
-        
+
     p_val.len = length;
     p_val.offset = 0;
     p_val.p_value = p_string;
-    
-    return sd_ble_gatts_value_set(p_per->conn_handle,data_handle->value_handle, &p_val);
+
+    return sd_ble_gatts_value_set(p_per->conn_handle, data_handle->value_handle, &p_val);
 }
 
 uint32_t per_char_update(per_t *p_per, ble_gatts_char_handles_t *data_handle, uint8_t *p_string, uint16_t length) {
@@ -361,13 +360,13 @@ uint32_t per_char_update(per_t *p_per, ble_gatts_char_handles_t *data_handle, ui
     if (length > MAX_CHAR_LEN) {
         return NRF_ERROR_INVALID_PARAM;
     }
-    
+
     uint8_t param_type = BLE_GATT_HVX_INDICATION;
-    
-    if(data_handle->value_handle == p_per->result_hdlrs.value_handle){
+
+    if (data_handle->value_handle == p_per->result_hdlrs.value_handle) {
         param_type = BLE_GATT_HVX_NOTIFICATION;
     }
-    
+
     ble_gatts_hvx_params_t hvx_params;
     memset(&hvx_params, 0, sizeof(hvx_params));
 
