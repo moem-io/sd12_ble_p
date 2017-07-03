@@ -13,6 +13,10 @@ static const unsigned int BATTERY_CAPACITY = 400; // e.g. 400mAh battery
 static const uint8_t SOCI_SET = 15; // Interrupt set threshold at 20%
 static const uint8_t SOCI_CLR = 20; // Interrupt clear threshold at 25%
 
+static const uint16_t MIN_VOLTAGE = 3300;
+static const uint16_t LOW_VOLTAGE = 3700;
+static const uint16_t MAX_VOLTAGE = 4200;
+
 /**
  * @brief I2C events handler.
  */
@@ -55,27 +59,7 @@ ret_code_t Fuel_Gauge_Init(void){
 			return err_code;
 		}
 	}
-	
-//	nrf_drv_gpiote_in_config_t in_config_gpout = GPIOTE_CONFIG_IN_SENSE_TOGGLE(true);
-//	in_config_gpout.pull = NRF_GPIO_PIN_PULLUP;
 
-//	err_code = nrf_drv_gpiote_in_init(pinGPOUT, &in_config_gpout, in_pin_handler);
-//	if(err_code != NRF_SUCCESS){
-//		return err_code;
-//	}
-
-//	nrf_drv_gpiote_in_config_t in_config_chg = GPIOTE_CONFIG_IN_SENSE_TOGGLE(true);
-//	in_config_chg.pull = NRF_GPIO_PIN_PULLUP;
-
-//	err_code = nrf_drv_gpiote_in_init(pinCHG, &in_config_chg, in_pin_handler);
-//	if(err_code != NRF_SUCCESS){
-//		return err_code;
-//	}
-
-//	nrf_drv_gpiote_in_event_enable(pinGPOUT, true);
-//	
-//	nrf_drv_gpiote_in_event_enable(pinCHG, true);
-//	
 	return err_code;
 
 }
@@ -98,6 +82,36 @@ bool Fuel_Gauge_Config(void){
 			
 		}
 		return true;
+}
+
+bool	FG_isBattery_Low(void){
+	
+	bool result = false;
+	
+	int voltage = 0;
+	
+	if(Fuel_Gauge_begin()){
+		if(FG_getPercentage( FG_getVoltage() ) < SOCI_SET){
+			result = true;
+		}else{
+			result = false;
+		}
+	}else{
+		result = false;
+	}
+	
+	return result;
+}
+
+uint8_t FG_getPercentage(uint16_t voltage){
+	uint16_t perVoltage = 0;
+	
+	perVoltage = (uint8_t)( ( (float)( voltage - MIN_VOLTAGE ) / (float)( MAX_VOLTAGE - MIN_VOLTAGE ) ) * 100);
+	if(perVoltage >= 100){
+		perVoltage = 100;
+	}
+	
+	return perVoltage;
 }
 
 static bool Fuel_Gauge_begin(){
@@ -231,7 +245,7 @@ char* Fuel_Gauge_getBatteryStatus(void){
 	
 	clearBuffer();
 	
-	sprintf(bufferFG, "%d%%, %dmV\n", capacity, voltage);
+	sprintf(bufferFG, "%d%%, %dmV", FG_getPercentage(voltage), voltage);
 	
 	return bufferFG;
 }

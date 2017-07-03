@@ -2,12 +2,12 @@
 
 static app_gpiote_user_id_t user_id;
 
-void sensor_dectect_handler(const uint32_t* event_pins_low_to_high,const uint32_t* event_pins_high_to_low){
-	Detect_CallBack(*event_pins_low_to_high, *event_pins_high_to_low);
+void sensor_dectect_handler(const uint32_t *event_pins_low_to_high, const uint32_t *event_pins_high_to_low) {
+    Detect_CallBack(*event_pins_low_to_high, *event_pins_high_to_low);
 }
 
-__WEAK void Detect_CallBack(uint32_t rising, uint32_t falling){
-	
+__WEAK void Detect_CallBack(uint32_t rising, uint32_t falling) {
+
 }
 
 uint32_t Detect_Init(void){
@@ -46,24 +46,25 @@ uint32_t Detect_Init(void){
 	return  err_code;
 }
 
-uint8_t getState_Channel(uint8_t id){
-	if(id >= ID1 && id <= MAX_CHANNEL){
-		return channel[id];
-	}
-	return 2;
+uint8_t getState_Channel(uint8_t id) {
+    if (id >= ID1 && id <= MAX_CHANNEL) {
+        return channel[id];
+    }
+    return 2;
 }
 
-void setState_Channel(uint8_t id, uint8_t state){
-	if(id >= ID1 && id < MAX_CHANNEL){
-		channel[id] = state;
-	}
+void setState_Channel(uint8_t id, uint8_t state) {
+    if (id >= ID1 && id < MAX_CHANNEL) {
+        channel[id] = state;
+    }
 }
 
-uint8_t getSensor_Channel(uint8_t id){
-	return channel_Type[id];
+uint8_t getSensor_Channel(uint8_t id) {
+    return channel_Type[id];
 }
-void		setSensor_Channel(uint8_t id, uint8_t type){
-	channel_Type[id] = type;
+
+void setSensor_Channel(uint8_t id, uint8_t type) {
+    channel_Type[id] = type;
 }
 
 bool checkChannel(uint8_t pin){
@@ -82,6 +83,7 @@ bool checkChannel(uint8_t pin){
 		case ID_CHG: 				return nrf_gpio_pin_read(pinCHG) > 0;
 		default: 									return false;
 	}
+		return false;
 }
 
 void checkEdge(__IO flagDetect* flag){
@@ -109,90 +111,95 @@ void checkEdge(__IO flagDetect* flag){
 	nrf_delay_ms(10);
 }
 
-void InitalizeQueue(void){
-	int id =0 ;
-	
-	for(id = ID1; id <= ID5; id++){
-		queue.buffer[id] = ID_None;
-	}
-	
-	queue.start = 0;
-	queue.end = 0;
+void InitalizeQueue(void) {
+    int id = 0;
+
+    for (id = ID1; id <= ID5; id++) {
+        queue.buffer[id] = ID_None;
+    }
+
+    queue.start = 0;
+    queue.end = 0;
 }
 
-bool push(uint8_t id){
-	
-	if( (queue.end + 1) % MAX_QUEUE == queue.start){
-		return false;
-	}
-	
-	queue.buffer[queue.end] = id;
-	queue.end = (queue.end + 1) % MAX_QUEUE;
-	
-	return true;
-}
-uint8_t pop(void){
-	uint8_t id = 0;
-	
-	if( queue.start == queue.end ){
-		return ID_None;
-	}
-	
-	id = queue.buffer[queue.start ];
-	queue.start = (queue.start + 1) % MAX_QUEUE;
-	
-	return id;
+bool push(uint8_t id) {
+
+    if ((queue.end + 1) % MAX_QUEUE == queue.start) {
+        return false;
+    }
+
+    queue.buffer[queue.end] = id;
+    queue.end = (queue.end + 1) % MAX_QUEUE;
+
+    return true;
 }
 
-bool checkItem(uint8_t id){
-	uint8_t index = 0;
-	
-	for(index = queue.start; index != queue.end; index = (index + 1) % MAX_QUEUE){
-		if(queue.buffer[index] == id){
-			return true;
-		}
-	}
-	
-	return false;
+uint8_t pop(void) {
+    uint8_t id = 0;
+
+    if (queue.start == queue.end) {
+        return ID_None;
+    }
+
+    id = queue.buffer[queue.start];
+    queue.start = (queue.start + 1) % MAX_QUEUE;
+
+    return id;
 }
 
-bool removeItem(uint8_t id){
-	uint8_t index = 0;
-	
-	for(index = queue.start; index != queue.end; index = (index + 1) % MAX_QUEUE){
-		if(queue.buffer[index] == id){
-			break;
-		}
-	}
-	
-	if(index == queue.end){
-		return false;
-	}else{
-		for(; (index + 1) % MAX_QUEUE != queue.end; index = (index + 1) % MAX_QUEUE){
-			queue.buffer[index] = queue.buffer[index + 1];
-		}
-		queue.end = (index + 1) % MAX_QUEUE;
-	}
-	
-	return true;
+bool checkItem(uint8_t id) {
+    uint8_t index = 0;
+
+    for (index = queue.start; index != queue.end; index = (index + 1) % MAX_QUEUE) {
+        if (queue.buffer[index] == id) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
-void setState_Set_Address(uint8_t id){
-	fsmSensor[id] = Set_Address;
-}
-void setState_Request(uint8_t id){
-	fsmSensor[id] = Request;
-}
-void setState_Command(uint8_t id){
-	fsmSensor[id] = Command;
-}
-void setState_ACK(uint8_t id){
-	fsmSensor[id] = Ack;
-}
-void setState_Response(uint8_t id){
-	fsmSensor[id] = Response;
+bool removeItem(uint8_t id) {
+    uint8_t index = 0;
+
+    for (index = queue.start; index != queue.end; index = (index + 1) % MAX_QUEUE) {
+        if (queue.buffer[index] == id) {
+            break;
+        }
+    }
+
+    if (index == queue.end) {
+        return false;
+    } else {
+        for (; (index + 1) % MAX_QUEUE != queue.end; index = (index + 1) % MAX_QUEUE) {
+            queue.buffer[index] = queue.buffer[index + 1];
+        }
+        queue.end = (index + 1) % MAX_QUEUE;
+    }
+
+    return true;
 }
 
-uint8_t getState_Sensor(uint8_t id){
-	return fsmSensor[id];
+void setState_Set_Address(uint8_t id) {
+    fsmSensor[id] = Set_Address;
+}
+
+void setState_Request(uint8_t id) {
+    fsmSensor[id] = Request;
+}
+
+void setState_Command(uint8_t id) {
+    fsmSensor[id] = Command;
+}
+
+void setState_ACK(uint8_t id) {
+    fsmSensor[id] = Ack;
+}
+
+void setState_Response(uint8_t id) {
+    fsmSensor[id] = Response;
+}
+
+uint8_t getState_Sensor(uint8_t id) {
+    return fsmSensor[id];
 }

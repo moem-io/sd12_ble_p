@@ -200,6 +200,9 @@ static bool FG_softReset(void);
 
 char* Fuel_Gauge_getBatteryStatus(void);
 
+bool	FG_isBattery_Low(void);
+uint8_t FG_getPercentage(uint16_t);
+
 static uint16_t FG_getStatus(void);
 static uint16_t FG_getFlag(void);
 static uint8_t FG_getCapacity(void);
