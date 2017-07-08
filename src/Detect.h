@@ -11,7 +11,7 @@
 #include "boards.h"
 #include "nrf_delay.h"
 
-#define MAX_CHANNEL    7
+#define MAX_CHANNEL    8
 #define MAX_QUEUE            6
 
 #define pinGPOUT                28

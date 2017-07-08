@@ -31,7 +31,7 @@ uint32_t Detect_Init(void){
 	
 	app_gpiote_user_enable(user_id);
 	
-	for(id = 0; id <= ID_CHG; id++){
+	for(id = ID1; id <= ID_CHG; id++){
 		if(checkChannel(id) == Falling){
 			setState_Channel(id, Falling); 
 		}else{
@@ -87,7 +87,8 @@ bool checkChannel(uint8_t pin){
 }
 
 void checkEdge(__IO flagDetect* flag){
-		uint32_t mask[MAX_CHANNEL] = { PIN_ID1_BITMASK,
+		uint32_t mask[MAX_CHANNEL] = { 0,
+																											PIN_ID1_BITMASK,
 																											PIN_ID2_BITMASK,
 																											PIN_ID3_BITMASK,
 																											PIN_ID4_BITMASK,

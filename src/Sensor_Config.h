@@ -28,10 +28,11 @@ typedef enum {
     Rgb = 'R',
     Ir = 'I',
     Buzzer = 'Z',
+		Sensor_None = 0,
 } Sensor_Type;
 
 enum num_ID {
-    ID1 = 0,
+    ID1 = 1,
     ID2,
     ID3,
     ID4,

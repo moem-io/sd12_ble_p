@@ -30,8 +30,6 @@
 //#define TEST_IR
 //#define TEST_TH
 
-//#define NETWORK
-
 #define NRF_LOG_MODULE_NAME "APP"
 
 #define IS_SRVC_CHANGED_CHARACT_PRESENT 1                                           /**< Include or not the service_changed characteristic. if not enabled, the server's database cannot be changed for the lifetime of the device*/
@@ -81,7 +79,7 @@
 
 #define DEAD_BEEF                       0xDEADBEEF                                  /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
-//#define FINAL
+#define FINAL
 
 uint8_t flagLED;
 uint8_t file_flag;
@@ -102,12 +100,14 @@ static ble_db_discovery_t m_ble_db_discovery;             /**< Instance of datab
 APP_TIMER_DEF(m_single_timer);
 #define NET_DISC_TIMER_INTERVAL     APP_TIMER_TICKS(10000, APP_TIMER_PRESCALER) // 1000 ms intervals
 
-__IO flagDetect flagButton 				= {.flag = false };
+__IO flagButton callBackButton 				= {.flag = false };
 __IO flagDetect flagCharger 			= {.flag = false };
 __IO flagDetect flagLowBattery = {.flag = false };
 __IO flagDetect flagSensor 			= {.flag = false };
 __IO flagUART	flagCommunication 					= { .flag = false };
-__IO flagPacket flagCommand = {.flag = false};
+
+__IO flagPacket flagCommand_Sensor = {.flag = false};
+__IO flagPacket flagCommand_Node = {.flag = false };
 
 volatile bool tgt_scan = false;
 
@@ -149,6 +149,11 @@ static void advertising_start(void);
  */
 void assert_nrf_callback(uint16_t line_num, const uint8_t *p_file_name) {
     app_error_handler(DEAD_BEEF, line_num, p_file_name);
+}
+void app_error_fault_handler(uint32_t id, uint32_t pc, uint32_t info){
+	LOG_D("id : %X, pc : %X", id, pc);
+	LOG_D("info->line_num : %d, info->p_file_name : %s, info->err_code : %d\r\n", ((error_info_t *)info)->line_num, LOG_PUSH((char *const )((error_info_t *)info)->p_file_name), ((error_info_t *)info)->err_code);
+
 }
 
 
@@ -873,13 +878,29 @@ static ret_code_t app_fds_init(void) {
 }
 
 void Button_Click_CallBack() {
-    // // LOG_D("Button Pressed\r\n");
 //TODO: Sequence must change to NVIC
-#ifdef NETWORK
-    pkt_build(PKT_TYPE_NODE_BTN_PRESS_REQ,0,0); //Move Seq. to Main FSM
-#endif
-    //////////
-    flagButton.flag = true;
+	
+	#ifdef TEST_LED
+	
+	#endif
+	#ifdef TEST_BUZZER
+	
+	#endif
+	#ifdef TEST_IR
+	
+	#endif
+	#ifdef TEST_TH
+	
+	#endif
+	
+	#if defined(TEST_LED) | defined(TEST_BUZZER) | defined(TEST_IR) | defined(TEST_TH)
+		
+	#else
+		callBackButton.count = (callBackButton.count + 1) % 3;
+	#endif
+	
+	
+	callBackButton.flag = true;
 }
 
 
@@ -906,12 +927,12 @@ void sensor_check() {
 #endif
 
             setState_Channel(flagSensor.pin, Falling);
-            setSensor_Channel(flagSensor.pin, 0);
+            setSensor_Channel(flagSensor.pin, Sensor_None);
 
-#ifdef NETWORK
-            uint8_t null_buf[1] = {0x00};
-            pkt_build(PKT_TYPE_SNSR_STATE_REQ,null_buf,flagSensor.pin);
-#endif
+					if(APP.net.established){
+            data[0] = Sensor_None;
+            pkt_build(PKT_TYPE_SNSR_STATE_REQ, data, flagSensor.pin);
+					}
 
             //Sensor detect
         }
@@ -937,19 +958,17 @@ void sensor_check() {
 #ifdef DEBUG
             switch (releasePacket(flagCommunication.bufferPacket)) {
                 case Packet_Ok:
-
                     LOG_I("Packet_Ok\r\n");
-
-
+								
                     packet = getReceivePacket();
                     sprintf(data, "%c", flagSensor.pin + 'A');
                     Send_Packet_Polling(Set_Address, packet->sensor, packet->id, data);
 
                     setSensor_Channel(flagSensor.pin, packet->sensor);
-#ifdef NETWORK
-                    pkt_build(PKT_TYPE_SNSR_STATE_REQ, &packet->sensor,flagSensor.pin);
-#endif
 
+										if(APP.net.established){
+												pkt_build(PKT_TYPE_SNSR_STATE_REQ, &packet->sensor,flagSensor.pin);
+										}
                     break;
                 case Packet_NULL:
 
@@ -996,13 +1015,12 @@ void sensor_check() {
                 Send_Packet_Polling(Set_Address, packet->sensor, packet->id, data);
 
                 setSensor_Channel(flagSensor.pin, packet->sensor);
-#ifdef NETWORK
-                pkt_build(PKT_TYPE_SNSR_STATE_REQ, &packet->sensor,flagSensor.pin);
-#endif
+							
+								if(APP.net.established){
+										pkt_build(PKT_TYPE_SNSR_STATE_REQ, &packet->sensor,flagSensor.pin);
+								}
             }
 #endif
-
-
             // Type : packet->sensor ID: flagSensor.pin
             // Sensor Type Packet Build
 
@@ -1039,7 +1057,7 @@ int main(void) {
 
     err_code = app_fds_init();
     ERR_CHK("FDS init Fail");
-//    app_fds_read();
+    app_fds_read();
 
     device_preset();
     app_fds_save();
@@ -1055,11 +1073,9 @@ int main(void) {
 
     nrf_delay_ms(300);
 
-//		#ifdef NETWORK
     advertising_start();
     APP_ERROR_CHECK(err_code);
-//		#endif
-       
+   
 #ifdef FINAL
 
 #ifdef DEBUG
@@ -1084,13 +1100,14 @@ int main(void) {
             if (LED_Control((uint8_t *)PKT.rx_p.pkt[PKT.rx_p.proc_cnt - 1].data.p_data)) {
                 //  TODO : IF success
             }
-						#ifdef NETWORK
-            pkt_build(PKT_TYPE_NODE_LED_RES,0,0);
-						#endif
             flagLED = false;
+						
+						nrf_delay_ms(100); //TODO: Maybe conflict with FSM
+						pkt_build(PKT_TYPE_NODE_LED_RES,0,0);
+						nrf_delay_ms(100);
         }
         
-        if(flagButton.flag){
+        if(callBackButton.flag){
             if(checkButton() == Falling){
 							#ifdef TEST_LED
 							buttonCount = (buttonCount + 1) % 8;
@@ -1138,14 +1155,17 @@ int main(void) {
 								
 							#endif
 								
-							Send_Packet_Polling(Command, 'R', ID4, data);
-            }else{
-							#ifdef DEBUG
-                LOG_I("flagButton is Rising\r\n");
+							#if defined(TEST_LED) | defined(TEST_BUZZER) | defined(TEST_IR) | defined(TEST_TH) 
+								Send_Packet_Polling(Command, 'R', ID4, data);
+							#else
+								//  TODO : Do it Reset
+								if(callBackButton.count == 2){
+									NVIC_SystemReset();
+								}
 							#endif
             }
 						
-            flagButton.flag = false;
+            callBackButton.flag = false;
         }
         
         if(flagSensor.flag){
@@ -1189,11 +1209,28 @@ int main(void) {
 							LOG_I("Packet_Ok\r\n");
 						
 							packet = getReceivePacket();
+							#ifdef DEBUG
 							printPacket(packet);
-                            
-							#ifdef NETWORK
-							pkt_build(PKT_TYPE_SNSR_ACT_REQ,  packet->data, flagSensor.pin);
 							#endif
+                            
+						if(APP.net.established){										
+								switch(packet->sensor){
+									case Th:
+										pkt_build(PKT_TYPE_SNSR_DATA_RES,  packet->data, flagSensor.pin);
+									break;
+									case Pressure:
+									case Light:
+									case Button:
+									case Human:
+									case Sound:
+										sprintf(data, "%d", packet->data[0]); //TODO: DATA to String.
+										pkt_build(PKT_TYPE_SNSR_ACT_REQ,  data, flagSensor.pin);
+									default: 
+										#ifdef DEBUG
+										LOG_I("packet->sensor Error!\r\n");
+										#endif
+								}
+							}
 						break;
 						case Packet_NULL:
 							LOG_I("Packet_NULL\r\n");
@@ -1222,10 +1259,10 @@ int main(void) {
 					flagCommunication.flag = false;
 				}
 				
-				if(flagCommand.flag){
+				if(flagCommand_Sensor.flag){
 					
-					Send_Packet_Polling(Command, getSensor_Channel(flagCommand.pin), flagCommand.pin, flagCommand.bufferData);
-					flagCommand.flag = false;
+					Send_Packet_Polling(Command, getSensor_Channel(flagCommand_Sensor.pin), flagCommand_Sensor.pin, flagCommand_Sensor.bufferData);
+					flagCommand_Sensor.flag = false;
 				}
         
         pkt_send(&m_cen_s);

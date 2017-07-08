@@ -7,6 +7,11 @@
 #include "app_error.h"
 #include "boards.h"
 
+typedef struct {
+	bool flag;
+	uint8_t count;
+}flagButton;
+
 /* @GPIO Definition */
 #define Button_IN                                                                                                    12
 
