@@ -263,7 +263,7 @@ void pkt_build(uint8_t build_type, uint8_t *p_data, uint8_t sensor) {
                 case PKT_TYPE_SNSR_STATE_REQ: // DATA -> TYPE(1 CHAR) - DETACHED -> 0
                 case PKT_TYPE_SNSR_ACT_REQ: //TODO-3: NOT IMPLEMENTED (data -> led, IR, BUZZER)
                     txp->header.source.sensor = sensor;
-                    memcpy(&txp->data.p_data, p_data, 1);
+                    strcpy((char *)&txp->data.p_data, (char *)p_data);
                     break;
 
                 case PKT_TYPE_SNSR_DATA_RES: //TODO-1: REQUEST SNSR DATA AND BUILD

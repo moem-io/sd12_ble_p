@@ -9,7 +9,7 @@ extern uint8_t tmp_addr[BLE_GAP_ADDR_LEN];
 extern volatile bool flagLED;
 extern volatile bool tgt_scan;
 
-extern __IO flagPacket flagCommand;
+extern __IO flagPacket flagCommand_Sensor;
 
 static void per_value_reset(per_t *p_per);
 
@@ -86,9 +86,17 @@ void pkt_interpret(per_t *p_per) {
                     break;
 
                 case PKT_TYPE_SNSR_CMD_REQ: //TODO2 : SEND COMMAND TO SNSR
-//									rxp->header.target.node;
-//								  getSensor_Channel(rxp->header.target.sensor);
-								
+								  if(getSensor_Channel(rxp->header.target.sensor) != Sensor_None){
+										flagCommand_Sensor.pin = rxp->header.target.sensor;
+										strcpy(flagCommand_Sensor.bufferData, rxp->data.p_data);
+										pkt_build(PKT_TYPE_SNSR_CMD_RES, 0, rxp->header.target.sensor); //Maybe order might be changed.
+										
+										nrf_delay_ms(100);
+										flagCommand_Sensor.flag = true;
+										
+										}else{ //TODO: IF Sensor No exists, return error packet.
+										
+									}						
                     break;
 
                 case PKT_TYPE_NET_UPDATE_REQ:
@@ -100,6 +108,7 @@ void pkt_interpret(per_t *p_per) {
 
                     LOG_D("Network ID UPDATED!\r\n");
                     pkt_build(PKT_TYPE_NET_UPDATE_RES, 0, 0);
+										APP.net.established = true;
                     break;
 
                 case PKT_TYPE_NODE_STAT_REQ: // TODO2 : NOT IMPLEMENTED
