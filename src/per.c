@@ -89,13 +89,9 @@ void pkt_interpret(per_t *p_per) {
 								  if(getSensor_Channel(rxp->header.target.sensor) != Sensor_None){
 										flagCommand_Sensor.pin = rxp->header.target.sensor;
 										strcpy(flagCommand_Sensor.bufferData, rxp->data.p_data);
-										pkt_build(PKT_TYPE_SNSR_CMD_RES, 0, rxp->header.target.sensor); //Maybe order might be changed.
-										
-										nrf_delay_ms(100);
 										flagCommand_Sensor.flag = true;
-										
-										}else{ //TODO: IF Sensor No exists, return error packet.
-										
+										}else{ 
+											//TODO: IF Sensor No exists, return error packet.
 									}						
                     break;
 

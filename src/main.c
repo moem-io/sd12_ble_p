@@ -1263,6 +1263,10 @@ int main(void) {
 					
 					Send_Packet_Polling(Command, getSensor_Channel(flagCommand_Sensor.pin), flagCommand_Sensor.pin, flagCommand_Sensor.bufferData);
 					flagCommand_Sensor.flag = false;
+					
+					nrf_delay_ms(100); //TODO: Mabye Conflict with FSM															
+					pkt_build(PKT_TYPE_SNSR_CMD_RES, 0, flagCommand_Sensor.pin);
+					nrf_delay_ms(100);
 				}
         
         pkt_send(&m_cen_s);
