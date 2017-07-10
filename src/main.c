@@ -1072,7 +1072,8 @@ int main(void) {
     conn_params_init();
 
     nrf_delay_ms(300);
-
+		
+		APP.net.established=true;
     advertising_start();
     APP_ERROR_CHECK(err_code);
    
@@ -1156,7 +1157,8 @@ int main(void) {
 							#endif
 								
 							#if defined(TEST_LED) | defined(TEST_BUZZER) | defined(TEST_IR) | defined(TEST_TH) 
-								Send_Packet_Polling(Command, 'R', ID4, data);
+								Send_Packet_Polling(Command, 'R', ID1, data);
+								
 							#else
 								//  TODO : Do it Reset
 								if(callBackButton.count == 2){

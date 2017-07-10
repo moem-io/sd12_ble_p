@@ -107,23 +107,7 @@ Packet_Status makePacket(char mode, uint8_t sensor, uint8_t pin, char *data) {
     if (mode == Set_Address) {
         transmitPacket.id = pin;
     } else {
-        switch (pin) {
-            case ID1:
-                transmitPacket.id = 'A';
-                break;
-            case ID2:
-                transmitPacket.id = 'B';
-                break;
-            case ID3:
-                transmitPacket.id = 'C';
-                break;
-            case ID4:
-                transmitPacket.id = 'D';
-                break;
-            case ID5:
-                transmitPacket.id = 'E';
-                break;
-        }
+			transmitPacket.id = pin + 'A';
     }
 
 
