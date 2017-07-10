@@ -1073,7 +1073,6 @@ int main(void) {
 
     nrf_delay_ms(300);
 		
-		APP.net.established=true;
     advertising_start();
     APP_ERROR_CHECK(err_code);
    
